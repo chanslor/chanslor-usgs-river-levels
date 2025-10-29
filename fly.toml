@@ -1,0 +1,32 @@
+# fly.toml app configuration file for USGS River Monitoring
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+
+app = 'docker-blue-sound-1751'
+primary_region = 'iad'
+
+[build]
+  dockerfile = "Containerfile.cloud"
+
+[env]
+  RUN_INTERVAL_SEC = "600"
+  NWS_UA = "mdchansl-usgs-alert/1.0"
+  QPF_TTL_HOURS = "3"
+  QPF_CACHE = "/data/qpf_cache.sqlite"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+# Persistent storage for SQLite databases and generated site files
+[mounts]
+  source = "usgs_data"
+  destination = "/data"
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
