@@ -1,0 +1,132 @@
+*** a/usgs_multi_alert.py
+--- b/usgs_multi_alert.py
+@@
+-import json, os, sys, time
++import json, os, sys, time
++from datetime import datetime, timedelta
++from dateutil.tz import gettz
++
++# QPF support
++try:
++    from qpf import QPFClient
++except Exception:
++    QPFClient = None
+@@
+-def compute_trend(series_ft, series_cfs, window_hours=8):
+-    """
+-    Existing behavior (feet only or whatever you had).
+-    """
+-    ...
++def compute_trend(series_ft, series_cfs, window_hours=8):
++    """
++    Compute trend as rate per hour. Prefer feet; if not available,
++    fall back to CFS so we never show 'unknown' when flow exists.
++    Returns: (rate, units) where units is "ft/hr" or "cfs/hr", or (0.0, None) if not enough data.
++    """
++    # Pick which series to use
++    if series_ft and len(series_ft) >= 2:
++        use = series_ft
++        units = "ft/hr"
++    elif series_cfs and len(series_cfs) >= 2:
++        use = series_cfs
++        units = "cfs/hr"
++    else:
++        return 0.0, None
++
++    # Limit to window_hours (assume tuples/lists of (ts, value) with ts as epoch or iso)
++    now_ts = use[-1][0]
++    if isinstance(now_ts, str):
++        now_ts = datetime.fromisoformat(now_ts.replace("Z", "+00:00")).timestamp()
++    cutoff = now_ts - window_hours * 3600
++    window = [p for p in use if (p[0] if isinstance(p[0], (int,float)) else datetime.fromisoformat(p[0].replace("Z","+00:00")).timestamp()) >= cutoff]
++    if len(window) < 2:
++        window = use[-2:]  # at least last two points
++
++    t0, v0 = window[0]
++    t1, v1 = window[-1]
++    if isinstance(t0, str): t0 = datetime.fromisoformat(t0.replace("Z","+00:00")).timestamp()
++    if isinstance(t1, str): t1 = datetime.fromisoformat(t1.replace("Z","+00:00")).timestamp()
++    dt_hr = max((t1 - t0) / 3600.0, 1e-6)
++    rate = (v1 - v0) / dt_hr
++    return rate, units
+@@
+-def format_site_row(site_cfg, series_ft, series_cfs, thresholds, trend_window_hr):
+-    row = {
+-        "name": site_cfg["name"],
+-        "subtitle": site_cfg.get("subtitle", site_cfg.get("site")),
+-        ...
+-    }
+-    # existing trend logic...
+-    rate_ft_hr, units = compute_trend(series_ft, series_cfs, trend_window_hr)
+-    if units:
+-        row["trend_rate"] = rate_ft_hr
+-        row["trend_units"] = units
+-    else:
+-        row["trend_units"] = "unknown"
+-    return row
++def format_site_row(site_cfg, series_ft, series_cfs, thresholds, trend_window_hr,
++                    qpf_client=None, qpf_tz="America/Chicago"):
++    row = {
++        "name": site_cfg["name"],
++        "subtitle": site_cfg.get("subtitle", site_cfg.get("site")),
++        # ... keep your other fields as they were ...
++    }
++
++    # Trend (feet preferred, else cfs)
++    rate, units = compute_trend(series_ft, series_cfs, trend_window_hr)
++    if units:
++        row["trend_rate"] = rate
++        row["trend_units"] = units
++    else:
++        row["trend_units"] = "unknown"
++
++    # QPF (append under the river name)
++    if qpf_client and "lat" in site_cfg and "lon" in site_cfg:
++        try:
++            totals = qpf_client.get_qpf_by_day(site_cfg["lat"], site_cfg["lon"], days=3, local_tz=qpf_tz)
++            tz = gettz(qpf_tz)
++            today = datetime.now(tz).date()
++            labels = []
++            for i, label in enumerate(("Today", "Tomorrow", "Day 3")):
++                key = (today + timedelta(days=i)).isoformat()
++                amt = totals.get(key, 0.0)
++                labels.append(f"{label} {amt:.2f}\"")
++            qpf_text = "Rain: " + ", ".join(labels)
++            # Show under name
++            row["subtitle"] = f"{row['subtitle']} · {qpf_text}"
++            # And expose in JSON if you emit it
++            row["qpf"] = {"today": labels[0], "tomorrow": labels[1], "day3": labels[2], "inches_by_date": totals}
++        except Exception as e:
++            row["qpf_error"] = f"{e.__class__.__name__}"
++    return row
+@@
+-def main():
+-    cfg = load_config(...)
+-    # existing setup...
+-    for site in cfg["sites"]:
+-        row = format_site_row(site, series_ft, series_cfs, thresholds, trend_window_hr)
+-        rows.append(row)
++def main():
++    cfg = load_config(...)
++    # QPF wiring
++    qpf_client = None
++    qpf_tz = "America/Chicago"
++    qpf_cfg = cfg.get("qpf", {})
++    if qpf_cfg.get("enabled", False) and QPFClient is not None:
++        ua = os.environ.get("NWS_UA", "usgs-alert/1.0")
++        email = os.environ.get("NWS_CONTACT", "you@example.com")
++        ttl = int(os.environ.get("QPF_TTL_HOURS", str(qpf_cfg.get("ttl_hours", 3))))
++        qpf_tz = qpf_cfg.get("timezone", qpf_tz)
++        try:
++            qpf_client = QPFClient(user_agent=ua, contact_email=email, ttl_hours=ttl)
++        except Exception as e:
++            print(f"[WARN] QPF disabled ({e})", file=sys.stderr)
++            qpf_client = None
++
++    # ... your existing loop and data fetch ...
++    for site in cfg["sites"]:
++        # fetch series_ft / series_cfs for this site as before
++        row = format_site_row(site, series_ft, series_cfs, thresholds, trend_window_hr,
++                              qpf_client=qpf_client, qpf_tz=qpf_tz)
++        rows.append(row)
+

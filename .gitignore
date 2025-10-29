@@ -1,0 +1,29 @@
+# Sensitive configuration with credentials
+gauges.conf.json
+
+# SQLite databases with state data
+usgs-data/
+*.sqlite
+*.sqlite-*
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Generated site files
+usgs-site/
+
+# Backup files
+*.BACKUP
+*.b4
+*.b4-patch
+*.claude-fix
+backups/
+
+# Environment files
+.env
+.env.local
+.env_creds
+.readme

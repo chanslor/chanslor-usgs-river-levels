@@ -1,0 +1,68 @@
+{
+  "smtp": {
+    "server": "smtp.gmail.com",
+    "port": 465,
+    "user": "YOUR_EMAIL@gmail.com",
+    "pass": "YOUR_APP_PASSWORD_HERE",
+    "to":   "YOUR_EMAIL@gmail.com",
+    "from": null
+  },
+
+  "sites": [
+    {
+      "site": "02455000",
+      "name": "Locust Fork @ US 231 (USGS 02455000)",
+      "include_discharge": true,
+      "min_ft": 1.70,
+      "min_cfs": null
+    },
+    {
+      "site": "03572900",
+      "name": "Town Creek near Geraldine (USGS 03572900)",
+      "include_discharge": true,
+      "min_ft": 2.00,
+      "min_cfs": null
+    },
+    {
+      "site": "03572690",
+      "name": "South Sauty (USGS 03572690)",
+      "include_discharge": true,
+      "min_ft": 8.34,
+      "min_cfs": null
+    },
+    {
+      "site": "03518500",
+      "name": "Tellico River at Tellico Plains, TN (USGS 03518500)",
+      "include_discharge": true,
+      "min_ft": 1.40,
+      "min_cfs": null
+    },
+    {
+      "site": "02399200",
+      "name": "Little River near Blue Pond, AL (USGS 02399200)",
+      "include_discharge": true,
+      "min_ft": null,
+      "min_cfs": 300
+    }
+  ],
+
+  "defaults": {
+    "min_ft": null,
+    "min_cfs": null
+  },
+
+  "cooldown_hours": 6,
+  "notify": {
+    "mode": "rising",
+    "send_out": true,
+    "out_cooldown_hours": 2
+  },
+
+  "percent_change_alert": {
+    "enabled": true,
+    "threshold_percent": 20,
+    "cooldown_hours": 2
+  },
+
+  "state_db": "/data/state.sqlite"
+}
