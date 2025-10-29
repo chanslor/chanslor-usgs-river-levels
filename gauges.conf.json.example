@@ -4,7 +4,11 @@
     "port": 465,
     "user": "YOUR_EMAIL@gmail.com",
     "pass": "YOUR_APP_PASSWORD_HERE",
-    "to":   "YOUR_EMAIL@gmail.com",
+    "to": [
+      "YOUR_EMAIL@gmail.com",
+      "friend1@example.com",
+      "friend2@example.com"
+    ],
     "from": null
   },
 
@@ -14,7 +18,9 @@
       "name": "Locust Fork @ US 231 (USGS 02455000)",
       "include_discharge": true,
       "min_ft": 1.70,
-      "min_cfs": null
+      "min_cfs": null,
+      "lat": 33.9803,
+      "lon": -86.5686
     },
     {
       "site": "03572900",
