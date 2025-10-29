@@ -16,6 +16,13 @@ from urllib.error import URLError, HTTPError
 import urllib.parse as up
 from html import escape as h
 
+# Import QPF client for rainfall forecasts
+try:
+    from qpf import QPFClient
+    QPF_AVAILABLE = True
+except ImportError:
+    QPF_AVAILABLE = False
+
 USGS_IV = "https://waterservices.usgs.gov/nwis/iv/"
 
 # ---------------- Utilities ----------------
@@ -193,15 +200,28 @@ def fetch_trend_label(site: str, hours: int):
 # ---------------- Email ----------------
 def send_email(smtp: dict, subject: str, body: str):
     msg = MIMEText(body)
-    from_addr = smtp.get("from") or smtp.get("user") or smtp["to"]
+
+    # Handle both single email and list of emails for recipients
+    to_addrs = smtp["to"]
+    if isinstance(to_addrs, str):
+        to_addrs = [to_addrs]
+    elif not isinstance(to_addrs, list):
+        to_addrs = [str(to_addrs)]
+
+    # From address fallback logic
+    from_addr = smtp.get("from") or smtp.get("user")
+    if not from_addr:
+        from_addr = to_addrs[0] if to_addrs else "noreply@example.com"
+
     msg["Subject"] = subject
     msg["From"] = from_addr
-    msg["To"] = smtp["to"]
+    msg["To"] = ", ".join(to_addrs)  # Comma-separated list for header
+
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL(smtp["server"], int(smtp.get("port", 465)), context=context) as server:
         if smtp.get("user") and smtp.get("pass"):
             server.login(smtp["user"], smtp["pass"])
-        server.send_message(msg)
+        server.send_message(msg, from_addr=from_addr, to_addrs=to_addrs)
 
 # ---------------- HTML render ----------------
 def format_timestamp(iso_str: str) -> str:
@@ -242,11 +262,30 @@ def render_static_html(generated_at_iso: str, rows: list):
             except Exception:
                 pass
 
+        # Format QPF (rainfall forecast) if available
+        qpf_line = ""
+        qpf_data = r.get("qpf")
+        if qpf_data and isinstance(qpf_data, dict):
+            sorted_dates = sorted(qpf_data.keys())
+            qpf_parts = []
+            labels = ["Today", "Tomorrow", "Day 3"]
+            for i, date_key in enumerate(sorted_dates[:3]):
+                label = labels[i] if i < len(labels) else f"Day {i+1}"
+                inches = qpf_data[date_key]
+                # Highlight significant rainfall (> 0.5") with blue text and rain emoji
+                if inches > 0.5:
+                    qpf_parts.append(f'<span class="rain-alert">{label}: {inches:.2f}" 🌧️</span>')
+                else:
+                    qpf_parts.append(f"{label}: {inches:.2f}\"")
+            if qpf_parts:
+                qpf_line = f'<div class="sub qpf">QPF {" · ".join(qpf_parts)}</div>'
+
         return f"""
         <tr class="{cls}">
           <td>
             <div class="river">{h(r.get('name') or r.get('site') or '')}</div>
             <div class="sub">{sub}</div>
+            {qpf_line}
           </td>
           <td class="num">{("" if r.get('cfs') is None else f"{int(round(r['cfs'])):,}")}</td>
           <td class="num">{("" if r.get('stage_ft') is None else f"{r['stage_ft']:.2f}")}</td>
@@ -265,14 +304,15 @@ def render_static_html(generated_at_iso: str, rows: list):
   h1 {{ margin:0 0 4px; font-size:22px; }} .muted{{color:#555;font-size:13px}}
   table {{ width:100%; border-collapse:collapse; margin-top:8px; }}
   thead td {{ font-weight:600; font-size:13px; padding:8px; border-bottom:1px solid #ddd; }}
-  tbody tr td {{ padding:10px; vertical-align:middle; }}
+  tbody tr td {{ padding:10px 6px; vertical-align:middle; }}
   tbody tr.in {{ background: var(--green); }}
   tbody tr.out {{ background: #f6f7f9; }}
-  .river {{ font-weight:600; }} .sub{{font-size:12px;color:#444}}
+  .river {{ font-weight:600; }} .sub{{font-size:14px;color:#444}}
   .num {{ text-align:right; white-space:nowrap; }}
   a {{ color: inherit; text-decoration: none; border-bottom: 1px dashed #aaa; }}
   a:hover {{ border-bottom-color: #333; }}
   .foot {{ margin-top:16px; font-size:12px; color:#666; }}
+  .rain-alert {{ color:#1e90ff; font-weight:600; }}
 </style>
 </head><body>
 <div class="wrap">
@@ -306,7 +346,15 @@ def main():
     smtp = cfg["smtp"].copy()
     smtp["user"] = os.environ.get("SMTP_USER", smtp.get("user"))
     smtp["pass"] = os.environ.get("SMTP_PASS", smtp.get("pass"))
-    smtp["to"] = os.environ.get("SMTP_TO", smtp.get("to"))
+
+    # Handle SMTP_TO as either single email or comma-separated list
+    smtp_to_env = os.environ.get("SMTP_TO")
+    if smtp_to_env:
+        # Split by comma if multiple emails provided via env var
+        smtp["to"] = [email.strip() for email in smtp_to_env.split(",")]
+    elif "to" not in smtp or smtp["to"] is None:
+        smtp["to"] = []
+
     smtp["from"] = os.environ.get("SMTP_FROM", smtp.get("from"))
 
     sites_cfg = cfg["sites"]
@@ -328,6 +376,19 @@ def main():
     pct_change_threshold = float(pct_change_cfg.get("threshold_percent", 20))
     pct_change_cooldown_hours = int(pct_change_cfg.get("cooldown_hours", 2))
     pct_change_cooldown_sec = pct_change_cooldown_hours * 3600
+
+    # Initialize QPF client for rainfall forecasts
+    qpf_client = None
+    if QPF_AVAILABLE:
+        nws_ua = os.environ.get("NWS_UA", "usgs-alert/1.0")
+        nws_contact = os.environ.get("NWS_CONTACT", smtp.get("user", "you@example.com"))
+        qpf_cache = os.environ.get("QPF_CACHE", "/data/qpf_cache.sqlite")
+        qpf_ttl_hours = int(os.environ.get("QPF_TTL_HOURS", "3"))
+        try:
+            qpf_client = QPFClient(user_agent=nws_ua, contact_email=nws_contact, cache_path=qpf_cache, ttl_hours=qpf_ttl_hours)
+        except Exception as e:
+            if not args.quiet:
+                print(f"[WARN] QPF client initialization failed: {e}")
 
     state_db = cfg.get("state_db"); state_file_legacy = cfg.get("state_file")
 
@@ -401,6 +462,16 @@ def main():
             print(f"[INFO] {name}: {stage if stage is not None else 'NA'} ft{cfs_part} @ {ts_iso} (mins: {thresh_str}) -> {'IN' if in_range else 'OUT'}")
 
         trend_label = fetch_trend_label(site, args.trend_hours) if (args.trend_hours and (args.dump_json or args.dump_html)) else None
+
+        # Fetch QPF (rainfall forecast) if available
+        qpf_data = None
+        if qpf_client and entry.get("lat") and entry.get("lon"):
+            try:
+                qpf_data = qpf_client.get_qpf_by_day(entry["lat"], entry["lon"], days=3)
+            except Exception as e:
+                if not args.quiet:
+                    print(f"[WARN] QPF fetch failed for {site}: {e}")
+
         feed_rows.append({
             "site": site,
             "name": name,
@@ -411,6 +482,7 @@ def main():
             "threshold_cfs": th_cfs,
             "in_range": in_range,
             "trend_8h": trend_label if args.trend_hours else None,
+            "qpf": qpf_data,
             "waterdata_url": f"https://waterdata.usgs.gov/monitoring-location/{site}/#parameterCode=00065&period=P7D"
         })
 
