@@ -303,7 +303,7 @@ def render_static_html(generated_at_iso: str, rows: list):
   .wrap {{ max-width: 1000px; margin: 0 auto; padding: 16px; }}
   h1 {{ margin:0 0 4px; font-size:22px; }} .muted{{color:#555;font-size:13px}}
   table {{ width:100%; border-collapse:collapse; margin-top:8px; }}
-  thead td {{ font-weight:600; font-size:13px; padding:8px; border-bottom:1px solid #ddd; }}
+  thead td {{ font-weight:600; font-size:16px; padding:8px; border-bottom:1px solid #ddd; }}
   tbody tr td {{ padding:10px 6px; vertical-align:middle; }}
   tbody tr.in {{ background: var(--green); }}
   tbody tr.out {{ background: #f6f7f9; }}
@@ -321,7 +321,7 @@ def render_static_html(generated_at_iso: str, rows: list):
     <div class="muted">Updated: {h(format_timestamp(generated_at_iso))}</div>
   </div>
   <table>
-    <thead><tr><td>River</td><td class="num">Cfs</td><td class="num">Feet</td><td class="num">Updated</td></tr></thead>
+    <thead><tr><td>River</td><td class="num">CFS</td><td class="num">Feet</td><td class="num">Updated</td></tr></thead>
     <tbody>{trs}</tbody>
   </table>
   <div class="foot">Green = meets all thresholds • Red = below at least one threshold</div>
