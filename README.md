@@ -261,7 +261,7 @@ Changelog discipline: keep a CHANGELOG.md; tag message should summarize user-vis
 
 # Current working version 10-29-2025
 <p align="center">
- <img src="./working.10-29-2025.png"
+ <img src="./claude-update-1pm-10-20-25.png"
 </p>
 
 
