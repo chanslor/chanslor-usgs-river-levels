@@ -389,7 +389,7 @@ def render_static_html(generated_at_iso: str, rows: list):
 </head><body>
 <div class="wrap">
   <div style="display:flex;justify-content:space-between;align-items:flex-end;">
-    <div><h1>Southeast Rivers (Live)</h1><div class="muted">Auto-updated from USGS IV</div></div>
+    <div><h1>Southeast Rivers</h1><div class="muted">Auto-updated from USGS IV</div></div>
     <div class="muted">Updated: {h(format_timestamp(generated_at_iso))}</div>
   </div>
   <table>
