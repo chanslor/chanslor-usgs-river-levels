@@ -302,7 +302,7 @@ def render_static_html(generated_at_iso: str, rows: list):
             <div class="sub">{sub}</div>
             {qpf_line}
           </td>
-          <td class="num">{("" if r.get('cfs') is None else f"{int(round(r['cfs'])):,}")}</td>
+          <td class="center">{("" if r.get('cfs') is None else f"{int(round(r['cfs'])):,}")}</td>
           <td class="num">{("" if r.get('stage_ft') is None else f"{r['stage_ft']:.2f}")}</td>
           <td class="num timestamp-cell"><a href="{h(r.get('waterdata_url') or '#')}">{format_timestamp_stacked(r.get('ts_iso') or '')}{stale_indicator}</a></td>
         </tr>"""
@@ -393,7 +393,7 @@ def render_static_html(generated_at_iso: str, rows: list):
     <div class="muted">Updated: {h(format_timestamp(generated_at_iso))}</div>
   </div>
   <table>
-    <thead><tr><td>River</td><td class="num">CFS</td><td class="num">Feet</td><td class="center">Updated</td></tr></thead>
+    <thead><tr><td>River</td><td class="center">CFS</td><td class="num">Feet</td><td class="center">Updated</td></tr></thead>
     <tbody>{trs}</tbody>
   </table>
   <div class="foot">Green = meets all thresholds • Red = below at least one threshold</div>
