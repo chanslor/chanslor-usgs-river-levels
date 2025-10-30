@@ -237,6 +237,20 @@ def format_timestamp(iso_str: str) -> str:
         # If parsing fails, return original
         return iso_str
 
+def format_timestamp_stacked(iso_str: str) -> str:
+    """Convert ISO timestamp to stacked HTML format (time on top, date below)"""
+    if not iso_str:
+        return ""
+    try:
+        # Parse ISO 8601 format (e.g., "2025-10-29T10:29:00-05:00")
+        dt = datetime.fromisoformat(iso_str.replace('Z', '+00:00'))
+        time_str = dt.strftime("%-I:%M%p")
+        date_str = dt.strftime("%m-%d-%Y")
+        return f'<div class="time">{time_str}</div><div class="date">{date_str}</div>'
+    except Exception:
+        # If parsing fails, return original
+        return iso_str
+
 def render_static_html(generated_at_iso: str, rows: list):
     def row_html(r):
         trend = r.get("trend_8h")
@@ -244,9 +258,10 @@ def render_static_html(generated_at_iso: str, rows: list):
         thbits = []
         if isinstance(r.get("threshold_ft"), (int,float)): thbits.append(f"≥ {r['threshold_ft']:.2f} ft")
         if isinstance(r.get("threshold_cfs"), (int,float)): thbits.append(f"≥ {int(r['threshold_cfs'])} cfs")
-        sub = f"USGS {h(r.get('site') or '')}"
-        if thbits: sub += " • " + ", ".join(thbits)
-        if trend:  sub += f" • {trend_icon} {trend}"
+        sub_parts = []
+        if thbits: sub_parts.extend(thbits)
+        if trend: sub_parts.append(f"{trend_icon} {trend}")
+        sub = " • ".join(sub_parts)
         cls = "in" if r.get("in_range") else "out"
 
         # Check if data is stale (> 1 hour old)
@@ -289,7 +304,7 @@ def render_static_html(generated_at_iso: str, rows: list):
           </td>
           <td class="num">{("" if r.get('cfs') is None else f"{int(round(r['cfs'])):,}")}</td>
           <td class="num">{("" if r.get('stage_ft') is None else f"{r['stage_ft']:.2f}")}</td>
-          <td class="num"><a href="{h(r.get('waterdata_url') or '#')}">{h(format_timestamp(r.get('ts_iso') or ''))}{stale_indicator}</a></td>
+          <td class="num timestamp-cell"><a href="{h(r.get('waterdata_url') or '#')}">{format_timestamp_stacked(r.get('ts_iso') or '')}{stale_indicator}</a></td>
         </tr>"""
     rows_sorted = sorted(rows, key=lambda r: (not r.get("in_range", False), (r.get("name") or r.get("site") or "")))
     trs = "\n".join(row_html(r) for r in rows_sorted)
@@ -309,10 +324,66 @@ def render_static_html(generated_at_iso: str, rows: list):
   tbody tr.out {{ background: #f6f7f9; }}
   .river {{ font-weight:600; }} .sub{{font-size:14px;color:#444}}
   .num {{ text-align:right; white-space:nowrap; }}
+
+  /* Stacked timestamp styling */
+  .timestamp-cell {{ line-height: 1.3; text-align: center; }}
+  .time {{ font-weight: 600; font-size: 14px; }}
+  .date {{ font-size: 12px; color: #666; }}
+
+  /* Column separation */
+  tbody tr td {{ border-left: 1px solid rgba(0,0,0,0.08); }}
+  tbody tr td:first-child {{ border-left: none; }}
+
   a {{ color: inherit; text-decoration: none; border-bottom: 1px dashed #aaa; }}
   a:hover {{ border-bottom-color: #333; }}
   .foot {{ margin-top:16px; font-size:12px; color:#666; }}
   .rain-alert {{ color:#1e90ff; font-weight:600; }}
+
+  /* Mobile optimizations */
+  @media (max-width: 768px) {{
+    .wrap {{ padding: 12px; }}
+    h1 {{ font-size: 20px; }}
+    .muted {{ font-size: 12px; }}
+
+    /* Stack header on mobile */
+    .wrap > div:first-of-type {{ flex-direction: column !important; align-items: flex-start !important; gap: 8px; }}
+
+    /* Make table more compact */
+    thead td {{ font-size: 14px; padding: 6px 4px; }}
+    tbody tr td {{ padding: 8px 4px; font-size: 14px; }}
+    .river {{ font-size: 15px; }}
+    .sub {{ font-size: 13px; }}
+    .qpf {{ font-size: 12px; }}
+
+    /* Adjust number columns to take less space */
+    .num {{ font-size: 14px; }}
+
+    /* Stacked timestamp on mobile */
+    .time {{ font-size: 13px; }}
+    .date {{ font-size: 11px; }}
+
+    /* Make links more touch-friendly */
+    a {{ padding: 4px 0; display: inline-block; }}
+
+    /* Better wrapping for long names */
+    .river, .sub {{ word-wrap: break-word; }}
+
+    .foot {{ font-size: 11px; margin-top: 12px; }}
+  }}
+
+  /* Extra small phones */
+  @media (max-width: 400px) {{
+    h1 {{ font-size: 18px; }}
+    thead td {{ font-size: 13px; padding: 6px 2px; }}
+    tbody tr td {{ padding: 8px 2px; font-size: 13px; }}
+    .river {{ font-size: 14px; }}
+    .sub, .qpf {{ font-size: 12px; }}
+    .num {{ font-size: 13px; }}
+
+    /* Even smaller stacked timestamp */
+    .time {{ font-size: 12px; }}
+    .date {{ font-size: 10px; }}
+  }}
 </style>
 </head><body>
 <div class="wrap">
