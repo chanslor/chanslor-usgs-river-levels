@@ -324,6 +324,7 @@ def render_static_html(generated_at_iso: str, rows: list):
   tbody tr.out {{ background: #f6f7f9; }}
   .river {{ font-weight:600; }} .sub{{font-size:14px;color:#444}}
   .num {{ text-align:right; white-space:nowrap; }}
+  .center {{ text-align:center; white-space:nowrap; }}
 
   /* Stacked timestamp styling */
   .timestamp-cell {{ line-height: 1.3; text-align: center; }}
@@ -392,7 +393,7 @@ def render_static_html(generated_at_iso: str, rows: list):
     <div class="muted">Updated: {h(format_timestamp(generated_at_iso))}</div>
   </div>
   <table>
-    <thead><tr><td>River</td><td class="num">CFS</td><td class="num">Feet</td><td class="num">Updated</td></tr></thead>
+    <thead><tr><td>River</td><td class="num">CFS</td><td class="num">Feet</td><td class="center">Updated</td></tr></thead>
     <tbody>{trs}</tbody>
   </table>
   <div class="foot">Green = meets all thresholds • Red = below at least one threshold</div>
