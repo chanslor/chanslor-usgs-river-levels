@@ -9,7 +9,7 @@
   "sites": [
     {
       "site": "02455000",
-      "name": "Locust Fork @ US 231 (USGS 02455000)",
+      "name": "Locust Fork",
       "include_discharge": true,
       "min_ft": 1.70,
       "min_cfs": null,
@@ -18,7 +18,7 @@
     },
     {
       "site": "03572900",
-      "name": "Town Creek near Geraldine (USGS 03572900)",
+      "name": "Town Creek",
       "include_discharge": true,
       "min_ft": 2.00,
       "min_cfs": null,
@@ -27,7 +27,7 @@
     },
     {
       "site": "03572690",
-      "name": "South Sauty (USGS 03572690)",
+      "name": "South Sauty",
       "include_discharge": true,
       "min_ft": 8.34,
       "min_cfs": null,
@@ -36,7 +36,7 @@
     },
     {
       "site": "03518500",
-      "name": "Tellico River at Tellico Plains, TN (USGS 03518500)",
+      "name": "Tellico River",
       "include_discharge": true,
       "min_ft": 1.40,
       "min_cfs": null,
@@ -45,7 +45,7 @@
     },
     {
       "site": "02399200",
-      "name": "Little River near Blue Pond, AL (USGS 02399200)",
+      "name": "Little River Canyon",
       "include_discharge": true,
       "min_ft": null,
       "min_cfs": 300,
