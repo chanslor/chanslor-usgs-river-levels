@@ -197,6 +197,92 @@ def fetch_trend_label(site: str, hours: int):
     except Exception:
         return None
 
+def fetch_trend_data(site: str, hours: int):
+    """Fetch historical data points for sparkline visualization"""
+    if hours <= 0:
+        return None
+    site_id = normalize_site_id(site)
+    period = f"PT{int(hours)}H"
+    url = f"{USGS_IV}?{up.urlencode({'sites': site_id, 'parameterCd': '00065', 'format': 'json', 'period': period})}"
+    try:
+        data = _get(url)
+        series = None
+        for ts in data["value"]["timeSeries"]:
+            if ts["variable"]["variableCode"][0]["value"] == "00065":
+                series = ts["values"][0]["value"]
+                break
+        if not series or len(series) < 2:
+            return None
+
+        # Extract values, filtering out None/empty
+        values = []
+        for point in series:
+            if point["value"] not in ("", None):
+                values.append(float(point["value"]))
+
+        if len(values) < 2:
+            return None
+
+        # Determine if rising or falling
+        delta = values[-1] - values[0]
+        eps = 0.02
+        if delta > eps:
+            direction = "rising"
+        elif delta < -eps:
+            direction = "falling"
+        else:
+            direction = "steady"
+
+        # Sample down to ~12 bars for display (take evenly spaced samples)
+        target_bars = 12
+        if len(values) > target_bars:
+            step = len(values) // target_bars
+            sampled = [values[i] for i in range(0, len(values), step)][:target_bars]
+        else:
+            sampled = values
+
+        return {
+            "values": sampled,
+            "direction": direction
+        }
+    except Exception:
+        return None
+
+def generate_sparkline_html(trend_data):
+    """Generate CSS bar chart sparkline HTML with individual bar colors"""
+    if not trend_data or not trend_data.get("values"):
+        return '<div class="sparkline-empty">—</div>'
+
+    values = trend_data["values"]
+
+    # Normalize values to 0-100 scale for bar heights
+    min_val = min(values)
+    max_val = max(values)
+    range_val = max_val - min_val if max_val > min_val else 1
+
+    # Generate bar divs with individual colors based on change from previous bar
+    bars = []
+    for i, v in enumerate(values):
+        height = int(((v - min_val) / range_val) * 100)
+
+        # Color each bar based on whether it's higher or lower than previous
+        if i == 0:
+            # First bar is gray (no previous to compare)
+            color_class = "sparkline-steady"
+        elif v > values[i-1]:
+            # Rising from previous bar = green
+            color_class = "sparkline-rising"
+        elif v < values[i-1]:
+            # Falling from previous bar = red
+            color_class = "sparkline-falling"
+        else:
+            # Same as previous = gray
+            color_class = "sparkline-steady"
+
+        bars.append(f'<div class="sparkline-bar {color_class}" style="height:{height}%"></div>')
+
+    return f'<div class="sparkline">{"".join(bars)}</div>'
+
 # ---------------- Email ----------------
 def send_email(smtp: dict, subject: str, body: str):
     msg = MIMEText(body)
@@ -295,13 +381,21 @@ def render_static_html(generated_at_iso: str, rows: list):
             if qpf_parts:
                 qpf_line = f'<div class="sub qpf">QPF {" · ".join(qpf_parts)}</div>'
 
+        # Generate sparkline for trend
+        sparkline_html = generate_sparkline_html(r.get("trend_data"))
+
+        # Build USGS site URL
+        site_id = r.get('site', '')
+        usgs_url = f"https://waterdata.usgs.gov/nwis/uv?site_no={site_id}&legacy=1" if site_id else "#"
+
         return f"""
         <tr class="{cls}">
           <td>
-            <div class="river">{h(r.get('name') or r.get('site') or '')}</div>
+            <div class="river"><a href="{usgs_url}" target="_blank" rel="noopener">{h(r.get('name') or r.get('site') or '')}</a></div>
             <div class="sub">{sub}</div>
             {qpf_line}
           </td>
+          <td class="sparkline-cell">{sparkline_html}</td>
           <td class="center">{("" if r.get('cfs') is None else f"{int(round(r['cfs'])):,}")}</td>
           <td class="num">{("" if r.get('stage_ft') is None else f"{r['stage_ft']:.2f}")}</td>
           <td class="num timestamp-cell"><a href="{h(r.get('waterdata_url') or '#')}">{format_timestamp_stacked(r.get('ts_iso') or '')}{stale_indicator}</a></td>
@@ -322,7 +416,10 @@ def render_static_html(generated_at_iso: str, rows: list):
   tbody tr td {{ padding:10px 6px; vertical-align:middle; }}
   tbody tr.in {{ background: var(--green); }}
   tbody tr.out {{ background: #f6f7f9; }}
-  .river {{ font-weight:600; }} .sub{{font-size:14px;color:#444}}
+  .river {{ font-weight:600; }}
+  .river a {{ color: #1a73e8; border-bottom: 1px solid #1a73e8; }}
+  .river a:hover {{ color: #0d47a1; border-bottom-color: #0d47a1; }}
+  .sub{{font-size:14px;color:#444}}
   .num {{ text-align:right; white-space:nowrap; }}
   .center {{ text-align:center; white-space:nowrap; }}
 
@@ -334,6 +431,26 @@ def render_static_html(generated_at_iso: str, rows: list):
   /* Column separation */
   tbody tr td {{ border-left: 1px solid rgba(0,0,0,0.08); }}
   tbody tr td:first-child {{ border-left: none; }}
+
+  /* Sparkline styling */
+  .sparkline-cell {{ text-align: center; padding: 10px 8px !important; }}
+  .sparkline {{
+    display: inline-flex;
+    align-items: flex-end;
+    height: 32px;
+    gap: 2px;
+    padding: 2px;
+  }}
+  .sparkline-bar {{
+    width: 4px;
+    min-height: 2px;
+    border-radius: 1px;
+    transition: opacity 0.2s;
+  }}
+  .sparkline-bar.sparkline-rising {{ background: #4ade80; }}  /* Green for rising */
+  .sparkline-bar.sparkline-falling {{ background: #ef4444; }}  /* Red for falling */
+  .sparkline-bar.sparkline-steady {{ background: #94a3b8; }}  /* Gray for steady */
+  .sparkline-empty {{ color: #94a3b8; font-size: 18px; }}
 
   a {{ color: inherit; text-decoration: none; border-bottom: 1px dashed #aaa; }}
   a:hover {{ border-bottom-color: #333; }}
@@ -363,6 +480,11 @@ def render_static_html(generated_at_iso: str, rows: list):
     .time {{ font-size: 13px; }}
     .date {{ font-size: 11px; }}
 
+    /* Smaller sparklines on mobile */
+    .sparkline {{ height: 28px; gap: 1.5px; }}
+    .sparkline-bar {{ width: 3px; }}
+    .sparkline-cell {{ padding: 8px 4px !important; }}
+
     /* Make links more touch-friendly */
     a {{ padding: 4px 0; display: inline-block; }}
 
@@ -384,6 +506,10 @@ def render_static_html(generated_at_iso: str, rows: list):
     /* Even smaller stacked timestamp */
     .time {{ font-size: 12px; }}
     .date {{ font-size: 10px; }}
+
+    /* Even smaller sparklines on tiny phones */
+    .sparkline {{ height: 24px; gap: 1px; }}
+    .sparkline-bar {{ width: 2.5px; }}
   }}
 </style>
 </head><body>
@@ -393,10 +519,12 @@ def render_static_html(generated_at_iso: str, rows: list):
     <div class="muted">Updated: {h(format_timestamp(generated_at_iso))}</div>
   </div>
   <table>
-    <thead><tr><td>River</td><td class="center">CFS</td><td class="num">Feet</td><td class="center">Updated</td></tr></thead>
+    <thead><tr><td>River</td><td class="center">12hr</td><td class="center">CFS</td><td class="num">Feet</td><td class="center">Updated</td></tr></thead>
     <tbody>{trs}</tbody>
   </table>
   <div class="foot">Green = meets all thresholds • Red = below at least one threshold</div>
+  <div class="foot" style="margin-top:8px;"><a href="http://flowpage.alabamawhitewater.com/" target="_blank" rel="noopener">Alabama Flow Page</a></div>
+  <div class="foot" style="margin-top:8px;"><a href="https://syotr.org/" target="_blank" rel="noopener">See You On The River</a></div>
 </div>
 </body></html>"""
 
@@ -535,6 +663,9 @@ def main():
 
         trend_label = fetch_trend_label(site, args.trend_hours) if (args.trend_hours and (args.dump_json or args.dump_html)) else None
 
+        # Fetch trend data for sparkline visualization (12 hours)
+        trend_data = fetch_trend_data(site, 12) if (args.dump_json or args.dump_html) else None
+
         # Fetch QPF (rainfall forecast) if available
         qpf_data = None
         if qpf_client and entry.get("lat") and entry.get("lon"):
@@ -554,6 +685,7 @@ def main():
             "threshold_cfs": th_cfs,
             "in_range": in_range,
             "trend_8h": trend_label if args.trend_hours else None,
+            "trend_data": trend_data,
             "qpf": qpf_data,
             "waterdata_url": f"https://waterdata.usgs.gov/monitoring-location/{site}/#parameterCode=00065&period=P7D"
         })
