@@ -23,6 +23,30 @@ try:
 except ImportError:
     QPF_AVAILABLE = False
 
+# Import weather observations
+try:
+    from observations import fetch_latest_observation, fmt_dir
+    OBS_AVAILABLE = True
+except ImportError:
+    OBS_AVAILABLE = False
+
+# Import site detail page generator
+try:
+    from site_detail import fetch_usgs_7day_data, generate_site_detail_html
+    SITE_DETAIL_AVAILABLE = True
+except ImportError:
+    SITE_DETAIL_AVAILABLE = False
+
+# Weather station mapping for each river site
+WEATHER_STATIONS = {
+    "Locust Fork": "KCMD",           # Cullman Regional Airport
+    "Town Creek": "KBFZ",            # Albertville Regional Airport
+    "South Sauty": "K4A9",           # Fort Payne / Isbell Field Airport
+    "Tellico River": "KMNV",         # Monroe County Airport, Madisonville TN
+    "Little River": "K4A9",          # Fort Payne / Isbell Field Airport
+    "Little River Canyon": "K4A9",   # Fort Payne / Isbell Field Airport (cloud config name)
+}
+
 USGS_IV = "https://waterservices.usgs.gov/nwis/iv/"
 
 # ---------------- Utilities ----------------
@@ -65,29 +89,40 @@ def open_state_db(db_path: str):
             last_ts_iso TEXT,
             last_cfs REAL,
             last_in INTEGER,
-            last_pct_change_epoch REAL
+            last_pct_change_epoch REAL,
+            last_in_epoch REAL,
+            last_temp_f REAL,
+            last_wind_mph REAL,
+            last_wind_dir TEXT,
+            last_wind_gust_mph REAL
         );
     """)
-    # Defensive migration if table existed without last_in or last_pct_change_epoch
+    # Defensive migration if table existed without newer columns
     cols = {row[1] for row in conn.execute("PRAGMA table_info(site_state)")}
-    if "last_in" not in cols:
-        try:
-            conn.execute("ALTER TABLE site_state ADD COLUMN last_in INTEGER;")
-            conn.commit()
-        except Exception:
-            pass
-    if "last_pct_change_epoch" not in cols:
-        try:
-            conn.execute("ALTER TABLE site_state ADD COLUMN last_pct_change_epoch REAL;")
-            conn.commit()
-        except Exception:
-            pass
+    migrations = [
+        ("last_in", "INTEGER"),
+        ("last_pct_change_epoch", "REAL"),
+        ("last_in_epoch", "REAL"),
+        ("last_temp_f", "REAL"),
+        ("last_wind_mph", "REAL"),
+        ("last_wind_dir", "TEXT"),
+        ("last_wind_gust_mph", "REAL")
+    ]
+    for col_name, col_type in migrations:
+        if col_name not in cols:
+            try:
+                conn.execute(f"ALTER TABLE site_state ADD COLUMN {col_name} {col_type};")
+                conn.commit()
+            except Exception:
+                pass
     conn.commit()
     return conn
 
 def read_site_state(conn, site: str):
     cur = conn.execute("""
-        SELECT last_alert_epoch, last_out_epoch, last_stage_ft, last_ts_iso, last_cfs, COALESCE(last_in,0), COALESCE(last_pct_change_epoch,0)
+        SELECT last_alert_epoch, last_out_epoch, last_stage_ft, last_ts_iso, last_cfs,
+               COALESCE(last_in,0), COALESCE(last_pct_change_epoch,0), COALESCE(last_in_epoch,0),
+               last_temp_f, last_wind_mph, last_wind_dir, last_wind_gust_mph
         FROM site_state WHERE site=?
     """, (site,))
     row = cur.fetchone()
@@ -100,13 +135,19 @@ def read_site_state(conn, site: str):
         "last_ts_iso":      row[3],
         "last_cfs":         row[4],
         "last_in":          bool(row[5]),
-        "last_pct_change_epoch": row[6] if row[6] is not None else 0.0
+        "last_pct_change_epoch": row[6] if row[6] is not None else 0.0,
+        "last_in_epoch":    row[7] if row[7] is not None else 0.0,
+        "last_temp_f":      row[8],
+        "last_wind_mph":    row[9],
+        "last_wind_dir":    row[10],
+        "last_wind_gust_mph": row[11]
     }
 
 def write_site_state(conn, site: str, state: dict):
     conn.execute("""
-        INSERT INTO site_state (site, last_alert_epoch, last_out_epoch, last_stage_ft, last_ts_iso, last_cfs, last_in, last_pct_change_epoch)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO site_state (site, last_alert_epoch, last_out_epoch, last_stage_ft, last_ts_iso, last_cfs, last_in, last_pct_change_epoch,
+                                last_in_epoch, last_temp_f, last_wind_mph, last_wind_dir, last_wind_gust_mph)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(site) DO UPDATE SET
             last_alert_epoch=excluded.last_alert_epoch,
             last_out_epoch=excluded.last_out_epoch,
@@ -114,7 +155,12 @@ def write_site_state(conn, site: str, state: dict):
             last_ts_iso=excluded.last_ts_iso,
             last_cfs=excluded.last_cfs,
             last_in=excluded.last_in,
-            last_pct_change_epoch=excluded.last_pct_change_epoch
+            last_pct_change_epoch=excluded.last_pct_change_epoch,
+            last_in_epoch=excluded.last_in_epoch,
+            last_temp_f=excluded.last_temp_f,
+            last_wind_mph=excluded.last_wind_mph,
+            last_wind_dir=excluded.last_wind_dir,
+            last_wind_gust_mph=excluded.last_wind_gust_mph
     """, (
         site,
         float(state.get("last_alert_epoch", 0.0)) if state.get("last_alert_epoch") is not None else None,
@@ -123,7 +169,12 @@ def write_site_state(conn, site: str, state: dict):
         state.get("last_ts_iso"),
         float(state.get("last_cfs")) if state.get("last_cfs") is not None else None,
         1 if state.get("last_in") else 0,
-        float(state.get("last_pct_change_epoch", 0.0)) if state.get("last_pct_change_epoch") is not None else None
+        float(state.get("last_pct_change_epoch", 0.0)) if state.get("last_pct_change_epoch") is not None else None,
+        float(state.get("last_in_epoch", 0.0)) if state.get("last_in_epoch") is not None else None,
+        float(state.get("last_temp_f")) if state.get("last_temp_f") is not None else None,
+        float(state.get("last_wind_mph")) if state.get("last_wind_mph") is not None else None,
+        state.get("last_wind_dir"),
+        float(state.get("last_wind_gust_mph")) if state.get("last_wind_gust_mph") is not None else None
     ))
 
 def migrate_json_to_db(json_path: str, conn):
@@ -248,10 +299,13 @@ def fetch_trend_data(site: str, hours: int):
     except Exception:
         return None
 
-def generate_sparkline_html(trend_data):
-    """Generate CSS bar chart sparkline HTML with individual bar colors"""
+def generate_sparkline_html(trend_data, site_id):
+    """Generate CSS bar chart sparkline HTML with individual bar colors, wrapped in detail page link"""
+    # Build link to our custom detail page
+    detail_url = f"details/{site_id}.html"
+
     if not trend_data or not trend_data.get("values"):
-        return '<div class="sparkline-empty">—</div>'
+        return f'<a href="{detail_url}" class="sparkline-link"><div class="sparkline-empty">—</div></a>'
 
     values = trend_data["values"]
 
@@ -281,7 +335,8 @@ def generate_sparkline_html(trend_data):
 
         bars.append(f'<div class="sparkline-bar {color_class}" style="height:{height}%"></div>')
 
-    return f'<div class="sparkline">{"".join(bars)}</div>'
+    sparkline_div = f'<div class="sparkline">{"".join(bars)}</div>'
+    return f'<a href="{detail_url}" class="sparkline-link">{sparkline_div}</a>'
 
 # ---------------- Email ----------------
 def send_email(smtp: dict, subject: str, body: str):
@@ -381,11 +436,32 @@ def render_static_html(generated_at_iso: str, rows: list):
             if qpf_parts:
                 qpf_line = f'<div class="sub qpf">QPF {" · ".join(qpf_parts)}</div>'
 
-        # Generate sparkline for trend
-        sparkline_html = generate_sparkline_html(r.get("trend_data"))
+        # Format weather observations (temp, wind) if available
+        obs_line = ""
+        obs_data = r.get("obs")
+        if obs_data and isinstance(obs_data, dict):
+            obs_parts = []
+            # Temperature
+            temp_f = obs_data.get("temp_f")
+            if temp_f is not None:
+                obs_parts.append(f"{temp_f}°F")
+            # Wind
+            wind_mph = obs_data.get("wind_mph")
+            wind_dir = obs_data.get("wind_dir")
+            wind_gust = obs_data.get("wind_gust_mph")
+            if wind_mph is not None:
+                wind_str = f"Wind: {wind_mph} mph {wind_dir}"
+                if wind_gust is not None and wind_gust > wind_mph:
+                    wind_str += f" (gust {wind_gust})"
+                obs_parts.append(wind_str)
+            if obs_parts:
+                obs_line = f'<div class="sub obs">{" · ".join(obs_parts)}</div>'
 
         # Build USGS site URL
         site_id = r.get('site', '')
+
+        # Generate sparkline for trend (with clickable link to USGS graph)
+        sparkline_html = generate_sparkline_html(r.get("trend_data"), site_id)
         usgs_url = f"https://waterdata.usgs.gov/nwis/uv?site_no={site_id}&legacy=1" if site_id else "#"
 
         return f"""
@@ -394,6 +470,7 @@ def render_static_html(generated_at_iso: str, rows: list):
             <div class="river"><a href="{usgs_url}" target="_blank" rel="noopener">{h(r.get('name') or r.get('site') or '')}</a></div>
             <div class="sub">{sub}</div>
             {qpf_line}
+            {obs_line}
           </td>
           <td class="sparkline-cell">{sparkline_html}</td>
           <td class="center">{("" if r.get('cfs') is None else f"{int(round(r['cfs'])):,}")}</td>
@@ -451,6 +528,20 @@ def render_static_html(generated_at_iso: str, rows: list):
   .sparkline-bar.sparkline-falling {{ background: #ef4444; }}  /* Red for falling */
   .sparkline-bar.sparkline-steady {{ background: #94a3b8; }}  /* Gray for steady */
   .sparkline-empty {{ color: #94a3b8; font-size: 18px; }}
+
+  /* Clickable sparkline link styling */
+  .sparkline-link {{
+    border-bottom: none !important;
+    cursor: pointer;
+    display: inline-block;
+    transition: opacity 0.2s;
+  }}
+  .sparkline-link:hover {{
+    opacity: 0.7;
+  }}
+  .sparkline-link:active {{
+    opacity: 0.5;
+  }}
 
   a {{ color: inherit; text-decoration: none; border-bottom: 1px dashed #aaa; }}
   a:hover {{ border-bottom-color: #333; }}
@@ -514,17 +605,13 @@ def render_static_html(generated_at_iso: str, rows: list):
 </style>
 </head><body>
 <div class="wrap">
-  <div style="display:flex;justify-content:space-between;align-items:flex-end;">
-    <div><h1>Southeast Rivers</h1><div class="muted">Auto-updated from USGS IV</div></div>
-    <div class="muted">Updated: {h(format_timestamp(generated_at_iso))}</div>
-  </div>
   <table>
     <thead><tr><td>River</td><td class="center">12hr</td><td class="center">CFS</td><td class="num">Feet</td><td class="center">Updated</td></tr></thead>
     <tbody>{trs}</tbody>
   </table>
-  <div class="foot">Green = meets all thresholds • Red = below at least one threshold</div>
   <div class="foot" style="margin-top:8px;"><a href="http://flowpage.alabamawhitewater.com/" target="_blank" rel="noopener">Alabama Flow Page</a></div>
   <div class="foot" style="margin-top:8px;"><a href="https://syotr.org/" target="_blank" rel="noopener">See You On The River</a></div>
+  <div class="foot" style="margin-top:8px;"><a href="https://rainpursuit.org/map/?supporter=true" target="_blank" rel="noopener">Rain Pursuit</a></div>
 </div>
 </body></html>"""
 
@@ -675,6 +762,22 @@ def main():
                 if not args.quiet:
                     print(f"[WARN] QPF fetch failed for {site}: {e}")
 
+        # Fetch weather observations (temp, wind) if available
+        obs_data = None
+        if OBS_AVAILABLE and name in WEATHER_STATIONS:
+            station = WEATHER_STATIONS[name]
+            try:
+                obs = fetch_latest_observation(station)
+                obs_data = {
+                    "temp_f": obs["temp_f"],
+                    "wind_mph": obs["wind_mph"],
+                    "wind_dir": fmt_dir(obs["wind_dir_deg"]),
+                    "wind_gust_mph": obs["wind_gust_mph"]
+                }
+            except Exception as e:
+                if not args.quiet:
+                    print(f"[WARN] Weather observation fetch failed for {name} [{station}]: {e}")
+
         feed_rows.append({
             "site": site,
             "name": name,
@@ -687,6 +790,7 @@ def main():
             "trend_8h": trend_label if args.trend_hours else None,
             "trend_data": trend_data,
             "qpf": qpf_data,
+            "obs": obs_data,
             "waterdata_url": f"https://waterdata.usgs.gov/monitoring-location/{site}/#parameterCode=00065&period=P7D"
         })
 
@@ -780,6 +884,18 @@ def main():
         site_state["last_ts_iso"]   = ts_iso
         site_state["last_cfs"]      = discharge
         site_state["last_in"]       = in_range
+
+        # Track when river crossed into runnable/green state
+        if (not was_in) and in_range:
+            site_state["last_in_epoch"] = now
+
+        # Save temperature and wind data if available
+        if obs_data:
+            site_state["last_temp_f"] = obs_data.get("temp_f")
+            site_state["last_wind_mph"] = obs_data.get("wind_mph")
+            site_state["last_wind_dir"] = obs_data.get("wind_dir")
+            site_state["last_wind_gust_mph"] = obs_data.get("wind_gust_mph")
+
         set_site_state(site, site_state)
 
     # Publish feeds/pages
@@ -796,6 +912,64 @@ def main():
         with open(args.dump_html, "w", encoding="utf-8") as f:
             f.write(html)
         if not args.quiet: print(f"[PAGE] wrote {args.dump_html} ({len(feed_rows)} sites)")
+
+        # Generate individual detail pages for each site
+        if SITE_DETAIL_AVAILABLE:
+            # Create details subdirectory
+            html_dir = os.path.dirname(args.dump_html)
+            details_dir = os.path.join(html_dir, "details")
+            os.makedirs(details_dir, exist_ok=True)
+
+            for row in feed_rows:
+                site_id = row.get("site")
+                if not site_id:
+                    continue
+
+                try:
+                    # Fetch 7-day historical data
+                    cfs_history = fetch_usgs_7day_data(site_id, "00060")  # Discharge
+                    feet_history = fetch_usgs_7day_data(site_id, "00065")  # Gage height
+
+                    # Get state data for last_in_epoch
+                    site_state = get_site_state(site_id) if conn else {}
+                    last_in_epoch = site_state.get("last_in_epoch", 0)
+
+                    # Format last_in_time as human-readable
+                    if last_in_epoch and last_in_epoch > 0:
+                        last_in_dt = datetime.fromtimestamp(last_in_epoch)
+                        last_in_time = last_in_dt.strftime("%b %d, %Y %I:%M %p")
+                    else:
+                        last_in_time = None
+
+                    # Prepare site data for detail page
+                    site_data = {
+                        "name": row.get("name"),
+                        "site": site_id,
+                        "cfs": row.get("cfs"),
+                        "stage_ft": row.get("stage_ft"),
+                        "temp_f": row.get("obs", {}).get("temp_f") if row.get("obs") else None,
+                        "wind_mph": row.get("obs", {}).get("wind_mph") if row.get("obs") else None,
+                        "wind_dir": row.get("obs", {}).get("wind_dir") if row.get("obs") else "",
+                        "threshold_ft": row.get("threshold_ft"),
+                        "threshold_cfs": row.get("threshold_cfs"),
+                        "in_range": row.get("in_range", False),
+                        "last_in_time": last_in_time
+                    }
+
+                    # Generate HTML
+                    detail_html = generate_site_detail_html(site_data, cfs_history, feet_history)
+
+                    # Write to file
+                    detail_path = os.path.join(details_dir, f"{site_id}.html")
+                    with open(detail_path, "w", encoding="utf-8") as f:
+                        f.write(detail_html)
+
+                    if not args.quiet:
+                        print(f"[DETAIL] wrote {detail_path}")
+
+                except Exception as e:
+                    if not args.quiet:
+                        print(f"[WARN] Failed to generate detail page for {site_id}: {e}")
 
     # close DB
     if state_db and 'conn' in locals() and conn:
