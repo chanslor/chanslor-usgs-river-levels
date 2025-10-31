@@ -4,10 +4,11 @@ Get current temp (°F) and wind speed (mph) for creek / river spots
 using nearby NOAA/NWS stations.
 
 Spots & Stations:
-- Town Creek (Geraldine, AL)      -> KBFZ  (Albertville Regional Airport)
-- South Sauty (Rainsville, AL)    -> K4A9  (Fort Payne / Isbell Field Airport)
-- Little River (Fort Payne, AL)   -> K4A9  (same as above)
-- Locust Fork (Cleveland, AL)     -> KCMD  (Cullman Regional Airport / Folsom Field)
+- Town Creek (Geraldine, AL)        -> KBFZ  (Albertville Regional Airport)
+- South Sauty (Rainsville, AL)      -> K4A9  (Fort Payne / Isbell Field Airport)
+- Little River (Fort Payne, AL)     -> K4A9  (same as above)
+- Locust Fork (Cleveland, AL)       -> KCMD  (Cullman Regional Airport / Folsom Field)
+- Tellico Plains (Tellico Plains, TN) -> KMNV (Monroe County Airport, Madisonville TN)
 """
 
 import json
@@ -15,12 +16,13 @@ import urllib.request
 import math
 from datetime import datetime, timezone
 
-# Map paddling spots to their NOAA/NWS station IDs
+# Map paddling / riding spots to their NOAA/NWS station IDs
 SPOTS = {
     "Town Creek (Geraldine, AL)": "KBFZ",
     "South Sauty (Rainsville, AL)": "K4A9",
     "Little River (Fort Payne, AL)": "K4A9",
     "Locust Fork (Cleveland, AL)": "KCMD",
+    "Tellico Plains (Tellico Plains, TN)": "KMNV",
 }
 
 API_BASE = "https://api.weather.gov/stations/{station}/observations/latest"
@@ -66,14 +68,14 @@ def fetch_latest_observation(station_id):
         # Ask for NOAA's GeoJSON/JSON
         "Accept": "application/geo+json, application/json;q=0.9",
         "Accept-Language": "en-US,en;q=0.8",
-        # IMPORTANT: leave out Accept-Encoding so we get plain text back
+        # DO NOT send Accept-Encoding so we get plain (uncompressed) JSON
         "Connection": "close",
     }
 
     req = urllib.request.Request(url, headers=headers)
 
     with urllib.request.urlopen(req, timeout=10) as resp:
-        raw = resp.read()  # should now be plain UTF-8 JSON
+        raw = resp.read()  # should be plain UTF-8 JSON now
 
     data = json.loads(raw)
     props = data.get("properties", {})
