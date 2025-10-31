@@ -15,6 +15,8 @@ RUN mkdir -p /app /data /site \
 # Copy app code & cloud config (NO CREDENTIALS)
 COPY usgs_multi_alert.py /app/usgs_multi_alert.py
 COPY qpf.py             /app/qpf.py
+COPY observations.py    /app/observations.py
+COPY site_detail.py     /app/site_detail.py
 COPY entrypoint.sh      /app/entrypoint.sh
 COPY gauges.conf.cloud.json /app/gauges.conf.json
 
