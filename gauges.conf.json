@@ -1,0 +1,86 @@
+{
+  "smtp": {
+    "server": "smtp.gmail.com",
+    "port": 465,
+    "to": [
+      "michael.chanslor@gmail.com"
+    ],
+    "from": null
+  },
+
+  "sites": [
+    {
+      "site": "02455000",
+      "name": "Locust Fork",
+      "include_discharge": true,
+      "min_ft": 1.70,
+      "min_cfs": null,
+      "lat": 33.9803,
+      "lon": -86.5686
+    },
+    {
+      "site": "03572900",
+      "name": "Town Creek",
+      "include_discharge": true,
+      "min_ft": 2.00,
+      "min_cfs": null,
+      "lat": 34.3631,
+      "lon": -86.0064
+    },
+    {
+      "site": "03572690",
+      "name": "South Sauty",
+      "include_discharge": true,
+      "min_ft": 8.34,
+      "min_cfs": null,
+      "lat": 34.6211,
+      "lon": -86.0492
+    },
+    {
+      "site": "03518500",
+      "name": "Tellico River",
+      "include_discharge": true,
+      "min_ft": 1.40,
+      "min_cfs": null,
+      "lat": 35.3628,
+      "lon": -84.2808
+    },
+    {
+      "site": "02399200",
+      "name": "Little River",
+      "include_discharge": true,
+      "min_ft": null,
+      "min_cfs": 300,
+      "lat": 34.1736,
+      "lon": -85.6164
+    }
+  ],
+
+  "defaults": {
+    "min_ft": null,
+    "min_cfs": null
+  },
+
+  "cooldown_hours": 6,
+  "notify": {
+    "mode": "rising",
+    "send_out": true,
+    "out_cooldown_hours": 2
+  },
+
+  "percent_change_alert": {
+    "enabled": true,
+    "threshold_percent": 20,
+    "cooldown_hours": 2
+  },
+
+  "visual_indicators": {
+    "wind_threshold_mph": 10,
+    "wind_alert_color": "#ffc107",
+    "temp_threshold_f": 55,
+    "temp_alert_color": "#add8e6"
+  },
+
+  "state_db": "/data/state.sqlite"
+}
+
