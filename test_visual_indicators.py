@@ -5,8 +5,10 @@ Generates a standalone HTML file to test all color zones and alert indicators
 """
 
 import os
+import json
+import sys
 
-def generate_test_html():
+def generate_test_html(wind_threshold_mph=10, wind_alert_color="#ffc107", temp_threshold_f=55, temp_alert_color="#add8e6"):
     """Generate comprehensive test HTML for all visual indicators"""
 
     # CSS copied from usgs_multi_alert.py
@@ -31,13 +33,16 @@ def generate_test_html():
   .sub{font-size:14px;color:#444}
   .num { text-align:right; white-space:nowrap; }
   .center { text-align:center; white-space:nowrap; }
-  .temp-alert { color:#5dade2; font-weight:600; }
-  .wind-alert { color:#ffc107; font-weight:600; }
+  .temp-alert { color:TEMP_COLOR_PLACEHOLDER; font-weight:600; }
+  .wind-alert { color:WIND_COLOR_PLACEHOLDER; font-weight:600; }
   .rain-alert { color:#1e90ff; font-weight:600; }
   .legend { display:inline-block; width:20px; height:20px; margin-right:8px; border:1px solid #999; vertical-align:middle; }
   .note { background:#fffbea; border-left:4px solid #ffc107; padding:12px; margin:16px 0; font-size:14px; }
   .test-section { margin-bottom: 32px; }
 """
+    # Replace color placeholders with actual config values
+    css = css.replace("TEMP_COLOR_PLACEHOLDER", temp_alert_color)
+    css = css.replace("WIND_COLOR_PLACEHOLDER", wind_alert_color)
 
     # Test data for Little River Canyon (all CFS levels)
     lrc_tests = [
@@ -71,11 +76,28 @@ def generate_test_html():
         (4000, "too-high", "2,500+ CFS: Too high for most"),
     ]
 
-    # Test data for temperature alerts
-    temp_tests = [35, 45, 52, 55, 65, 75, 85]
+    # Test data for temperature alerts (generate around threshold)
+    temp_tests = [
+        temp_threshold_f - 20,
+        temp_threshold_f - 10,
+        temp_threshold_f - 3,
+        temp_threshold_f,
+        temp_threshold_f + 10,
+        temp_threshold_f + 20,
+        temp_threshold_f + 30
+    ]
 
-    # Test data for wind alerts
-    wind_tests = [0, 5, 10, 11, 15, 20, 25, 30]
+    # Test data for wind alerts (generate around threshold)
+    wind_tests = [
+        0,
+        wind_threshold_mph - 5,
+        wind_threshold_mph,
+        wind_threshold_mph + 1,
+        wind_threshold_mph + 5,
+        wind_threshold_mph + 10,
+        wind_threshold_mph + 15,
+        wind_threshold_mph + 20
+    ]
 
     # Test data for gauge heights
     height_tests = [0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0]
@@ -97,8 +119,8 @@ def generate_test_html():
   <div class="note">
     <strong>⚠️ Testing Instructions:</strong><br>
     1. Verify each color matches the expected zone<br>
-    2. Check that temperature alerts (< 55°F) appear in light blue<br>
-    3. Check that wind alerts (> 10 mph) appear in yellow<br>
+    2. Check that temperature alerts (&lt; {temp_threshold_f}°F) appear in {temp_alert_color}<br>
+    3. Check that wind alerts (&gt; {wind_threshold_mph} mph) appear in {wind_alert_color}<br>
     4. Verify text is readable on all background colors<br>
     5. Compare colors with live dashboard at http://localhost:8080
   </div>
@@ -140,7 +162,7 @@ def generate_test_html():
   <!-- Temperature Alert Tests -->
   <div class="test-section">
     <h2>🌡️ Temperature Alert Testing</h2>
-    <p class="muted">Temperatures below 55°F should be highlighted in light blue</p>
+    <p class="muted">Temperatures below {temp_threshold_f}°F should be highlighted in {temp_alert_color}</p>
     <table>
       <thead>
         <tr>
@@ -153,12 +175,12 @@ def generate_test_html():
 """
 
     for temp in temp_tests:
-        if temp < 55:
+        if temp < temp_threshold_f:
             display = f'<span class="temp-alert">{temp}°F</span>'
-            expected = "Light blue highlight (< 55°F)"
+            expected = f"Alert highlight (&lt; {temp_threshold_f}°F)"
         else:
             display = f"{temp}°F"
-            expected = "Normal text (≥ 55°F)"
+            expected = f"Normal text (≥ {temp_threshold_f}°F)"
 
         html += f"""        <tr class="out">
           <td class="center"><strong>{temp}°F</strong></td>
@@ -174,7 +196,7 @@ def generate_test_html():
   <!-- Wind Alert Tests -->
   <div class="test-section">
     <h2>💨 Wind Alert Testing</h2>
-    <p class="muted">Wind speeds above 10 mph should be highlighted in yellow</p>
+    <p class="muted">Wind speeds above {wind_threshold_mph} mph should be highlighted in {wind_alert_color}</p>
     <table>
       <thead>
         <tr>
@@ -187,12 +209,12 @@ def generate_test_html():
 """
 
     for wind in wind_tests:
-        if wind > 10:
+        if wind > wind_threshold_mph:
             display = f'Wind: <span class="wind-alert">{wind} mph</span> N'
-            expected = "Yellow highlight (> 10 mph)"
+            expected = f"Alert highlight (&gt; {wind_threshold_mph} mph)"
         else:
             display = f"Wind: {wind} mph N"
-            expected = "Normal text (≤ 10 mph)"
+            expected = f"Normal text (≤ {wind_threshold_mph} mph)"
 
         html += f"""        <tr class="out">
           <td class="center"><strong>{wind} mph</strong></td>
@@ -342,8 +364,8 @@ def generate_test_html():
   <div class="note" style="margin-top:32px;">
     <strong>✅ Test Checklist:</strong><br>
     □ All 6 Little River color zones display correctly<br>
-    □ Temperature < 55°F shows light blue<br>
-    □ Wind > 10 mph shows yellow<br>
+    □ Temperature &lt; {temp_threshold_f}°F shows {temp_alert_color}<br>
+    □ Wind &gt; {wind_threshold_mph} mph shows {wind_alert_color}<br>
     □ Text is readable on all backgrounds<br>
     □ Colors match the live dashboard<br>
     □ Mobile view looks correct (resize window)
@@ -377,7 +399,33 @@ def get_color_name(css_class):
 if __name__ == "__main__":
     print("🧪 Generating visual indicators test file...")
 
-    html = generate_test_html()
+    # Load config file to get visual indicators settings
+    config_path = sys.argv[1] if len(sys.argv) > 1 else "gauges.conf.json"
+    try:
+        with open(config_path, "r") as f:
+            cfg = json.load(f)
+        visual_indicators = cfg.get("visual_indicators", {})
+        wind_threshold_mph = float(visual_indicators.get("wind_threshold_mph", 10))
+        wind_alert_color = visual_indicators.get("wind_alert_color", "#ffc107")
+        temp_threshold_f = float(visual_indicators.get("temp_threshold_f", 55))
+        temp_alert_color = visual_indicators.get("temp_alert_color", "#add8e6")
+        print(f"   Using config: {config_path}")
+        print(f"   Wind threshold: {wind_threshold_mph} mph ({wind_alert_color})")
+        print(f"   Temp threshold: {temp_threshold_f}°F ({temp_alert_color})")
+    except FileNotFoundError:
+        print(f"   Warning: Config file '{config_path}' not found, using defaults")
+        wind_threshold_mph = 10
+        wind_alert_color = "#ffc107"
+        temp_threshold_f = 55
+        temp_alert_color = "#add8e6"
+    except Exception as e:
+        print(f"   Warning: Error reading config: {e}, using defaults")
+        wind_threshold_mph = 10
+        wind_alert_color = "#ffc107"
+        temp_threshold_f = 55
+        temp_alert_color = "#add8e6"
+
+    html = generate_test_html(wind_threshold_mph, wind_alert_color, temp_threshold_f, temp_alert_color)
 
     output_file = "test_visual_indicators.html"
     with open(output_file, "w") as f:
@@ -391,8 +439,8 @@ if __name__ == "__main__":
     print(f"      Then visit: http://localhost:8081/{output_file}")
     print(f"\n🔍 What to look for:")
     print(f"   • Little River: 6 distinct color zones from gray→yellow→brown→light green→green→red")
-    print(f"   • Temperatures < 55°F should be light blue (#5dade2)")
-    print(f"   • Wind > 10 mph should be yellow (#ffc107)")
+    print(f"   • Temperatures < {temp_threshold_f}°F should be {temp_alert_color}")
+    print(f"   • Wind > {wind_threshold_mph} mph should be {wind_alert_color}")
     print(f"   • All text should be readable on colored backgrounds")
     print(f"   • Compare side-by-side with live dashboard at http://localhost:8080")
 
