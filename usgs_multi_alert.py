@@ -392,7 +392,7 @@ def format_timestamp_stacked(iso_str: str) -> str:
         # If parsing fails, return original
         return iso_str
 
-def render_static_html(generated_at_iso: str, rows: list):
+def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: float = 10, wind_alert_color: str = "#ffc107", temp_threshold_f: float = 55, temp_alert_color: str = "#add8e6"):
     def row_html(r):
         trend = r.get("trend_8h")
         trend_icon = "↗" if trend == "rising" else ("↘" if trend == "falling" else ("→" if trend else ""))
@@ -472,8 +472,8 @@ def render_static_html(generated_at_iso: str, rows: list):
             # Temperature
             temp_f = obs_data.get("temp_f")
             if temp_f is not None:
-                # Highlight temperatures below 55°F in light blue
-                if temp_f < 55:
+                # Highlight temperatures below threshold in light blue
+                if temp_f < temp_threshold_f:
                     obs_parts.append(f'<span class="temp-alert">{temp_f}°F</span>')
                 else:
                     obs_parts.append(f"{temp_f}°F")
@@ -482,8 +482,8 @@ def render_static_html(generated_at_iso: str, rows: list):
             wind_dir = obs_data.get("wind_dir")
             wind_gust = obs_data.get("wind_gust_mph")
             if wind_mph is not None:
-                # Highlight wind speeds over 10 mph in yellow
-                if wind_mph > 10:
+                # Highlight wind speeds over threshold in yellow
+                if wind_mph > wind_threshold_mph:
                     wind_str = f'Wind: <span class="wind-alert">{wind_mph} mph</span> {wind_dir}'
                     if wind_gust is not None and wind_gust > wind_mph:
                         wind_str += f" (gust {wind_gust})"
@@ -590,8 +590,8 @@ def render_static_html(generated_at_iso: str, rows: list):
   a:hover {{ border-bottom-color: #333; }}
   .foot {{ margin-top:16px; font-size:12px; color:#666; }}
   .rain-alert {{ color:#1e90ff; font-weight:600; }}
-  .wind-alert {{ color:#ffc107; font-weight:600; }}
-  .temp-alert {{ color:#5dade2; font-weight:600; }}
+  .wind-alert {{ color:{wind_alert_color}; font-weight:600; }}
+  .temp-alert {{ color:{temp_alert_color}; font-weight:600; }}
   .trend-rising {{ color:#4ade80; font-weight:600; }}
   .trend-falling {{ color:#f87171; font-weight:600; }}
 
@@ -711,6 +711,13 @@ def main():
     pct_change_threshold = float(pct_change_cfg.get("threshold_percent", 20))
     pct_change_cooldown_hours = int(pct_change_cfg.get("cooldown_hours", 2))
     pct_change_cooldown_sec = pct_change_cooldown_hours * 3600
+
+    # Visual indicators config (wind, temperature alerts)
+    visual_indicators = cfg.get("visual_indicators", {})
+    wind_threshold_mph = float(visual_indicators.get("wind_threshold_mph", 10))
+    wind_alert_color = visual_indicators.get("wind_alert_color", "#ffc107")
+    temp_threshold_f = float(visual_indicators.get("temp_threshold_f", 55))
+    temp_alert_color = visual_indicators.get("temp_alert_color", "#add8e6")
 
     # Initialize QPF client for rainfall forecasts
     qpf_client = None
@@ -955,7 +962,7 @@ def main():
         if not args.quiet: print(f"[FEED] wrote {args.dump_json} ({len(feed_rows)} sites)")
 
     if args.dump_html:
-        html = render_static_html(now_iso, feed_rows)
+        html = render_static_html(now_iso, feed_rows, wind_threshold_mph, wind_alert_color, temp_threshold_f, temp_alert_color)
         ensure_parent_dir(args.dump_html)
         with open(args.dump_html, "w", encoding="utf-8") as f:
             f.write(html)
