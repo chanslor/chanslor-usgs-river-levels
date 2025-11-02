@@ -31,6 +31,9 @@ COPY site_detail.py     /app/site_detail.py
 COPY entrypoint.sh      /app/entrypoint.sh
 COPY gauges.conf.json   /app/gauges.conf.json
 
+# Copy test suite to /site (served by HTTP server)
+COPY test_visual_indicators.html /site/test_visual_indicators.html
+
 # Ensure executable
 RUN chmod 0755 /app/entrypoint.sh /app/usgs_multi_alert.py
 

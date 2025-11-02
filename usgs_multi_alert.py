@@ -650,6 +650,7 @@ def render_static_html(generated_at_iso: str, rows: list):
   <div class="foot" style="margin-top:8px;"><a href="http://flowpage.alabamawhitewater.com/" target="_blank" rel="noopener">Alabama Flow Page</a></div>
   <div class="foot" style="margin-top:8px;"><a href="https://syotr.org/" target="_blank" rel="noopener">See You On The River</a></div>
   <div class="foot" style="margin-top:8px;"><a href="https://rainpursuit.org/map/?supporter=true" target="_blank" rel="noopener">Rain Pursuit</a></div>
+  <div class="foot" style="margin-top:16px; padding-top:8px; border-top:1px solid #ddd;"><a href="test_visual_indicators.html" target="_blank">🧪 Visual Indicators Test Suite</a></div>
 </div>
 </body></html>"""
 
