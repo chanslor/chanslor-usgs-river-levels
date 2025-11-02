@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Visual Indicators Test - USGS River Monitor</title>
+<style>
+
+  :root { --green:#b7ff9c; }
+  body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; margin:0; color:#111; background:#fafafa; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  h1 { margin:0 0 4px; font-size:22px; }
+  h2 { margin:24px 0 8px; font-size:18px; color:#444; border-bottom:2px solid #ddd; padding-bottom:4px; }
+  .muted{color:#555;font-size:13px}
+  table { width:100%; border-collapse:collapse; margin-top:8px; margin-bottom:24px; }
+  thead td { font-weight:600; font-size:16px; padding:8px; border-bottom:1px solid #ddd; background:#f0f0f0; }
+  tbody tr td { padding:10px 6px; vertical-align:middle; border:1px solid #e0e0e0; }
+  tbody tr.in { background: var(--green); }
+  tbody tr.out { background: #f6f7f9; }
+  tbody tr.good-low { background: #fff9c4; }
+  tbody tr.shitty-medium { background: #d4a574; }
+  tbody tr.good-medium { background: #c8e6c9; }
+  tbody tr.good-high { background: var(--green); }
+  tbody tr.too-high { background: #ffcdd2; }
+  .river { font-weight:600; }
+  .sub{font-size:14px;color:#444}
+  .num { text-align:right; white-space:nowrap; }
+  .center { text-align:center; white-space:nowrap; }
+  .temp-alert { color:#5dade2; font-weight:600; }
+  .wind-alert { color:#ffc107; font-weight:600; }
+  .rain-alert { color:#1e90ff; font-weight:600; }
+  .legend { display:inline-block; width:20px; height:20px; margin-right:8px; border:1px solid #999; vertical-align:middle; }
+  .note { background:#fffbea; border-left:4px solid #ffc107; padding:12px; margin:16px 0; font-size:14px; }
+  .test-section { margin-bottom: 32px; }
+
+</style>
+</head><body>
+<div class="wrap">
+  <h1>🧪 Visual Indicators Test Suite</h1>
+  <p class="muted">Generated test cases for all color zones and alert conditions</p>
+
+  <div class="note">
+    <strong>⚠️ Testing Instructions:</strong><br>
+    1. Verify each color matches the expected zone<br>
+    2. Check that temperature alerts (< 55°F) appear in light blue<br>
+    3. Check that wind alerts (> 10 mph) appear in yellow<br>
+    4. Verify text is readable on all background colors<br>
+    5. Compare colors with live dashboard at http://localhost:8080
+  </div>
+
+  <!-- Little River Canyon Multi-Level Tests -->
+  <div class="test-section">
+    <h2>🎨 Little River Canyon - Multi-Level Color Classification</h2>
+    <p class="muted">Testing all 6 CFS-based color zones (USGS 02399200)</p>
+    <table>
+      <thead>
+        <tr>
+          <td>CFS</td>
+          <td>Expected Color</td>
+          <td>Zone Description</td>
+          <td class="num">Stage (ft)</td>
+          <td>CSS Class</td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="out">
+          <td class="center"><strong>0</strong></td>
+          <td>Gray</td>
+          <td>< 250 CFS: Not runnable</td>
+          <td class="num">2.00</td>
+          <td><code>out</code></td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>100</strong></td>
+          <td>Gray</td>
+          <td>< 250 CFS: Not runnable</td>
+          <td class="num">2.20</td>
+          <td><code>out</code></td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>200</strong></td>
+          <td>Gray</td>
+          <td>< 250 CFS: Not runnable</td>
+          <td class="num">2.40</td>
+          <td><code>out</code></td>
+        </tr>
+        <tr class="good-low">
+          <td class="center"><strong>250</strong></td>
+          <td>Yellow</td>
+          <td>250-400 CFS: Good low water</td>
+          <td class="num">2.50</td>
+          <td><code>good-low</code></td>
+        </tr>
+        <tr class="good-low">
+          <td class="center"><strong>300</strong></td>
+          <td>Yellow</td>
+          <td>250-400 CFS: Good low water</td>
+          <td class="num">2.60</td>
+          <td><code>good-low</code></td>
+        </tr>
+        <tr class="good-low">
+          <td class="center"><strong>350</strong></td>
+          <td>Yellow</td>
+          <td>250-400 CFS: Good low water</td>
+          <td class="num">2.70</td>
+          <td><code>good-low</code></td>
+        </tr>
+        <tr class="shitty-medium">
+          <td class="center"><strong>400</strong></td>
+          <td>Brown</td>
+          <td>400-800 CFS: Shitty medium</td>
+          <td class="num">2.80</td>
+          <td><code>shitty-medium</code></td>
+        </tr>
+        <tr class="shitty-medium">
+          <td class="center"><strong>500</strong></td>
+          <td>Brown</td>
+          <td>400-800 CFS: Shitty medium</td>
+          <td class="num">3.00</td>
+          <td><code>shitty-medium</code></td>
+        </tr>
+        <tr class="shitty-medium">
+          <td class="center"><strong>600</strong></td>
+          <td>Brown</td>
+          <td>400-800 CFS: Shitty medium</td>
+          <td class="num">3.20</td>
+          <td><code>shitty-medium</code></td>
+        </tr>
+        <tr class="shitty-medium">
+          <td class="center"><strong>700</strong></td>
+          <td>Brown</td>
+          <td>400-800 CFS: Shitty medium</td>
+          <td class="num">3.40</td>
+          <td><code>shitty-medium</code></td>
+        </tr>
+        <tr class="good-medium">
+          <td class="center"><strong>800</strong></td>
+          <td>Light Green</td>
+          <td>800-1,500 CFS: Good medium flow</td>
+          <td class="num">3.60</td>
+          <td><code>good-medium</code></td>
+        </tr>
+        <tr class="good-medium">
+          <td class="center"><strong>1,000</strong></td>
+          <td>Light Green</td>
+          <td>800-1,500 CFS: Good medium flow</td>
+          <td class="num">4.00</td>
+          <td><code>good-medium</code></td>
+        </tr>
+        <tr class="good-medium">
+          <td class="center"><strong>1,200</strong></td>
+          <td>Light Green</td>
+          <td>800-1,500 CFS: Good medium flow</td>
+          <td class="num">4.40</td>
+          <td><code>good-medium</code></td>
+        </tr>
+        <tr class="good-medium">
+          <td class="center"><strong>1,400</strong></td>
+          <td>Light Green</td>
+          <td>800-1,500 CFS: Good medium flow</td>
+          <td class="num">4.80</td>
+          <td><code>good-medium</code></td>
+        </tr>
+        <tr class="good-high">
+          <td class="center"><strong>1,500</strong></td>
+          <td>Green (Best!)</td>
+          <td>1,500-2,500 CFS: Good high - BEST!</td>
+          <td class="num">5.00</td>
+          <td><code>good-high</code></td>
+        </tr>
+        <tr class="good-high">
+          <td class="center"><strong>1,750</strong></td>
+          <td>Green (Best!)</td>
+          <td>1,500-2,500 CFS: Good high - BEST!</td>
+          <td class="num">5.50</td>
+          <td><code>good-high</code></td>
+        </tr>
+        <tr class="good-high">
+          <td class="center"><strong>2,000</strong></td>
+          <td>Green (Best!)</td>
+          <td>1,500-2,500 CFS: Good high - BEST!</td>
+          <td class="num">6.00</td>
+          <td><code>good-high</code></td>
+        </tr>
+        <tr class="good-high">
+          <td class="center"><strong>2,250</strong></td>
+          <td>Green (Best!)</td>
+          <td>1,500-2,500 CFS: Good high - BEST!</td>
+          <td class="num">6.50</td>
+          <td><code>good-high</code></td>
+        </tr>
+        <tr class="too-high">
+          <td class="center"><strong>2,500</strong></td>
+          <td>Red</td>
+          <td>2,500+ CFS: Too high for most</td>
+          <td class="num">7.00</td>
+          <td><code>too-high</code></td>
+        </tr>
+        <tr class="too-high">
+          <td class="center"><strong>3,000</strong></td>
+          <td>Red</td>
+          <td>2,500+ CFS: Too high for most</td>
+          <td class="num">8.00</td>
+          <td><code>too-high</code></td>
+        </tr>
+        <tr class="too-high">
+          <td class="center"><strong>3,500</strong></td>
+          <td>Red</td>
+          <td>2,500+ CFS: Too high for most</td>
+          <td class="num">9.00</td>
+          <td><code>too-high</code></td>
+        </tr>
+        <tr class="too-high">
+          <td class="center"><strong>4,000</strong></td>
+          <td>Red</td>
+          <td>2,500+ CFS: Too high for most</td>
+          <td class="num">10.00</td>
+          <td><code>too-high</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Temperature Alert Tests -->
+  <div class="test-section">
+    <h2>🌡️ Temperature Alert Testing</h2>
+    <p class="muted">Temperatures below 55°F should be highlighted in light blue</p>
+    <table>
+      <thead>
+        <tr>
+          <td>Temperature</td>
+          <td>Display</td>
+          <td>Expected Behavior</td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="out">
+          <td class="center"><strong>35°F</strong></td>
+          <td><span class="temp-alert">35°F</span></td>
+          <td>Light blue highlight (< 55°F)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>45°F</strong></td>
+          <td><span class="temp-alert">45°F</span></td>
+          <td>Light blue highlight (< 55°F)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>52°F</strong></td>
+          <td><span class="temp-alert">52°F</span></td>
+          <td>Light blue highlight (< 55°F)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>55°F</strong></td>
+          <td>55°F</td>
+          <td>Normal text (≥ 55°F)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>65°F</strong></td>
+          <td>65°F</td>
+          <td>Normal text (≥ 55°F)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>75°F</strong></td>
+          <td>75°F</td>
+          <td>Normal text (≥ 55°F)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>85°F</strong></td>
+          <td>85°F</td>
+          <td>Normal text (≥ 55°F)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Wind Alert Tests -->
+  <div class="test-section">
+    <h2>💨 Wind Alert Testing</h2>
+    <p class="muted">Wind speeds above 10 mph should be highlighted in yellow</p>
+    <table>
+      <thead>
+        <tr>
+          <td>Wind Speed</td>
+          <td>Display</td>
+          <td>Expected Behavior</td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="out">
+          <td class="center"><strong>0 mph</strong></td>
+          <td>Wind: 0 mph N</td>
+          <td>Normal text (≤ 10 mph)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>5 mph</strong></td>
+          <td>Wind: 5 mph N</td>
+          <td>Normal text (≤ 10 mph)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>10 mph</strong></td>
+          <td>Wind: 10 mph N</td>
+          <td>Normal text (≤ 10 mph)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>11 mph</strong></td>
+          <td>Wind: <span class="wind-alert">11 mph</span> N</td>
+          <td>Yellow highlight (> 10 mph)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>15 mph</strong></td>
+          <td>Wind: <span class="wind-alert">15 mph</span> N</td>
+          <td>Yellow highlight (> 10 mph)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>20 mph</strong></td>
+          <td>Wind: <span class="wind-alert">20 mph</span> N</td>
+          <td>Yellow highlight (> 10 mph)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>25 mph</strong></td>
+          <td>Wind: <span class="wind-alert">25 mph</span> N</td>
+          <td>Yellow highlight (> 10 mph)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>30 mph</strong></td>
+          <td>Wind: <span class="wind-alert">30 mph</span> N</td>
+          <td>Yellow highlight (> 10 mph)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Gauge Height Tests -->
+  <div class="test-section">
+    <h2>📏 Gauge Height Testing</h2>
+    <p class="muted">Testing various water levels (standard rivers use binary in/out)</p>
+    <table>
+      <thead>
+        <tr>
+          <td>River</td>
+          <td>Stage (ft)</td>
+          <td>CFS</td>
+          <td>Status</td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="out">
+          <td>Locust Fork</td>
+          <td class="num">0.50</td>
+          <td class="center">25</td>
+          <td>OUT - Below threshold</td>
+        </tr>
+        <tr class="out">
+          <td>Locust Fork</td>
+          <td class="num">1.00</td>
+          <td class="center">50</td>
+          <td>OUT - Below threshold</td>
+        </tr>
+        <tr class="in">
+          <td>Locust Fork</td>
+          <td class="num">2.00</td>
+          <td class="center">100</td>
+          <td>IN - Above threshold</td>
+        </tr>
+        <tr class="in">
+          <td>Locust Fork</td>
+          <td class="num">3.00</td>
+          <td class="center">150</td>
+          <td>IN - Above threshold</td>
+        </tr>
+        <tr class="in">
+          <td>Locust Fork</td>
+          <td class="num">5.00</td>
+          <td class="center">250</td>
+          <td>IN - Above threshold</td>
+        </tr>
+        <tr class="in">
+          <td>Locust Fork</td>
+          <td class="num">10.00</td>
+          <td class="center">500</td>
+          <td>IN - Above threshold</td>
+        </tr>
+        <tr class="in">
+          <td>Locust Fork</td>
+          <td class="num">15.00</td>
+          <td class="center">750</td>
+          <td>IN - Above threshold</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Combined Conditions Tests -->
+  <div class="test-section">
+    <h2>🔀 Combined Conditions Testing</h2>
+    <p class="muted">Testing multiple alerts simultaneously</p>
+    <table>
+      <thead>
+        <tr>
+          <td>Scenario</td>
+          <td>Conditions</td>
+          <td>Display</td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="good-high">
+          <td>Perfect Day</td>
+          <td>High water + warm + calm</td>
+          <td>65°F · Wind: 5 mph N</td>
+        </tr>
+        <tr class="good-high">
+          <td>Cold High Water</td>
+          <td>High water + cold temp</td>
+          <td><span class="temp-alert">45°F</span> · Wind: 8 mph N</td>
+        </tr>
+        <tr class="good-medium">
+          <td>Windy Medium Flow</td>
+          <td>Medium water + high wind</td>
+          <td>58°F · Wind: <span class="wind-alert">18 mph</span> NW</td>
+        </tr>
+        <tr class="good-low">
+          <td>Cold & Windy Low</td>
+          <td>Low water + cold + windy</td>
+          <td><span class="temp-alert">50°F</span> · Wind: <span class="wind-alert">22 mph</span> N</td>
+        </tr>
+        <tr class="too-high">
+          <td>Extreme Conditions</td>
+          <td>Flood stage + alerts</td>
+          <td><span class="temp-alert">42°F</span> · Wind: <span class="wind-alert">25 mph</span> NNW</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Color Legend -->
+  <div class="test-section">
+    <h2>🎨 Color Legend</h2>
+    <table>
+      <thead>
+        <tr>
+          <td>Color Sample</td>
+          <td>CSS Class</td>
+          <td>Use Case</td>
+          <td>Hex/RGB</td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="legend" style="background:#f6f7f9;"></span> Gray</td>
+          <td><code>out</code></td>
+          <td>Not runnable / Below threshold</td>
+          <td>#f6f7f9</td>
+        </tr>
+        <tr>
+          <td><span class="legend" style="background:#fff9c4;"></span> Yellow</td>
+          <td><code>good-low</code></td>
+          <td>Little River: 250-400 CFS</td>
+          <td>#fff9c4</td>
+        </tr>
+        <tr>
+          <td><span class="legend" style="background:#d4a574;"></span> Brown</td>
+          <td><code>shitty-medium</code></td>
+          <td>Little River: 400-800 CFS</td>
+          <td>#d4a574</td>
+        </tr>
+        <tr>
+          <td><span class="legend" style="background:#c8e6c9;"></span> Light Green</td>
+          <td><code>good-medium</code></td>
+          <td>Little River: 800-1,500 CFS</td>
+          <td>#c8e6c9</td>
+        </tr>
+        <tr>
+          <td><span class="legend" style="background:#b7ff9c;"></span> Green</td>
+          <td><code>good-high</code> / <code>in</code></td>
+          <td>Best conditions / Above threshold</td>
+          <td>#b7ff9c</td>
+        </tr>
+        <tr>
+          <td><span class="legend" style="background:#ffcdd2;"></span> Red</td>
+          <td><code>too-high</code></td>
+          <td>Little River: 2,500+ CFS</td>
+          <td>#ffcdd2</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note" style="margin-top:32px;">
+    <strong>✅ Test Checklist:</strong><br>
+    □ All 6 Little River color zones display correctly<br>
+    □ Temperature < 55°F shows light blue<br>
+    □ Wind > 10 mph shows yellow<br>
+    □ Text is readable on all backgrounds<br>
+    □ Colors match the live dashboard<br>
+    □ Mobile view looks correct (resize window)
+  </div>
+
+  <p class="muted" style="text-align:center; margin-top:32px; padding:16px; border-top:1px solid #ddd;">
+    Generated by test_visual_indicators.py •
+    <a href="http://localhost:8080" target="_blank">View Live Dashboard</a>
+  </p>
+</div>
+</body></html>
