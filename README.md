@@ -739,5 +739,12 @@ ls -lh usgs-data/qpf_cache.sqlite
 ### Working Dashboard (10-29-2025)
 ![Working Dashboard](./working.10-29-2025.png)
 
+*Initial working version with basic features*
+
+### Enhanced Dashboard with Visual Indicators (11-01-2025)
+![Enhanced Dashboard](./example.graph-11-01-2025.png)
+
+*Added multi-level color coding, temperature/wind alerts, and colored trend indicators*
+
 
 
