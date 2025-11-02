@@ -1,5 +1,4 @@
 # Sensitive configuration with credentials
-gauges.conf.json
 
 # SQLite databases with state data
 usgs-data/
