@@ -15,12 +15,15 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 - 🎨 **Multi-level color coding for river conditions**
 - 🌡️ **Temperature alerts** (< 55°F highlighted in light blue)
 - 💨 **Wind alerts** (> 10 mph highlighted in yellow)
+- 📈 **Color-coded trend indicators** (rising = green, falling = light red)
+- 🧪 **Comprehensive test suite** for visual indicator verification
 
 ---
 
 ## Table of Contents
 
 - [Visual Indicators & Color Coding](#visual-indicators--color-coding)
+- [Testing Visual Indicators](#-testing-visual-indicators)
 - [Quick Start](#quick-start)
   - [Configure Gauges & Credentials](#1-configure-your-gauges-and-credentials)
   - [Get Gmail App Password](#2-get-a-gmail-app-password)
@@ -84,14 +87,53 @@ The dashboard uses intelligent color coding and visual indicators to help you qu
 - 🔴 Red bars: Water level falling
 - ⚪ Gray bars: Water level steady
 
-**Text Indicators:**
-- ↗ rising
-- ↘ falling
-- → steady
+**Text Indicators (Color-Coded):**
+- ↗ **rising**: Displayed in **green** (#4ade80) - water level increasing
+- ↘ **falling**: Displayed in **light red** (#f87171) - water level decreasing
+- → **steady**: Default text color - water level stable
+
+*Both the arrow icon and text are colored for quick visual scanning*
 
 ### Data Freshness
 
 - ⏳ Clock icon: Data is stale (> 1 hour old)
+
+---
+
+## 🧪 Testing Visual Indicators
+
+A comprehensive test suite is included to verify all color zones and alert conditions.
+
+### Accessing the Test Suite
+
+**From the Live Dashboard:**
+- Scroll to the bottom of the main page
+- Click "🧪 Visual Indicators Test Suite"
+
+**Direct URLs:**
+- Local: http://localhost:8080/test_visual_indicators.html
+- Cloud: https://your-app.fly.dev/test_visual_indicators.html
+
+### Test Coverage
+
+The test suite includes:
+- ✅ All 6 Little River Canyon color zones (22 test cases)
+- ✅ Temperature alerts at various thresholds (7 cases: 35-85°F)
+- ✅ Wind alerts at various speeds (8 cases: 0-30 mph)
+- ✅ Gauge heights for binary classification (7 cases)
+- ✅ Combined alert scenarios (5 multi-condition tests)
+- ✅ Color legend with hex codes
+- ✅ Interactive testing checklist
+
+### Regenerating Tests
+
+If you modify CSS or thresholds, regenerate the test file:
+
+```bash
+python3 test_visual_indicators.py
+```
+
+This creates a standalone HTML file with all test cases for visual verification.
 
 ---
 
