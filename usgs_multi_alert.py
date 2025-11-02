@@ -401,7 +401,14 @@ def render_static_html(generated_at_iso: str, rows: list):
         if isinstance(r.get("threshold_cfs"), (int,float)): thbits.append(f"≥ {int(r['threshold_cfs'])} cfs")
         sub_parts = []
         if thbits: sub_parts.extend(thbits)
-        if trend: sub_parts.append(f"{trend_icon} {trend}")
+        # Color the trend text: green for rising, light red for falling
+        if trend:
+            if trend == "rising":
+                sub_parts.append(f'<span class="trend-rising">{trend_icon} {trend}</span>')
+            elif trend == "falling":
+                sub_parts.append(f'<span class="trend-falling">{trend_icon} {trend}</span>')
+            else:
+                sub_parts.append(f"{trend_icon} {trend}")
         sub = " • ".join(sub_parts)
 
         # Multi-level classification for Little River Canyon based on CFS
@@ -585,6 +592,8 @@ def render_static_html(generated_at_iso: str, rows: list):
   .rain-alert {{ color:#1e90ff; font-weight:600; }}
   .wind-alert {{ color:#ffc107; font-weight:600; }}
   .temp-alert {{ color:#5dade2; font-weight:600; }}
+  .trend-rising {{ color:#4ade80; font-weight:600; }}
+  .trend-falling {{ color:#f87171; font-weight:600; }}
 
   /* Mobile optimizations */
   @media (max-width: 768px) {{
