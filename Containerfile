@@ -1,10 +1,21 @@
-# Containerfile
+# Containerfile - Multi-stage build for smaller image size
+# Stage 1: Builder - Install dependencies
+FROM registry.access.redhat.com/ubi9/python-311 AS builder
+
+# Switch to root to create deps directory
+USER 0
+RUN mkdir -p /deps && chown -R 1001:0 /deps
+
+# Switch back to default user and install dependencies
+USER 1001
+RUN python3 -m pip install --no-cache-dir --upgrade pip && \
+    python3 -m pip install --no-cache-dir --target=/deps requests python-dateutil
+
+# Stage 2: Final image - Copy only what we need
 FROM registry.access.redhat.com/ubi9/python-311
 
-# (Optional) install dependencies for requests/dateutil if needed
-# Comment these 3 lines out if you already have them in the image.
-RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir requests python-dateutil
+# Copy installed dependencies from builder stage
+COPY --from=builder /deps /usr/local/lib/python3.11/site-packages/
 
 # Prepare writable dirs, group-owned by 0 and group-writable
 USER 0
@@ -15,6 +26,8 @@ RUN mkdir -p /app /data /site \
 # Copy app code & config
 COPY usgs_multi_alert.py /app/usgs_multi_alert.py
 COPY qpf.py             /app/qpf.py
+COPY observations.py    /app/observations.py
+COPY site_detail.py     /app/site_detail.py
 COPY entrypoint.sh      /app/entrypoint.sh
 COPY gauges.conf.json   /app/gauges.conf.json
 

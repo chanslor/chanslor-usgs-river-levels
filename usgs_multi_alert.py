@@ -403,7 +403,28 @@ def render_static_html(generated_at_iso: str, rows: list):
         if thbits: sub_parts.extend(thbits)
         if trend: sub_parts.append(f"{trend_icon} {trend}")
         sub = " • ".join(sub_parts)
-        cls = "in" if r.get("in_range") else "out"
+
+        # Multi-level classification for Little River Canyon based on CFS
+        site_id = r.get('site', '')
+        if site_id == "02399200":  # Little River Canyon
+            cfs = r.get('cfs')
+            if cfs is None:
+                cls = "out"
+            elif cfs < 250:
+                cls = "out"
+            elif cfs < 400:
+                cls = "good-low"
+            elif cfs < 800:
+                cls = "shitty-medium"
+            elif cfs < 1500:
+                cls = "good-medium"
+            elif cfs < 2500:
+                cls = "good-high"
+            else:  # 2500+
+                cls = "too-high"
+        else:
+            # Standard binary classification for other sites
+            cls = "in" if r.get("in_range") else "out"
 
         # Check if data is stale (> 1 hour old)
         stale_indicator = ""
@@ -444,15 +465,25 @@ def render_static_html(generated_at_iso: str, rows: list):
             # Temperature
             temp_f = obs_data.get("temp_f")
             if temp_f is not None:
-                obs_parts.append(f"{temp_f}°F")
+                # Highlight temperatures below 55°F in light blue
+                if temp_f < 55:
+                    obs_parts.append(f'<span class="temp-alert">{temp_f}°F</span>')
+                else:
+                    obs_parts.append(f"{temp_f}°F")
             # Wind
             wind_mph = obs_data.get("wind_mph")
             wind_dir = obs_data.get("wind_dir")
             wind_gust = obs_data.get("wind_gust_mph")
             if wind_mph is not None:
-                wind_str = f"Wind: {wind_mph} mph {wind_dir}"
-                if wind_gust is not None and wind_gust > wind_mph:
-                    wind_str += f" (gust {wind_gust})"
+                # Highlight wind speeds over 10 mph in yellow
+                if wind_mph > 10:
+                    wind_str = f'Wind: <span class="wind-alert">{wind_mph} mph</span> {wind_dir}'
+                    if wind_gust is not None and wind_gust > wind_mph:
+                        wind_str += f" (gust {wind_gust})"
+                else:
+                    wind_str = f"Wind: {wind_mph} mph {wind_dir}"
+                    if wind_gust is not None and wind_gust > wind_mph:
+                        wind_str += f" (gust {wind_gust})"
                 obs_parts.append(wind_str)
             if obs_parts:
                 obs_line = f'<div class="sub obs">{" · ".join(obs_parts)}</div>'
@@ -493,6 +524,11 @@ def render_static_html(generated_at_iso: str, rows: list):
   tbody tr td {{ padding:10px 6px; vertical-align:middle; }}
   tbody tr.in {{ background: var(--green); }}
   tbody tr.out {{ background: #f6f7f9; }}
+  tbody tr.good-low {{ background: #fff9c4; }}
+  tbody tr.shitty-medium {{ background: #d4a574; }}
+  tbody tr.good-medium {{ background: #c8e6c9; }}
+  tbody tr.good-high {{ background: var(--green); }}
+  tbody tr.too-high {{ background: #ffcdd2; }}
   .river {{ font-weight:600; }}
   .river a {{ color: #1a73e8; border-bottom: 1px solid #1a73e8; }}
   .river a:hover {{ color: #0d47a1; border-bottom-color: #0d47a1; }}
@@ -547,6 +583,8 @@ def render_static_html(generated_at_iso: str, rows: list):
   a:hover {{ border-bottom-color: #333; }}
   .foot {{ margin-top:16px; font-size:12px; color:#666; }}
   .rain-alert {{ color:#1e90ff; font-weight:600; }}
+  .wind-alert {{ color:#ffc107; font-weight:600; }}
+  .temp-alert {{ color:#5dade2; font-weight:600; }}
 
   /* Mobile optimizations */
   @media (max-width: 768px) {{
