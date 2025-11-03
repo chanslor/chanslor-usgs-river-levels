@@ -8,7 +8,7 @@ primary_region = 'iad'
   dockerfile = "Containerfile.cloud"
 
 [env]
-  RUN_INTERVAL_SEC = "600"
+  RUN_INTERVAL_SEC = "60"
   NWS_UA = "mdchansl-usgs-alert/1.0"
   QPF_TTL_HOURS = "3"
   QPF_CACHE = "/data/qpf_cache.sqlite"
