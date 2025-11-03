@@ -38,7 +38,7 @@
       "site": "03518500",
       "name": "Tellico River",
       "include_discharge": true,
-      "min_ft": 1.40,
+      "min_ft": 1.70,
       "min_cfs": null,
       "lat": 35.3628,
       "lon": -84.2808
@@ -51,6 +51,17 @@
       "min_cfs": 300,
       "lat": 34.1736,
       "lon": -85.6164
+    },
+    {
+      "source": "streambeam",
+      "streambeam_site_id": "1",
+      "streambeam_zero_offset": 21.85,
+      "streambeam_floor_at_zero": true,
+      "name": "Short Creek",
+      "min_ft": 0.5,
+      "min_cfs": null,
+      "lat": 34.3580,
+      "lon": -86.2950
     }
   ],
 
@@ -73,7 +84,7 @@
   },
 
   "visual_indicators": {
-    "wind_threshold_mph": 10,
+    "wind_threshold_mph": 15,
     "wind_alert_color": "#ffc107",
     "temp_threshold_f": 55,
     "temp_alert_color": "#add8e6"
