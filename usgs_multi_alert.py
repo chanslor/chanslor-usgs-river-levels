@@ -8,7 +8,13 @@ Usage examples:
   python usgs_multi_alert.py --config gauges.conf.json --cfs \
     --dump-json public/gauges.json --dump-html public/index.html --trend-hours 8
 """
-import argparse, json, os, time, smtplib, ssl, sqlite3, re
+import sys
+import os
+# Ensure /app is in the path for module imports
+if '/app' not in sys.path:
+    sys.path.insert(0, '/app')
+
+import argparse, json, time, smtplib, ssl, sqlite3, re
 from datetime import datetime
 from email.mime.text import MIMEText
 from urllib.request import urlopen, Request
@@ -37,14 +43,38 @@ try:
 except ImportError:
     SITE_DETAIL_AVAILABLE = False
 
+# Import StreamBeam scraper for non-USGS gauges
+try:
+    from streambeam_multi_scrape import scrape_one as streambeam_scrape_one
+    STREAMBEAM_AVAILABLE = True
+except ImportError:
+    STREAMBEAM_AVAILABLE = False
+
 # Weather station mapping for each river site
+# For sites that need multiple stations for operational decisions, use primary station here
 WEATHER_STATIONS = {
     "Locust Fork": "KCMD",           # Cullman Regional Airport
-    "Town Creek": "KBFZ",            # Albertville Regional Airport
+    "Town Creek": "KBFZ",            # Albertville Regional Airport (ultra-local, near shore)
     "South Sauty": "K4A9",           # Fort Payne / Isbell Field Airport
     "Tellico River": "KMNV",         # Monroe County Airport, Madisonville TN
     "Little River": "K4A9",          # Fort Payne / Isbell Field Airport
     "Little River Canyon": "K4A9",   # Fort Payne / Isbell Field Airport (cloud config name)
+    "Short Creek": "KBFZ",           # Albertville Regional Airport (ultra-local for lake paddling)
+}
+
+# Secondary weather stations for sites that need valley trend data
+WEATHER_STATIONS_SECONDARY = {
+    "Short Creek": "KHSV",           # Huntsville (valley trend for operational paddling calls)
+    "Town Creek": "KHSV",            # Huntsville (valley trend backup)
+}
+
+# Friendly city abbreviations for weather station codes (for display)
+STATION_CITY_LABELS = {
+    "KCMD": "CULMAN",      # Cullman Regional Airport
+    "KBFZ": "ALBVL",       # Albertville Regional Airport
+    "K4A9": "FTPAYN",      # Fort Payne / Isbell Field Airport
+    "KMNV": "MADSNVL",     # Monroe County Airport, Madisonville TN
+    "KHSV": "HNTSV",       # Huntsville International Airport
 }
 
 USGS_IV = "https://waterservices.usgs.gov/nwis/iv/"
@@ -299,6 +329,77 @@ def fetch_trend_data(site: str, hours: int):
     except Exception:
         return None
 
+# ---------------- StreamBeam helpers ----------------
+def convert_streambeam_timestamp_to_iso(timestamp_str: str) -> str:
+    """
+    Convert StreamBeam timestamp format to ISO 8601.
+    Input: "2025-11-03 07:44 AM CST"
+    Output: "2025-11-03T07:44:00-06:00"
+    """
+    if not timestamp_str:
+        return ""
+
+    try:
+        # Parse StreamBeam format: "2025-11-03 07:44 AM CST"
+        # Remove timezone abbreviation (CST, CDT, etc) for now
+        ts_without_tz = timestamp_str.rsplit(' ', 1)[0]  # "2025-11-03 07:44 AM"
+
+        # Parse the datetime
+        dt = datetime.strptime(ts_without_tz, "%Y-%m-%d %I:%M %p")
+
+        # Assume Central Time (CST/CDT) - most StreamBeam gauges are in central time
+        # CST = UTC-6, CDT = UTC-5
+        # For simplicity, use -06:00 (CST) year-round
+        # If you need DST handling, you'd need pytz library
+        if "CDT" in timestamp_str:
+            tz_offset = "-05:00"
+        else:  # CST or unknown
+            tz_offset = "-06:00"
+
+        # Format as ISO 8601
+        return dt.strftime("%Y-%m-%dT%H:%M:%S") + tz_offset
+    except Exception:
+        # If parsing fails, return original
+        return timestamp_str
+
+def fetch_streambeam_latest(entry):
+    """
+    Fetch latest StreamBeam gauge reading for a site.
+    Returns data in same format as fetch_latest() for compatibility.
+    """
+    if not STREAMBEAM_AVAILABLE:
+        raise RuntimeError("StreamBeam scraper not available")
+
+    # Build StreamBeam entry format
+    sb_entry = {
+        "name": entry.get("name", "unknown"),
+        "site_id": entry.get("streambeam_site_id"),
+        "url": entry.get("streambeam_url"),
+        "zero_offset_ft": float(entry.get("streambeam_zero_offset", 0.0)),
+        "floor_at_zero": bool(entry.get("streambeam_floor_at_zero", True))
+    }
+
+    # Scrape the data
+    result = streambeam_scrape_one(sb_entry, timeout=25, def_zero=0.0, def_floor=True)
+
+    if not result.get("ok"):
+        raise RuntimeError(f"StreamBeam fetch failed: {result.get('error', 'Unknown error')}")
+
+    # Convert StreamBeam timestamp to ISO format
+    streambeam_timestamp = result.get("observed_at_local", "")
+    iso_timestamp = convert_streambeam_timestamp_to_iso(streambeam_timestamp)
+
+    # Convert StreamBeam format to USGS-compatible format
+    # StreamBeam returns: adjusted_ft, observed_at_local
+    # USGS format expects: stage_ft, ts_iso, discharge_cfs, site
+    return {
+        "site": entry.get("streambeam_site_id", entry.get("name")),
+        "url": result.get("url"),
+        "ts_iso": iso_timestamp,
+        "stage_ft": result.get("adjusted_ft"),
+        "discharge_cfs": None  # StreamBeam doesn't provide CFS
+    }
+
 def generate_sparkline_html(trend_data, site_id):
     """Generate CSS bar chart sparkline HTML with individual bar colors, wrapped in detail page link"""
     # Build link to our custom detail page
@@ -411,8 +512,10 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
                 sub_parts.append(f"{trend_icon} {trend}")
         sub = " • ".join(sub_parts)
 
-        # Multi-level classification for Little River Canyon based on CFS
+        # Multi-level classification for specific sites
         site_id = r.get('site', '')
+        name = r.get('name', '')
+
         if site_id == "02399200":  # Little River Canyon
             cfs = r.get('cfs')
             if cfs is None:
@@ -429,6 +532,16 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
                 cls = "good-high"
             else:  # 2500+
                 cls = "too-high"
+        elif "Short Creek" in name:  # Short Creek (StreamBeam)
+            stage_ft = r.get('stage_ft')
+            if stage_ft is None:
+                cls = "out"
+            elif stage_ft < 0.5:
+                cls = "out"  # Too low
+            elif stage_ft <= 1.5:
+                cls = "in"   # Good range (0.5-1.5 ft)
+            else:
+                cls = "too-high"  # Too high, dangerous
         else:
             # Standard binary classification for other sites
             cls = "in" if r.get("in_range") else "out"
@@ -469,6 +582,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
         obs_data = r.get("obs")
         if obs_data and isinstance(obs_data, dict):
             obs_parts = []
+            station = obs_data.get("station", "")
             # Temperature
             temp_f = obs_data.get("temp_f")
             if temp_f is not None:
@@ -493,7 +607,43 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
                         wind_str += f" (gust {wind_gust})"
                 obs_parts.append(wind_str)
             if obs_parts:
-                obs_line = f'<div class="sub obs">{" · ".join(obs_parts)}</div>'
+                # Use city abbreviation if available, otherwise use airport code
+                city_label = STATION_CITY_LABELS.get(station, station)
+                station_label = f" ({city_label})" if city_label else ""
+                obs_line = f'<div class="sub obs">{" · ".join(obs_parts)}{station_label}</div>'
+
+        # Format secondary weather observations (valley trend) if available
+        obs_secondary_line = ""
+        obs_secondary = r.get("obs_secondary")
+        if obs_secondary and isinstance(obs_secondary, dict):
+            obs_sec_parts = []
+            station = obs_secondary.get("station", "")
+            # Temperature
+            temp_f = obs_secondary.get("temp_f")
+            if temp_f is not None:
+                if temp_f < temp_threshold_f:
+                    obs_sec_parts.append(f'<span class="temp-alert">{temp_f}°F</span>')
+                else:
+                    obs_sec_parts.append(f"{temp_f}°F")
+            # Wind
+            wind_mph = obs_secondary.get("wind_mph")
+            wind_dir = obs_secondary.get("wind_dir")
+            wind_gust = obs_secondary.get("wind_gust_mph")
+            if wind_mph is not None:
+                if wind_mph > wind_threshold_mph:
+                    wind_str = f'Wind: <span class="wind-alert">{wind_mph} mph</span> {wind_dir}'
+                    if wind_gust is not None and wind_gust > wind_mph:
+                        wind_str += f" (gust {wind_gust})"
+                else:
+                    wind_str = f"Wind: {wind_mph} mph {wind_dir}"
+                    if wind_gust is not None and wind_gust > wind_mph:
+                        wind_str += f" (gust {wind_gust})"
+                obs_sec_parts.append(wind_str)
+            if obs_sec_parts:
+                # Use city abbreviation if available, otherwise use airport code
+                city_label = STATION_CITY_LABELS.get(station, station)
+                station_label = f" ({city_label})" if city_label else ""
+                obs_secondary_line = f'<div class="sub obs-secondary">{" · ".join(obs_sec_parts)}{station_label}</div>'
 
         # Build USGS site URL
         site_id = r.get('site', '')
@@ -509,6 +659,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
             <div class="sub">{sub}</div>
             {qpf_line}
             {obs_line}
+            {obs_secondary_line}
           </td>
           <td class="sparkline-cell">{sparkline_html}</td>
           <td class="center">{("" if r.get('cfs') is None else f"{int(round(r['cfs'])):,}")}</td>
@@ -778,21 +929,52 @@ def main():
     feed_rows = []
 
     for entry in sites_cfg:
-        site_raw = entry["site"]
-        site = normalize_site_id(site_raw)         # hardened
-        name = entry.get("name", site)
-        include_q = bool(entry.get("include_discharge", False) or args.cfs)
-        th_ft = entry.get("min_ft", def_default_ft)
-        th_cfs = entry.get("min_cfs", def_default_cfs)
+        # Determine data source (default to "usgs")
+        source = entry.get("source", "usgs").lower()
 
-        try:
-            data = fetch_latest(site, include_discharge=include_q)
-        except (URLError, HTTPError, RuntimeError, ValueError) as e:
-            if not args.quiet:
-                print(f"[ERROR] fetch {site_raw} failed: {e}")
-            continue
+        if source == "streambeam":
+            # StreamBeam source - use streambeam_site_id or name as identifier
+            site_raw = entry.get("streambeam_site_id") or entry.get("name", "unknown")
+            site = site_raw  # No normalization needed for StreamBeam
+            name = entry.get("name", site_raw)
+            th_ft = entry.get("min_ft", def_default_ft)
+            th_cfs = entry.get("min_cfs", def_default_cfs)
 
-        stage = data["stage_ft"]; ts_iso = data["ts_iso"]; discharge = data["discharge_cfs"]
+            try:
+                data = fetch_streambeam_latest(entry)
+            except (RuntimeError, ValueError) as e:
+                if not args.quiet:
+                    print(f"[ERROR] StreamBeam fetch {site_raw} failed: {e}")
+                continue
+
+            stage = data["stage_ft"]; ts_iso = data["ts_iso"]; discharge = data["discharge_cfs"]
+            # StreamBeam doesn't provide historical data, so no trend data
+            trend_label = None
+            trend_data = None
+
+        else:
+            # USGS source (default)
+            site_raw = entry["site"]
+            site = normalize_site_id(site_raw)         # hardened
+            name = entry.get("name", site)
+            include_q = bool(entry.get("include_discharge", False) or args.cfs)
+            th_ft = entry.get("min_ft", def_default_ft)
+            th_cfs = entry.get("min_cfs", def_default_cfs)
+
+            try:
+                data = fetch_latest(site, include_discharge=include_q)
+            except (URLError, HTTPError, RuntimeError, ValueError) as e:
+                if not args.quiet:
+                    print(f"[ERROR] fetch {site_raw} failed: {e}")
+                continue
+
+            stage = data["stage_ft"]; ts_iso = data["ts_iso"]; discharge = data["discharge_cfs"]
+
+            # Fetch trend data for USGS sites
+            trend_label = fetch_trend_label(site, args.trend_hours) if (args.trend_hours and (args.dump_json or args.dump_html)) else None
+            trend_data = fetch_trend_data(site, 12) if (args.dump_json or args.dump_html) else None
+
+        # Common processing for both sources
         in_range = is_in(stage, discharge, th_ft, th_cfs)
 
         if not args.quiet:
@@ -801,12 +983,8 @@ def main():
             if th_cfs is not None: th_bits.append(f"{int(th_cfs)} cfs")
             thresh_str = " & ".join(th_bits) if th_bits else "no min"
             cfs_part = f" - {discharge:.0f} cfs" if discharge is not None else ""
-            print(f"[INFO] {name}: {stage if stage is not None else 'NA'} ft{cfs_part} @ {ts_iso} (mins: {thresh_str}) -> {'IN' if in_range else 'OUT'}")
-
-        trend_label = fetch_trend_label(site, args.trend_hours) if (args.trend_hours and (args.dump_json or args.dump_html)) else None
-
-        # Fetch trend data for sparkline visualization (12 hours)
-        trend_data = fetch_trend_data(site, 12) if (args.dump_json or args.dump_html) else None
+            source_tag = f"[{source.upper()}]"
+            print(f"[INFO] {source_tag} {name}: {stage if stage is not None else 'NA'} ft{cfs_part} @ {ts_iso} (mins: {thresh_str}) -> {'IN' if in_range else 'OUT'}")
 
         # Fetch QPF (rainfall forecast) if available
         qpf_data = None
@@ -824,6 +1002,7 @@ def main():
             try:
                 obs = fetch_latest_observation(station)
                 obs_data = {
+                    "station": station,
                     "temp_f": obs["temp_f"],
                     "wind_mph": obs["wind_mph"],
                     "wind_dir": fmt_dir(obs["wind_dir_deg"]),
@@ -832,6 +1011,23 @@ def main():
             except Exception as e:
                 if not args.quiet:
                     print(f"[WARN] Weather observation fetch failed for {name} [{station}]: {e}")
+
+        # Fetch secondary weather observations for sites that need valley trend data
+        obs_secondary = None
+        if OBS_AVAILABLE and name in WEATHER_STATIONS_SECONDARY:
+            station_secondary = WEATHER_STATIONS_SECONDARY[name]
+            try:
+                obs = fetch_latest_observation(station_secondary)
+                obs_secondary = {
+                    "station": station_secondary,
+                    "temp_f": obs["temp_f"],
+                    "wind_mph": obs["wind_mph"],
+                    "wind_dir": fmt_dir(obs["wind_dir_deg"]),
+                    "wind_gust_mph": obs["wind_gust_mph"]
+                }
+            except Exception as e:
+                if not args.quiet:
+                    print(f"[WARN] Secondary weather observation fetch failed for {name} [{station_secondary}]: {e}")
 
         feed_rows.append({
             "site": site,
@@ -846,6 +1042,7 @@ def main():
             "trend_data": trend_data,
             "qpf": qpf_data,
             "obs": obs_data,
+            "obs_secondary": obs_secondary,
             "waterdata_url": f"https://waterdata.usgs.gov/monitoring-location/{site}/#parameterCode=00065&period=P7D"
         })
 
