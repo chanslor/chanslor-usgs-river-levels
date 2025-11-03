@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Allow overrides via env
 : "${CONFIG_PATH:=/app/gauges.conf.json}"
-: "${RUN_INTERVAL_SEC:=600}"           # every 10 minutes
+: "${RUN_INTERVAL_SEC:=60}"            # every 1 minute
 : "${BIND_HOST:=0.0.0.0}"
 : "${BIND_PORT:=8080}"
 
