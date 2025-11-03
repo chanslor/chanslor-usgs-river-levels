@@ -31,6 +31,7 @@ COPY usgs_multi_alert.py /app/usgs_multi_alert.py
 COPY qpf.py             /app/qpf.py
 COPY observations.py    /app/observations.py
 COPY site_detail.py     /app/site_detail.py
+COPY streambeam_multi_scrape.py /app/streambeam_multi_scrape.py
 COPY entrypoint.sh      /app/entrypoint.sh
 COPY gauges.conf.cloud.json /app/gauges.conf.json
 
