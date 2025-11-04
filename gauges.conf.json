@@ -89,7 +89,9 @@
     "wind_threshold_mph": 10,
     "wind_alert_color": "#ffc107",
     "temp_threshold_f": 55,
-    "temp_alert_color": "#add8e6"
+    "temp_alert_color": "#add8e6",
+    "temp_cold_threshold_f": 45,
+    "temp_cold_alert_color": "#1e90ff"
   },
 
   "state_db": "usgs-data/state.sqlite"

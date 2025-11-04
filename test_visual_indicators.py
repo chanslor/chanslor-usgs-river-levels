@@ -8,7 +8,7 @@ import os
 import json
 import sys
 
-def generate_test_html(wind_threshold_mph=10, wind_alert_color="#ffc107", temp_threshold_f=55, temp_alert_color="#add8e6"):
+def generate_test_html(wind_threshold_mph=10, wind_alert_color="#ffc107", temp_threshold_f=55, temp_alert_color="#add8e6", temp_cold_threshold_f=45, temp_cold_alert_color="#1e90ff"):
     """Generate comprehensive test HTML for all visual indicators"""
 
     # CSS copied from usgs_multi_alert.py
@@ -34,6 +34,7 @@ def generate_test_html(wind_threshold_mph=10, wind_alert_color="#ffc107", temp_t
   .num { text-align:right; white-space:nowrap; }
   .center { text-align:center; white-space:nowrap; }
   .temp-alert { color:TEMP_COLOR_PLACEHOLDER; font-weight:600; }
+  .temp-cold-alert { color:TEMP_COLD_COLOR_PLACEHOLDER; font-weight:600; }
   .wind-alert { color:WIND_COLOR_PLACEHOLDER; font-weight:600; }
   .rain-alert { color:#1e90ff; font-weight:600; }
   .legend { display:inline-block; width:20px; height:20px; margin-right:8px; border:1px solid #999; vertical-align:middle; }
@@ -42,6 +43,7 @@ def generate_test_html(wind_threshold_mph=10, wind_alert_color="#ffc107", temp_t
 """
     # Replace color placeholders with actual config values
     css = css.replace("TEMP_COLOR_PLACEHOLDER", temp_alert_color)
+    css = css.replace("TEMP_COLD_COLOR_PLACEHOLDER", temp_cold_alert_color)
     css = css.replace("WIND_COLOR_PLACEHOLDER", wind_alert_color)
 
     # Test data for Little River Canyon (all CFS levels)
@@ -76,15 +78,18 @@ def generate_test_html(wind_threshold_mph=10, wind_alert_color="#ffc107", temp_t
         (4000, "too-high", "2,500+ CFS: Too high for most"),
     ]
 
-    # Test data for temperature alerts (generate around threshold)
+    # Test data for temperature alerts (generate around both thresholds)
     temp_tests = [
-        temp_threshold_f - 20,
-        temp_threshold_f - 10,
-        temp_threshold_f - 3,
-        temp_threshold_f,
-        temp_threshold_f + 10,
-        temp_threshold_f + 20,
-        temp_threshold_f + 30
+        35,  # Below cold threshold - should be dark blue with snowflake
+        40,  # Below cold threshold - should be dark blue with snowflake
+        temp_cold_threshold_f - 2,  # Just below cold threshold
+        temp_cold_threshold_f,  # At cold threshold (still below, so cold alert)
+        temp_cold_threshold_f + 2,  # Just above cold but below regular threshold - light blue
+        temp_threshold_f - 3,  # Below regular threshold - light blue
+        temp_threshold_f,  # At regular threshold (still below, so alert)
+        temp_threshold_f + 10,  # Above threshold - normal
+        temp_threshold_f + 20,  # Above threshold - normal
+        85  # Well above threshold - normal
     ]
 
     # Test data for wind alerts (generate around threshold)
@@ -162,7 +167,8 @@ def generate_test_html(wind_threshold_mph=10, wind_alert_color="#ffc107", temp_t
   <!-- Temperature Alert Tests -->
   <div class="test-section">
     <h2>🌡️ Temperature Alert Testing</h2>
-    <p class="muted">Temperatures below {temp_threshold_f}°F should be highlighted in {temp_alert_color}</p>
+    <p class="muted">Temperatures below {temp_cold_threshold_f}°F should be highlighted in {temp_cold_alert_color} with snowflake ❄️<br>
+    Temperatures {temp_cold_threshold_f}°F-{temp_threshold_f}°F should be highlighted in {temp_alert_color}</p>
     <table>
       <thead>
         <tr>
@@ -175,9 +181,12 @@ def generate_test_html(wind_threshold_mph=10, wind_alert_color="#ffc107", temp_t
 """
 
     for temp in temp_tests:
-        if temp < temp_threshold_f:
+        if temp < temp_cold_threshold_f:
+            display = f'❄️ <span class="temp-cold-alert">{temp}°F</span>'
+            expected = f"Cold alert with snowflake (&lt; {temp_cold_threshold_f}°F) - {temp_cold_alert_color}"
+        elif temp < temp_threshold_f:
             display = f'<span class="temp-alert">{temp}°F</span>'
-            expected = f"Alert highlight (&lt; {temp_threshold_f}°F)"
+            expected = f"Cool alert ({temp_cold_threshold_f}°F-{temp_threshold_f}°F) - {temp_alert_color}"
         else:
             display = f"{temp}°F"
             expected = f"Normal text (≥ {temp_threshold_f}°F)"
@@ -409,37 +418,47 @@ if __name__ == "__main__":
         wind_alert_color = visual_indicators.get("wind_alert_color", "#ffc107")
         temp_threshold_f = float(visual_indicators.get("temp_threshold_f", 55))
         temp_alert_color = visual_indicators.get("temp_alert_color", "#add8e6")
+        temp_cold_threshold_f = float(visual_indicators.get("temp_cold_threshold_f", 45))
+        temp_cold_alert_color = visual_indicators.get("temp_cold_alert_color", "#1e90ff")
         print(f"   Using config: {config_path}")
         print(f"   Wind threshold: {wind_threshold_mph} mph ({wind_alert_color})")
-        print(f"   Temp threshold: {temp_threshold_f}°F ({temp_alert_color})")
+        print(f"   Temp thresholds: < {temp_cold_threshold_f}°F ({temp_cold_alert_color}), < {temp_threshold_f}°F ({temp_alert_color})")
     except FileNotFoundError:
         print(f"   Warning: Config file '{config_path}' not found, using defaults")
         wind_threshold_mph = 10
         wind_alert_color = "#ffc107"
         temp_threshold_f = 55
         temp_alert_color = "#add8e6"
+        temp_cold_threshold_f = 45
+        temp_cold_alert_color = "#1e90ff"
     except Exception as e:
         print(f"   Warning: Error reading config: {e}, using defaults")
         wind_threshold_mph = 10
         wind_alert_color = "#ffc107"
         temp_threshold_f = 55
         temp_alert_color = "#add8e6"
+        temp_cold_threshold_f = 45
+        temp_cold_alert_color = "#1e90ff"
 
-    html = generate_test_html(wind_threshold_mph, wind_alert_color, temp_threshold_f, temp_alert_color)
+    html = generate_test_html(wind_threshold_mph, wind_alert_color, temp_threshold_f, temp_alert_color, temp_cold_threshold_f, temp_cold_alert_color)
 
-    output_file = "test_visual_indicators.html"
+    # Determine output directory - use script's directory by default
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_file = os.path.join(script_dir, "test_visual_indicators.html")
+
     with open(output_file, "w") as f:
         f.write(html)
 
     print(f"✅ Test file generated: {output_file}")
     print(f"\n📋 To view the tests:")
-    print(f"   1. Open in browser: file://{os.path.abspath(output_file)}")
+    print(f"   1. Open in browser: file://{output_file}")
     print(f"   2. Or run: xdg-open {output_file}")
-    print(f"   3. Or run: python3 -m http.server 8081")
-    print(f"      Then visit: http://localhost:8081/{output_file}")
+    print(f"   3. Or run from project dir: python3 -m http.server 8080")
+    print(f"      Then visit: http://localhost:8080/test_visual_indicators.html")
     print(f"\n🔍 What to look for:")
     print(f"   • Little River: 6 distinct color zones from gray→yellow→brown→light green→green→red")
-    print(f"   • Temperatures < {temp_threshold_f}°F should be {temp_alert_color}")
+    print(f"   • Temperatures < {temp_cold_threshold_f}°F should be {temp_cold_alert_color} with ❄️ snowflake")
+    print(f"   • Temperatures {temp_cold_threshold_f}-{temp_threshold_f}°F should be {temp_alert_color}")
     print(f"   • Wind > {wind_threshold_mph} mph should be {wind_alert_color}")
     print(f"   • All text should be readable on colored backgrounds")
     print(f"   • Compare side-by-side with live dashboard at http://localhost:8080")

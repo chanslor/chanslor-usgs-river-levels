@@ -13,7 +13,7 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 - 🌧️ NWS Quantitative Precipitation Forecast (QPF) integration
 - 📱 Mobile-responsive dashboard with 7-day historical charts
 - 🎨 **Multi-level color coding for river conditions**
-- 🌡️ **Temperature alerts** (< 55°F highlighted in light blue)
+- 🌡️ **Temperature alerts** (< 45°F with ❄️ snowflake in dark blue, < 55°F in light blue)
 - 💨 **Wind alerts** (> 10 mph highlighted in yellow)
 - 📈 **Color-coded trend indicators** (rising = green, falling = light red)
 - 🧪 **Comprehensive test suite** for visual indicator verification
@@ -69,8 +69,9 @@ The dashboard uses intelligent color coding and visual indicators to help you qu
 ### Weather Alerts
 
 **Temperature Indicator:**
-- 🌡️ **< 55°F**: Temperature displayed in **light blue** (#5dade2)
-- ≥ 55°F: Normal text color
+- ❄️ **< 45°F**: Temperature displayed with **snowflake emoji** in **dark blue** (#1e90ff) - freezing conditions
+- 🌡️ **45-55°F**: Temperature displayed in **light blue** (#add8e6) - cool conditions
+- ≥ 55°F: Normal text color - comfortable paddling temperature
 
 **Wind Indicator:**
 - 💨 **> 10 mph**: Wind speed and "mph" displayed in **yellow** (#ffc107)
@@ -118,7 +119,7 @@ A comprehensive test suite is included to verify all color zones and alert condi
 
 The test suite includes:
 - ✅ All 6 Little River Canyon color zones (22 test cases)
-- ✅ Temperature alerts at various thresholds (7 cases: 35-85°F)
+- ✅ Temperature alerts at various thresholds (10 cases: 35-85°F, testing both cold and cool zones)
 - ✅ Wind alerts at various speeds (8 cases: 0-30 mph)
 - ✅ Gauge heights for binary classification (7 cases)
 - ✅ Combined alert scenarios (5 multi-condition tests)
@@ -130,10 +131,14 @@ The test suite includes:
 If you modify CSS or thresholds, regenerate the test file:
 
 ```bash
+# Run from the project directory
+cd /chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker
 python3 test_visual_indicators.py
 ```
 
-This creates a standalone HTML file with all test cases for visual verification.
+This creates a standalone HTML file (`test_visual_indicators.html`) in the project directory with all test cases for visual verification.
+
+**Note:** All working files, temporary files, and test outputs are stored in the project directory (`/chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker/`) to keep the workspace organized and make the project self-contained.
 
 ---
 
@@ -731,6 +736,47 @@ podman exec usgs-alert env | grep NWS
 # Verify cache file exists and has data
 ls -lh usgs-data/qpf_cache.sqlite
 ```
+
+---
+
+## Project Organization
+
+### Working Directory Structure
+
+All development work, testing, and temporary files should be kept within the project directory:
+
+```
+/chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker/
+├── usgs_multi_alert.py          # Main application
+├── qpf.py                        # Weather forecast integration
+├── site_detail.py                # Site detail pages
+├── observations.py               # Weather observations
+├── gauges.conf.json              # Site configuration
+├── Containerfile                 # Container build instructions
+├── entrypoint.sh                 # Container startup script
+├── test_visual_indicators.py    # Test generator script
+├── test_visual_indicators.html  # Generated test suite (DO NOT commit)
+├── validate_dashboard.py        # Dashboard validator
+├── usgs-data/                   # Runtime data (SQLite databases)
+├── usgs-site/                   # Generated dashboard files
+└── backups/                     # Backup copies of modified files
+```
+
+### Best Practices
+
+**✅ DO:**
+- Store all working files in the project directory
+- Generate test outputs in the project directory
+- Run scripts from the project directory
+- Keep temporary files within the project structure
+
+**❌ DON'T:**
+- Save working files to `/home/mdc/` or other locations
+- Commit generated test files (`test_visual_indicators.html`)
+- Commit runtime data (`usgs-data/`, `usgs-site/`)
+- Commit credentials (`gauges.conf.json`, `.env_creds`)
+
+This keeps your workspace organized and makes the project portable across different systems.
 
 ---
 

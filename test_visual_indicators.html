@@ -25,7 +25,8 @@
   .sub{font-size:14px;color:#444}
   .num { text-align:right; white-space:nowrap; }
   .center { text-align:center; white-space:nowrap; }
-  .temp-alert { color:#5dade2; font-weight:600; }
+  .temp-alert { color:#add8e6; font-weight:600; }
+  .temp-cold-alert { color:#1e90ff; font-weight:600; }
   .wind-alert { color:#ffc107; font-weight:600; }
   .rain-alert { color:#1e90ff; font-weight:600; }
   .legend { display:inline-block; width:20px; height:20px; margin-right:8px; border:1px solid #999; vertical-align:middle; }
@@ -41,8 +42,8 @@
   <div class="note">
     <strong>⚠️ Testing Instructions:</strong><br>
     1. Verify each color matches the expected zone<br>
-    2. Check that temperature alerts (< 55°F) appear in light blue<br>
-    3. Check that wind alerts (> 10 mph) appear in yellow<br>
+    2. Check that temperature alerts (&lt; 55.0°F) appear in #add8e6<br>
+    3. Check that wind alerts (&gt; 10.0 mph) appear in #ffc107<br>
     4. Verify text is readable on all background colors<br>
     5. Compare colors with live dashboard at http://localhost:8080
   </div>
@@ -223,7 +224,8 @@
   <!-- Temperature Alert Tests -->
   <div class="test-section">
     <h2>🌡️ Temperature Alert Testing</h2>
-    <p class="muted">Temperatures below 55°F should be highlighted in light blue</p>
+    <p class="muted">Temperatures below {temp_cold_threshold_f}°F should be highlighted in {temp_cold_alert_color} with snowflake ❄️<br>
+    Temperatures {temp_cold_threshold_f}°F-{temp_threshold_f}°F should be highlighted in {temp_alert_color}</p>
     <table>
       <thead>
         <tr>
@@ -235,38 +237,53 @@
       <tbody>
         <tr class="out">
           <td class="center"><strong>35°F</strong></td>
-          <td><span class="temp-alert">35°F</span></td>
-          <td>Light blue highlight (< 55°F)</td>
+          <td>❄️ <span class="temp-cold-alert">35°F</span></td>
+          <td>Cold alert with snowflake (&lt; 45.0°F) - #1e90ff</td>
         </tr>
         <tr class="out">
-          <td class="center"><strong>45°F</strong></td>
-          <td><span class="temp-alert">45°F</span></td>
-          <td>Light blue highlight (< 55°F)</td>
+          <td class="center"><strong>40°F</strong></td>
+          <td>❄️ <span class="temp-cold-alert">40°F</span></td>
+          <td>Cold alert with snowflake (&lt; 45.0°F) - #1e90ff</td>
         </tr>
         <tr class="out">
-          <td class="center"><strong>52°F</strong></td>
-          <td><span class="temp-alert">52°F</span></td>
-          <td>Light blue highlight (< 55°F)</td>
+          <td class="center"><strong>43.0°F</strong></td>
+          <td>❄️ <span class="temp-cold-alert">43.0°F</span></td>
+          <td>Cold alert with snowflake (&lt; 45.0°F) - #1e90ff</td>
         </tr>
         <tr class="out">
-          <td class="center"><strong>55°F</strong></td>
-          <td>55°F</td>
-          <td>Normal text (≥ 55°F)</td>
+          <td class="center"><strong>45.0°F</strong></td>
+          <td><span class="temp-alert">45.0°F</span></td>
+          <td>Cool alert (45.0°F-55.0°F) - #add8e6</td>
         </tr>
         <tr class="out">
-          <td class="center"><strong>65°F</strong></td>
-          <td>65°F</td>
-          <td>Normal text (≥ 55°F)</td>
+          <td class="center"><strong>47.0°F</strong></td>
+          <td><span class="temp-alert">47.0°F</span></td>
+          <td>Cool alert (45.0°F-55.0°F) - #add8e6</td>
         </tr>
         <tr class="out">
-          <td class="center"><strong>75°F</strong></td>
-          <td>75°F</td>
-          <td>Normal text (≥ 55°F)</td>
+          <td class="center"><strong>52.0°F</strong></td>
+          <td><span class="temp-alert">52.0°F</span></td>
+          <td>Cool alert (45.0°F-55.0°F) - #add8e6</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>55.0°F</strong></td>
+          <td>55.0°F</td>
+          <td>Normal text (≥ 55.0°F)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>65.0°F</strong></td>
+          <td>65.0°F</td>
+          <td>Normal text (≥ 55.0°F)</td>
+        </tr>
+        <tr class="out">
+          <td class="center"><strong>75.0°F</strong></td>
+          <td>75.0°F</td>
+          <td>Normal text (≥ 55.0°F)</td>
         </tr>
         <tr class="out">
           <td class="center"><strong>85°F</strong></td>
           <td>85°F</td>
-          <td>Normal text (≥ 55°F)</td>
+          <td>Normal text (≥ 55.0°F)</td>
         </tr>
       </tbody>
     </table>
@@ -275,7 +292,7 @@
   <!-- Wind Alert Tests -->
   <div class="test-section">
     <h2>💨 Wind Alert Testing</h2>
-    <p class="muted">Wind speeds above 10 mph should be highlighted in yellow</p>
+    <p class="muted">Wind speeds above {wind_threshold_mph} mph should be highlighted in {wind_alert_color}</p>
     <table>
       <thead>
         <tr>
@@ -288,42 +305,42 @@
         <tr class="out">
           <td class="center"><strong>0 mph</strong></td>
           <td>Wind: 0 mph N</td>
-          <td>Normal text (≤ 10 mph)</td>
+          <td>Normal text (≤ 10.0 mph)</td>
         </tr>
         <tr class="out">
-          <td class="center"><strong>5 mph</strong></td>
-          <td>Wind: 5 mph N</td>
-          <td>Normal text (≤ 10 mph)</td>
+          <td class="center"><strong>5.0 mph</strong></td>
+          <td>Wind: 5.0 mph N</td>
+          <td>Normal text (≤ 10.0 mph)</td>
         </tr>
         <tr class="out">
-          <td class="center"><strong>10 mph</strong></td>
-          <td>Wind: 10 mph N</td>
-          <td>Normal text (≤ 10 mph)</td>
+          <td class="center"><strong>10.0 mph</strong></td>
+          <td>Wind: 10.0 mph N</td>
+          <td>Normal text (≤ 10.0 mph)</td>
         </tr>
         <tr class="out">
-          <td class="center"><strong>11 mph</strong></td>
-          <td>Wind: <span class="wind-alert">11 mph</span> N</td>
-          <td>Yellow highlight (> 10 mph)</td>
+          <td class="center"><strong>11.0 mph</strong></td>
+          <td>Wind: <span class="wind-alert">11.0 mph</span> N</td>
+          <td>Alert highlight (&gt; 10.0 mph)</td>
         </tr>
         <tr class="out">
-          <td class="center"><strong>15 mph</strong></td>
-          <td>Wind: <span class="wind-alert">15 mph</span> N</td>
-          <td>Yellow highlight (> 10 mph)</td>
+          <td class="center"><strong>15.0 mph</strong></td>
+          <td>Wind: <span class="wind-alert">15.0 mph</span> N</td>
+          <td>Alert highlight (&gt; 10.0 mph)</td>
         </tr>
         <tr class="out">
-          <td class="center"><strong>20 mph</strong></td>
-          <td>Wind: <span class="wind-alert">20 mph</span> N</td>
-          <td>Yellow highlight (> 10 mph)</td>
+          <td class="center"><strong>20.0 mph</strong></td>
+          <td>Wind: <span class="wind-alert">20.0 mph</span> N</td>
+          <td>Alert highlight (&gt; 10.0 mph)</td>
         </tr>
         <tr class="out">
-          <td class="center"><strong>25 mph</strong></td>
-          <td>Wind: <span class="wind-alert">25 mph</span> N</td>
-          <td>Yellow highlight (> 10 mph)</td>
+          <td class="center"><strong>25.0 mph</strong></td>
+          <td>Wind: <span class="wind-alert">25.0 mph</span> N</td>
+          <td>Alert highlight (&gt; 10.0 mph)</td>
         </tr>
         <tr class="out">
-          <td class="center"><strong>30 mph</strong></td>
-          <td>Wind: <span class="wind-alert">30 mph</span> N</td>
-          <td>Yellow highlight (> 10 mph)</td>
+          <td class="center"><strong>30.0 mph</strong></td>
+          <td>Wind: <span class="wind-alert">30.0 mph</span> N</td>
+          <td>Alert highlight (&gt; 10.0 mph)</td>
         </tr>
       </tbody>
     </table>
@@ -487,8 +504,8 @@
   <div class="note" style="margin-top:32px;">
     <strong>✅ Test Checklist:</strong><br>
     □ All 6 Little River color zones display correctly<br>
-    □ Temperature < 55°F shows light blue<br>
-    □ Wind > 10 mph shows yellow<br>
+    □ Temperature &lt; {temp_threshold_f}°F shows {temp_alert_color}<br>
+    □ Wind &gt; {wind_threshold_mph} mph shows {wind_alert_color}<br>
     □ Text is readable on all backgrounds<br>
     □ Colors match the live dashboard<br>
     □ Mobile view looks correct (resize window)
