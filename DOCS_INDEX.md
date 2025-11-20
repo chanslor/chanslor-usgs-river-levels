@@ -10,9 +10,10 @@ This index provides a quick overview of all documentation files and their purpos
 
 **New to this project?** Start here:
 
-1. **[DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md)** - Current production status and quick links
-2. **[CLAUDE.md](CLAUDE.md)** - Complete project overview and architecture
-3. **[API_README.md](API_README.md)** - REST API documentation for ESP32 integration
+1. **[QUICKSTART.md](QUICKSTART.md)** ⭐ - Get running in 5 minutes! **START HERE**
+2. **[DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md)** - Current production status and quick links
+3. **[CLAUDE.md](CLAUDE.md)** - Complete project overview and architecture
+4. **[API_README.md](API_README.md)** - REST API documentation for ESP32 integration
 
 ---
 
@@ -22,8 +23,9 @@ This index provides a quick overview of all documentation files and their purpos
 
 | File | Size | Purpose | Audience |
 |------|------|---------|----------|
-| **[DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md)** | 12K | Current deployment status, configuration, monitoring | DevOps, Maintainers |
-| **[CLAUDE.md](CLAUDE.md)** | 16K | Complete project guide, architecture, patterns | Developers, AI Assistants |
+| **[QUICKSTART.md](QUICKSTART.md)** ⭐ | 6K | Get running in 5 minutes, troubleshooting | **Everyone - START HERE** |
+| **[DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md)** | 14K | Current deployment status, configuration, monitoring | DevOps, Maintainers |
+| **[CLAUDE.md](CLAUDE.md)** | 18K | Complete project guide, architecture, patterns | Developers, AI Assistants |
 | **[API_README.md](API_README.md)** | 8.2K | REST API endpoints, ESP32 integration examples | API Users, IoT Developers |
 
 ### Container & Deployment
@@ -51,10 +53,15 @@ This index provides a quick overview of all documentation files and their purpos
 
 ## 🗺️ Documentation Map by Use Case
 
+### "I want to get started quickly"
+1. [QUICKSTART.md](QUICKSTART.md) ⭐ - 5-minute setup guide
+2. [API_README.md](API_README.md) - If using the API
+
 ### "I want to deploy this project"
-1. [DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md) - See current deployment
-2. [CONTAINERFILES.md](CONTAINERFILES.md) - Choose the right Containerfile
-3. [CLAUDE.md](CLAUDE.md) - Understand the architecture
+1. [QUICKSTART.md](QUICKSTART.md) - Quick local deployment
+2. [DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md) - Production deployment
+3. [CONTAINERFILES.md](CONTAINERFILES.md) - Choose the right Containerfile
+4. [CLAUDE.md](CLAUDE.md) - Understand the architecture
 
 ### "I want to use the API"
 1. [API_README.md](API_README.md) - API endpoints and examples

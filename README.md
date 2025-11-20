@@ -3,6 +3,7 @@
 A containerized river gauge monitoring system that tracks USGS water levels, sends email alerts, and displays live data on a web dashboard.
 
 **🔗 Quick Links to Documentation:**
+- 🚀 **[QUICKSTART.md](QUICKSTART.md)** - Get running in 5 minutes! ⭐ START HERE
 - 📋 **[DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md)** - Production status, quick links, monitoring
 - 🔌 **[API_README.md](API_README.md)** - REST API documentation, ESP32 integration
 - 🐳 **[CONTAINERFILES.md](CONTAINERFILES.md)** - Container build guide, comparison matrix
@@ -13,6 +14,10 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 - **Dashboard**: https://docker-blue-sound-1751.fly.dev/
 - **API Info**: https://docker-blue-sound-1751.fly.dev/api
 - **ESP32 API**: https://docker-blue-sound-1751.fly.dev/api/river-levels/02399200
+
+**🏠 Local Access:**
+- Use your machine's IP address (e.g., http://192.168.1.168:8080/)
+- **Not** `localhost` - see [QUICKSTART.md](QUICKSTART.md) for details
 
 ---
 

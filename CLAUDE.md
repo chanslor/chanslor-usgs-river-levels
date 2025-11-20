@@ -326,19 +326,93 @@ Per-site configuration supports:
 
 ## Systemd Integration
 
-Enable auto-start on boot using Podman Quadlet:
+Enable auto-start on boot using Podman Quadlet. This will run the Flask API + Dashboard system automatically.
+
+### Setup Steps
+
+1. **Create the systemd unit file**:
 ```bash
 mkdir -p ~/.config/containers/systemd
-# Create usgs-alert.container file in that directory
+cat > ~/.config/containers/systemd/usgs-alert.container << 'EOF'
+[Unit]
+Description=USGS River Alert System with Flask API
+After=network-online.target
 
+[Container]
+Image=localhost/usgs-api:latest
+Pull=never
+PublishPort=8080:8080
+
+# Load credentials from .env_creds file
+EnvironmentFile=/chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker/.env_creds
+
+# Runtime configuration
+Environment=BIND_HOST=0.0.0.0
+Environment=RUN_INTERVAL_SEC=60
+Environment=QPF_TTL_HOURS=3
+Environment=QPF_CACHE=/data/qpf_cache.sqlite
+Environment=SITE_DIR=/site
+Environment=PORT=8080
+Environment=NWS_UA=mdchansl-usgs-alert/1.0
+Environment=NWS_CONTACT=michael.chanslor@gmail.com
+
+# Persistent data volumes
+Volume=/chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker/usgs-data:/data:Z
+Volume=/chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker/usgs-site:/site:Z
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target
+EOF
+```
+
+2. **Build the image** (if not already built):
+```bash
+cd /chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker
+podman build -f Containerfile.api.simple -t usgs-api:latest .
+```
+
+3. **Enable and start the service**:
+```bash
 systemctl --user daemon-reload
 systemctl --user enable --now usgs-alert.service
 loginctl enable-linger "$USER"
 ```
 
-Verify service status:
+4. **Verify service status**:
 ```bash
 systemctl --user status usgs-alert.service --no-pager
+```
+
+5. **View logs**:
+```bash
+journalctl --user -u usgs-alert.service -f
+```
+
+6. **Access locally**:
+- Dashboard: http://YOUR_IP:8080/ (e.g., http://192.168.1.168:8080/)
+- API Info: http://YOUR_IP:8080/api
+- River Data: http://YOUR_IP:8080/api/river-levels/02399200
+
+**Note**: Use your machine's IP address (not `localhost`) for reliable access. Find your IP with: `ip addr show | grep "inet "`
+
+### Service Management
+
+```bash
+# Stop service
+systemctl --user stop usgs-alert.service
+
+# Restart service (after config changes)
+systemctl --user restart usgs-alert.service
+
+# Disable auto-start
+systemctl --user disable usgs-alert.service
+
+# Check if enabled
+systemctl --user is-enabled usgs-alert.service
 ```
 
 ## Git Repository State

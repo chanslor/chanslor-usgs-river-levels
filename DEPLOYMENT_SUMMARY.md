@@ -138,7 +138,7 @@ primary_region = 'iad'
 
 ## Deployment Process
 
-### From Local Machine
+### Production Deployment (Fly.io)
 
 ```bash
 # Navigate to project directory
@@ -157,7 +157,7 @@ fly logs
 curl https://docker-blue-sound-1751.fly.dev/api/health
 ```
 
-### Rollback Process
+#### Rollback Process
 
 ```bash
 # List previous releases
@@ -165,6 +165,89 @@ fly releases
 
 # Rollback to previous version
 fly releases rollback <version>
+```
+
+---
+
+### Local Deployment (Systemd)
+
+For auto-start on boot using Podman Quadlet:
+
+**1. Create systemd unit file**:
+```bash
+mkdir -p ~/.config/containers/systemd
+cat > ~/.config/containers/systemd/usgs-alert.container << 'EOF'
+[Unit]
+Description=USGS River Alert System with Flask API
+After=network-online.target
+
+[Container]
+Image=localhost/usgs-api:latest
+Pull=never
+PublishPort=8080:8080
+
+EnvironmentFile=/chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker/.env_creds
+
+Environment=BIND_HOST=0.0.0.0
+Environment=RUN_INTERVAL_SEC=60
+Environment=QPF_TTL_HOURS=3
+Environment=QPF_CACHE=/data/qpf_cache.sqlite
+Environment=SITE_DIR=/site
+Environment=PORT=8080
+Environment=NWS_UA=mdchansl-usgs-alert/1.0
+Environment=NWS_CONTACT=michael.chanslor@gmail.com
+
+Volume=/chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker/usgs-data:/data:Z
+Volume=/chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker/usgs-site:/site:Z
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target
+EOF
+```
+
+**2. Build the image**:
+```bash
+cd /chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker
+podman build -f Containerfile.api.simple -t usgs-api:latest .
+```
+
+**3. Enable and start**:
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now usgs-alert.service
+loginctl enable-linger "$USER"
+```
+
+**4. Verify**:
+```bash
+systemctl --user status usgs-alert.service
+```
+
+**5. Access**:
+- Find your IP: `ip addr show | grep "inet "`
+- Dashboard: http://YOUR_IP:8080/
+- API: http://YOUR_IP:8080/api
+
+**Note**: Use your machine's IP address (not `localhost`) for reliable access.
+
+#### Service Management
+
+```bash
+# View logs
+journalctl --user -u usgs-alert.service -f
+
+# Restart service
+systemctl --user restart usgs-alert.service
+
+# Stop service
+systemctl --user stop usgs-alert.service
+
+# Disable auto-start
+systemctl --user disable usgs-alert.service
 ```
 
 ---
