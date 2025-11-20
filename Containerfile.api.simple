@@ -1,7 +1,5 @@
 # Simple single-stage Containerfile for API deployment
-# Cache buster: 2025-11-19-v2
 FROM docker.io/library/ubuntu:22.04
-ARG CACHEBUST=2025-11-19-v2
 
 ENV DEBIAN_FRONTEND=noninteractive
 

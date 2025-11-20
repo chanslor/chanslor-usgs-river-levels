@@ -1,29 +1,19 @@
-# Simple single-stage Containerfile for API deployment
-# Cache buster: 2025-11-19-v2
-FROM docker.io/library/ubuntu:22.04
-ARG CACHEBUST=2025-11-19-v2
+# Containerfile for cloud deployment WITH Flask API (Fly.io, Railway, etc.)
+# Uses gauges.conf.cloud.json without credentials
 
-ENV DEBIAN_FRONTEND=noninteractive
+FROM registry.access.redhat.com/ubi9/python-311
 
-# Install Python and dependencies
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python packages
-RUN python3 -m pip install --no-cache-dir \
-    requests \
-    python-dateutil \
-    flask \
-    flask-cors
-
-# Prepare directories
+# Prepare writable dirs, group-owned by 0 and group-writable
+USER 0
 RUN mkdir -p /app /data /site \
  && chgrp -R 0 /app /data /site \
  && chmod -R g+rwX /app /data /site
 
-# Copy application files
+# Install Flask and dependencies to system site-packages
+# Must be done as root before switching to non-root user
+RUN python3 -m pip install --no-cache-dir flask flask-cors requests python-dateutil
+
+# Copy app code & cloud config (NO CREDENTIALS)
 COPY usgs_multi_alert.py /app/usgs_multi_alert.py
 COPY qpf.py             /app/qpf.py
 COPY observations.py    /app/observations.py
@@ -32,12 +22,14 @@ COPY streambeam_multi_scrape.py /app/streambeam_multi_scrape.py
 COPY api_app.py         /app/api_app.py
 COPY entrypoint-api.sh  /app/entrypoint-api.sh
 COPY gauges.conf.cloud.json /app/gauges.conf.json
+
+# Copy test suite to /site (served by HTTP server)
 COPY test_visual_indicators.html /site/test_visual_indicators.html
 
-# Make scripts executable
+# Ensure executable
 RUN chmod 0755 /app/entrypoint-api.sh /app/usgs_multi_alert.py /app/api_app.py
 
-# Run as non-root
+# Drop privileges: run as UID 10001, GID 0 (so group perms apply)
 USER 10001:0
 
 EXPOSE 8080

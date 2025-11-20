@@ -1,0 +1,49 @@
+
+9d381810cef: Pushed
+115fc79fb3d1: Pushed
+fd93afbbe1ce: Pushed
+f92983442b23: Pushed
+4d274d05ee12: Pushed
+548a79621a42: Pushed
+deployment-01K8RNYC4GX4CHZ9E7FVT8QR3A: digest: sha256:88b90052d790f2c30ad402554ff2772fc6101138b630f73789a9b1d5062d577e size: 3452
+--> Pushing image done
+image: registry.fly.io/docker-blue-sound-1751:deployment-01K8RNYC4GX4CHZ9E7FVT8QR3A
+image size: 282 MB
+
+Watch your deployment at https://fly.io/apps/docker-blue-sound-1751/monitoring
+
+Provisioning ips for docker-blue-sound-1751
+  Dedicated ipv6: 2a09:8280:1::aa:c28c:0
+  Shared ipv4: 66.241.125.229
+  Add a dedicated ipv4 with: fly ips allocate-v4
+
+This deployment will:
+ * create 2 "app" machines
+
+No machines in group app, launching a new machine
+
+-------
+ ✖ Failed: smoke checks for 7849655c274638 failed: the app appears to be crashing
+-------
+Error: smoke checks for 7849655c274638 failed: the app appears to be crashing
+Smoke checks for 7849655c274638 failed: the app appears to be crashing
+Check its logs: here's the last lines below, or run 'fly logs -i 7849655c274638':
+
+
+┌─[02:11 PM Wed Oct 29]─[✗]─[mdc@mdcws]─[/chanslor/mdc/YOUTUBE/scripts/chanslor-usgs-river-levels/docker](20 files, 384Kb)
+└──╼ fly logs -i 7849655c274638
+2025-10-29T19:13:06Z app[7849655c274638] iad [info]2025-10-29T19:13:06.896470889 [01K8RP3BSE0JD57D98G28VKS62:main] Running Firecracker v1.12.1
+2025-10-29T19:13:06Z app[7849655c274638] iad [info]2025-10-29T19:13:06.896613070 [01K8RP3BSE0JD57D98G28VKS62:main] Listening on API socket ("/fc.sock").
+2025-10-29T19:13:07Z app[7849655c274638] iad [info] INFO Starting init (commit: fad6f82)...
+2025-10-29T19:13:07Z app[7849655c274638] iad [info] INFO Preparing to run: `/cnb/process/web` as 1000
+2025-10-29T19:13:07Z app[7849655c274638] iad [info] INFO [fly api proxy] listening at /.fly/api
+2025-10-29T19:13:07Z app[7849655c274638] iad [info]bash: gunicorn: command not found
+2025-10-29T19:13:07Z runner[7849655c274638] iad [info]Machine started in 1.158s
+2025-10-29T19:13:08Z app[7849655c274638] iad [info]2025/10/29 19:13:08 INFO SSH listening listen_address=[fdaa:31:f8f1:a7b:518:15d2:a1a4:2]:22
+2025-10-29T19:13:08Z app[7849655c274638] iad [info] INFO Main child exited normally with code: 127
+2025-10-29T19:13:08Z app[7849655c274638] iad [info] INFO Starting clean up.
+2025-10-29T19:13:08Z app[7849655c274638] iad [info][    1.844574] reboot: Restarting system
+2025-10-29T19:13:09Z runner[7849655c274638] iad [info]machine has reached its max restart count of 10
+
+
+

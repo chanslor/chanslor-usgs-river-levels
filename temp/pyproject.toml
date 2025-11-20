@@ -1,0 +1,16 @@
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 100
+extend-select = ["E", "F", "I", "UP"]
+target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+warn_return_any = true
+warn_unreachable = true
+implicit_optional = false
+strict_optional = true

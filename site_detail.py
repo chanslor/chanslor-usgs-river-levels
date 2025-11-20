@@ -10,6 +10,54 @@ import urllib.parse
 from datetime import datetime, timezone, timedelta
 import html
 
+def calculate_wind_chill(temp_f, wind_mph):
+    """
+    Calculate wind chill temperature using NWS formula.
+
+    Wind chill is only valid for:
+    - Temperature <= 50°F
+    - Wind speed >= 3 mph
+
+    Formula: WC = 35.74 + 0.6215T - 35.75(V^0.16) + 0.4275T(V^0.16)
+    Where T = air temperature in °F, V = wind speed in mph
+
+    Returns:
+        Tuple of (wind_chill_temp, emoji, description) or (None, None, None) if not applicable
+    """
+    if temp_f is None or wind_mph is None:
+        return None, None, None
+
+    # Wind chill only applies when temp <= 50°F and wind >= 3 mph
+    if temp_f > 50 or wind_mph < 3:
+        return None, None, None
+
+    # NWS Wind Chill Formula
+    wind_chill = (35.74 + 0.6215 * temp_f -
+                  35.75 * (wind_mph ** 0.16) +
+                  0.4275 * temp_f * (wind_mph ** 0.16))
+
+    # Fun emoji ranges based on wind chill
+    if wind_chill < 0:
+        emoji = "❄️🥶"
+        desc = "Dangerous!"
+    elif wind_chill < 10:
+        emoji = "🥶"
+        desc = "Extreme Cold"
+    elif wind_chill < 20:
+        emoji = "🧊"
+        desc = "Very Cold"
+    elif wind_chill < 32:
+        emoji = "🌬️"
+        desc = "Freezing"
+    elif wind_chill < 40:
+        emoji = "😬"
+        desc = "Chilly"
+    else:
+        emoji = "🌡️"
+        desc = "Cool"
+
+    return wind_chill, emoji, desc
+
 def fetch_usgs_7day_data(site_id, parameter_code):
     """
     Fetch 7 days of historical data from USGS IV service.
@@ -142,6 +190,15 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
 
     # Last runnable time
     last_runnable = last_in_time if last_in_time else "Never recorded"
+
+    # Get wind chill from passed data, or calculate if not provided
+    wind_chill_temp = site_data.get("wind_chill_f")
+    wind_chill_emoji = site_data.get("wind_chill_emoji")
+    wind_chill_desc = site_data.get("wind_chill_desc")
+
+    # If wind chill wasn't pre-calculated, calculate it now
+    if wind_chill_temp is None and current_temp is not None and current_wind_mph is not None:
+        wind_chill_temp, wind_chill_emoji, wind_chill_desc = calculate_wind_chill(current_temp, current_wind_mph)
 
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -319,6 +376,11 @@ body {{
       <div class="label">Current Status</div>
       <div class="value" style="color: {status_color};">{status_text}</div>
       <div class="range">{"Meets all thresholds" if in_range else "Below threshold"}</div>
+    </div>
+    <div class="stat-box">
+      <div class="label">Wind Chill {wind_chill_emoji if wind_chill_emoji else ""}</div>
+      <div class="value">{f"{wind_chill_temp:.1f}°F" if wind_chill_temp is not None else "N/A"}</div>
+      <div class="range">{wind_chill_desc if wind_chill_desc else "No wind chill" if current_temp is not None and current_wind_mph is not None else "Data unavailable"}</div>
     </div>
   </div>
 

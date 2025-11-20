@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "timeout_seconds": 25,
+  "adjustment_defaults": {
+    "zero_offset_ft": 0.0,
+    "floor_at_zero": true
+  },
+  "sites": [
+    {
+      "name": "Short Creek (AL)",
+      "site_id": "1",
+      "zero_offset_ft": 21.85,
+      "floor_at_zero": true
+    },
+    {
+      "name": "Kelly Creek near Moody, AL",
+      "site_id": "5",
+      "zero_offset_ft": 0.0,
+      "floor_at_zero": true
+    }
+  ]
+}

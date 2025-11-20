@@ -1,0 +1,21 @@
+ Weather station mapping for each river site
+# For sites that need multiple stations for operational decisions, use primary station here
+WEATHER_STATIONS = {
+    "Locust Fork": "KCMD",           # Cullman Regional Airport
+    "Town Creek": "KBFZ",            # Albertville Regional Airport (ultra-local, near shore)
+    "South Sauty": "K4A9",           # Fort Payne / Isbell Field Airport
+    "Tellico River": "KMNV",         # Monroe County Airport, Madisonville TN
+    "Little River": "K4A9",          # Fort Payne / Isbell Field Airport
+    "Little River Canyon": "K4A9",   # Fort Payne / Isbell Field Airport (cloud config name)
+    "Short Creek": "KBFZ",           # Albertville Regional Airport (ultra-local for lake paddling)
+}
+
+# Secondary weather stations for sites that need valley trend data
+WEATHER_STATIONS_SECONDARY = {
+    "Short Creek": "KHSV",           # Huntsville (valley trend for operational paddling calls)
+    "Town Creek": "KHSV",            # Huntsville (valley trend backup)
+}
+
+USGS_IV = "https://waterservices.usgs.gov/nwis/iv/"
+
+

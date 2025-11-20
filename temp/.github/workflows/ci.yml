@@ -1,0 +1,80 @@
+name: ci
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*", "V*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install ruff black mypy pytest
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Black (check)
+        run: black --check --line-length 100 .
+
+      - name: Mypy
+        run: mypy --ignore-missing-imports --install-types --non-interactive || true
+
+      - name: Pytest
+        run: |
+          if ls -1 test*.py tests 2>/dev/null; then
+            pytest -q
+          else
+            echo "No tests found, skipping"
+          fi
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image tags
+        id: meta
+        run: |
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "name=repo::ghcr.io/${REPO_LC}" >> $GITHUB_OUTPUT
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "name=tags::${{ github.ref_name }},latest" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/master" ]]; then
+            echo "name=tags::latest,${{ github.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=tags::${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build & Push container
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.tags }}

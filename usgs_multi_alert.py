@@ -38,10 +38,13 @@ except ImportError:
 
 # Import site detail page generator
 try:
-    from site_detail import fetch_usgs_7day_data, generate_site_detail_html
+    from site_detail import fetch_usgs_7day_data, generate_site_detail_html, calculate_wind_chill
     SITE_DETAIL_AVAILABLE = True
 except ImportError:
     SITE_DETAIL_AVAILABLE = False
+    def calculate_wind_chill(temp_f, wind_mph):
+        """Fallback if site_detail not available"""
+        return None, None, None
 
 # Import StreamBeam scraper for non-USGS gauges
 try:
@@ -608,6 +611,12 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
                     if wind_gust is not None and wind_gust > wind_mph:
                         wind_str += f" (gust {wind_gust})"
                 obs_parts.append(wind_str)
+            # Wind Chill
+            wind_chill_f = obs_data.get("wind_chill_f")
+            wind_chill_emoji = obs_data.get("wind_chill_emoji")
+            wind_chill_desc = obs_data.get("wind_chill_desc")
+            if wind_chill_f is not None:
+                obs_parts.append(f'{wind_chill_emoji} <span class="wind-chill">Feels: {wind_chill_f:.0f}°F</span>')
             if obs_parts:
                 # Use city abbreviation if available, otherwise use airport code
                 city_label = STATION_CITY_LABELS.get(station, station)
@@ -643,6 +652,12 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
                     if wind_gust is not None and wind_gust > wind_mph:
                         wind_str += f" (gust {wind_gust})"
                 obs_sec_parts.append(wind_str)
+            # Wind Chill
+            wind_chill_f = obs_secondary.get("wind_chill_f")
+            wind_chill_emoji = obs_secondary.get("wind_chill_emoji")
+            wind_chill_desc = obs_secondary.get("wind_chill_desc")
+            if wind_chill_f is not None:
+                obs_sec_parts.append(f'{wind_chill_emoji} <span class="wind-chill">Feels: {wind_chill_f:.0f}°F</span>')
             if obs_sec_parts:
                 # Use city abbreviation if available, otherwise use airport code
                 city_label = STATION_CITY_LABELS.get(station, station)
@@ -748,6 +763,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   .wind-alert {{ color:{wind_alert_color}; font-weight:600; }}
   .temp-alert {{ color:{temp_alert_color}; font-weight:600; }}
   .temp-cold-alert {{ color:{temp_cold_alert_color}; font-weight:600; }}
+  .wind-chill {{ color:#87ceeb; font-weight:600; }}
   .trend-rising {{ color:#4ade80; font-weight:600; }}
   .trend-falling {{ color:#f87171; font-weight:600; }}
 
@@ -1008,12 +1024,17 @@ def main():
             station = WEATHER_STATIONS[name]
             try:
                 obs = fetch_latest_observation(station)
+                # Calculate wind chill
+                wind_chill_temp, wind_chill_emoji, wind_chill_desc = calculate_wind_chill(obs["temp_f"], obs["wind_mph"])
                 obs_data = {
                     "station": station,
                     "temp_f": obs["temp_f"],
                     "wind_mph": obs["wind_mph"],
                     "wind_dir": fmt_dir(obs["wind_dir_deg"]),
-                    "wind_gust_mph": obs["wind_gust_mph"]
+                    "wind_gust_mph": obs["wind_gust_mph"],
+                    "wind_chill_f": wind_chill_temp,
+                    "wind_chill_emoji": wind_chill_emoji,
+                    "wind_chill_desc": wind_chill_desc
                 }
             except Exception as e:
                 if not args.quiet:
@@ -1025,12 +1046,17 @@ def main():
             station_secondary = WEATHER_STATIONS_SECONDARY[name]
             try:
                 obs = fetch_latest_observation(station_secondary)
+                # Calculate wind chill for secondary station
+                wind_chill_temp_sec, wind_chill_emoji_sec, wind_chill_desc_sec = calculate_wind_chill(obs["temp_f"], obs["wind_mph"])
                 obs_secondary = {
                     "station": station_secondary,
                     "temp_f": obs["temp_f"],
                     "wind_mph": obs["wind_mph"],
                     "wind_dir": fmt_dir(obs["wind_dir_deg"]),
-                    "wind_gust_mph": obs["wind_gust_mph"]
+                    "wind_gust_mph": obs["wind_gust_mph"],
+                    "wind_chill_f": wind_chill_temp_sec,
+                    "wind_chill_emoji": wind_chill_emoji_sec,
+                    "wind_chill_desc": wind_chill_desc_sec
                 }
             except Exception as e:
                 if not args.quiet:
@@ -1201,14 +1227,24 @@ def main():
                         last_in_time = None
 
                     # Prepare site data for detail page
+                    # Prefer primary obs, but fall back to secondary if primary is unavailable
+                    obs_data = row.get("obs", {})
+                    obs_secondary = row.get("obs_secondary", {})
+
+                    # Use primary obs if temp_f is available, otherwise use secondary
+                    active_obs = obs_data if obs_data and obs_data.get("temp_f") is not None else obs_secondary
+
                     site_data = {
                         "name": row.get("name"),
                         "site": site_id,
                         "cfs": row.get("cfs"),
                         "stage_ft": row.get("stage_ft"),
-                        "temp_f": row.get("obs", {}).get("temp_f") if row.get("obs") else None,
-                        "wind_mph": row.get("obs", {}).get("wind_mph") if row.get("obs") else None,
-                        "wind_dir": row.get("obs", {}).get("wind_dir") if row.get("obs") else "",
+                        "temp_f": active_obs.get("temp_f") if active_obs else None,
+                        "wind_mph": active_obs.get("wind_mph") if active_obs else None,
+                        "wind_dir": active_obs.get("wind_dir") if active_obs else "",
+                        "wind_chill_f": active_obs.get("wind_chill_f") if active_obs else None,
+                        "wind_chill_emoji": active_obs.get("wind_chill_emoji") if active_obs else None,
+                        "wind_chill_desc": active_obs.get("wind_chill_desc") if active_obs else None,
                         "threshold_ft": row.get("threshold_ft"),
                         "threshold_cfs": row.get("threshold_cfs"),
                         "in_range": row.get("in_range", False),

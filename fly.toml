@@ -5,7 +5,7 @@ app = 'docker-blue-sound-1751'
 primary_region = 'iad'
 
 [build]
-  dockerfile = "Containerfile.cloud"
+  dockerfile = "Containerfile.api.simple"
 
 [env]
   RUN_INTERVAL_SEC = "60"

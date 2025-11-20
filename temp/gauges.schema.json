@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Gauges config",
+  "type": "object",
+  "properties": {
+    "smtp": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "user": {
+          "type": "string"
+        },
+        "from_email": {
+          "type": "string",
+          "format": "email"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ]
+    },
+    "gauges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lon": {
+            "type": "number"
+          },
+          "threshold_cfs": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      }
+    }
+  },
+  "required": [
+    "gauges"
+  ]
+}

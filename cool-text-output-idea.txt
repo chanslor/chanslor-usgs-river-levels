@@ -1,0 +1,25 @@
+---
+  📋 Current River Status:
+
+  All rivers are currently OUT (below thresholds):
+
+  | River         | Current Level     | Threshold | Status |
+  |---------------|-------------------|-----------|--------|
+  | Locust Fork   | 1.49 ft / 67 cfs  | ≥1.70 ft  | 🔴 OUT |
+  | Town Creek    | 1.44 ft / 84 cfs  | ≥2.00 ft  | 🔴 OUT |
+  | South Sauty   | 7.38 ft / 6 cfs   | ≥8.34 ft  | 🔴 OUT |
+  | Tellico River | 1.05 ft / 139 cfs | ≥1.40 ft  | 🔴 OUT |
+  | Little River  | 2.96 ft / 147 cfs | ≥300 cfs  | 🔴 OUT |
+
+  ---
+  🌐 Access Your Dashboard:
+
+  # Get your Fly.io app URL
+  fly open -a docker-blue-sound-1751
+
+  # Or check status
+  fly status -a docker-blue-sound-1751
+
+  Your dashboard should be accessible at: https://docker-blue-sound-1751.fly.dev
+
+

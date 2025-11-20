@@ -1,0 +1,2 @@
+I'm looking for a way to display the river like Tellico and Cheoah at the bottom of the html unless the are IN, running.
+Cheaoh - USGS 0351706800 - 500cfs is min flow - Above 1,000 cfs is good.

@@ -1,7 +1,6 @@
-# Simple single-stage Containerfile for API deployment
-# Cache buster: 2025-11-19-v2
+# Containerfile for cloud deployment WITH Flask API
+# Uses Ubuntu base image - no Red Hat credentials required
 FROM docker.io/library/ubuntu:22.04
-ARG CACHEBUST=2025-11-19-v2
 
 ENV DEBIAN_FRONTEND=noninteractive
 

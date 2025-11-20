@@ -1,0 +1,89 @@
+Updating existing machines in 'docker-blue-sound-1751' with rolling strategy
+
+-------
+ ✔ Machine 2873d3df690218 [app] update succeeded
+-------
+Checking DNS configuration for docker-blue-sound-1751.fly.dev
+✓ DNS configuration verified
+┌─[02:23 PM Wed Oct 29]─[mdc@mdcws]─[/chanslor/mdc/YOUTUBE/scripts/chanslor-usgs-river-levels/docker](24 files, 404Kb)
+└──╼ fly volumes list
+ID                  	STATE  	NAME     	SIZE	REGION	ZONE	ENCRYPTED	ATTACHED VM   	CREATED AT    
+vol_4m8y38lz7o75o83r	created	usgs_data	1GB 	iad   	718a	true     	2873d3df690218	6 minutes ago
+
+┌─[02:23 PM Wed Oct 29]─[mdc@mdcws]─[/chanslor/mdc/YOUTUBE/scripts/chanslor-usgs-river-levels/docker](24 files, 404Kb)
+└──╼ fly deploy
+==> Verifying app config
+Validating /chanslor/mdc/YOUTUBE/scripts/chanslor-usgs-river-levels/docker/fly.toml
+✓ Configuration is valid
+--> Verified app config
+==> Building image
+==> Building image with Depot
+--> build:  (​)
+[+] Building 1.3s (13/13) FINISHED                                                                                    
+ => [internal] load build definition from Containerfile.cloud                                                    0.1s
+ => => transferring dockerfile: 1.06kB                                                                           0.1s
+ => [internal] load metadata for registry.access.redhat.com/ubi9/python-311:latest                               0.2s
+ => [internal] load .dockerignore                                                                                0.1s
+ => => transferring context: 55B                                                                                 0.1s
+ => [1/8] FROM registry.access.redhat.com/ubi9/python-311:latest@sha256:ee1128adb98b79e58cd31c32da4cfd6641c4665  0.0s
+ => => resolve registry.access.redhat.com/ubi9/python-311:latest@sha256:ee1128adb98b79e58cd31c32da4cfd6641c4665  0.0s
+ => [internal] load build context                                                                                0.1s
+ => => transferring context: 1.69kB                                                                              0.1s
+ => CACHED [2/8] RUN python3 -m pip install --no-cache-dir --upgrade pip &&     python3 -m pip install --no-cac  0.0s
+ => CACHED [3/8] RUN mkdir -p /app /data /site  && chgrp -R 0 /app /data /site  && chmod -R g+rwX /app /data /s  0.0s
+ => CACHED [4/8] COPY usgs_multi_alert.py /app/usgs_multi_alert.py                                               0.0s
+ => CACHED [5/8] COPY qpf.py             /app/qpf.py                                                             0.0s
+ => CACHED [6/8] COPY entrypoint.sh      /app/entrypoint.sh                                                      0.0s
+ => [7/8] COPY gauges.conf.cloud.json /app/gauges.conf.json                                                      0.0s
+ => [8/8] RUN chmod 0755 /app/entrypoint.sh /app/usgs_multi_alert.py                                             0.1s
+ => exporting to image                                                                                           0.6s
+ => => exporting layers                                                                                          0.1s
+ => => exporting manifest sha256:5a8fa82cd701530a84c323f74cfd85d68e0b7c888b4b2f0e722735c7f9d2b6a3                0.0s
+ => => exporting config sha256:365e20b30a8d18068742bb6ab2ed969aa8a25895edfc3a117ce042260e000efd                  0.0s
+ => => pushing layers for registry.fly.io/docker-blue-sound-1751:deployment-01K8RPVDV3D8MQ4KAMDKHGXCBT@sha256:5  0.5s
+ => => pushing layer sha256:365e20b30a8d18068742bb6ab2ed969aa8a25895edfc3a117ce042260e000efd                     0.5s
+ => => pushing layer sha256:1caf15c41efcbaa095b93b247a787bbbe3a031b328ab2628326bf80247fc14bc                     0.3s
+ => => pushing layer sha256:c8c47b97c963eaed18772b8aecafdd8b946be819b63d54a294fe942a52711c2f                     0.2s
+ => => pushing layer sha256:084ae4e40ec5a53992ce4b5161d28aa66c2822140e9507791f925b96f52a4f46                     0.5s
+ => => pushing layer sha256:9e8cf23479bcb35200749638b168bcf7c5aa8be373c6a41b3c199d22b1109fa8                     0.3s
+ => => pushing layer sha256:52419f9d7612526578f71b0b92f103cb1cdbbd285e9990604353868f0cdb47c0                     0.2s
+ => => pushing layer sha256:08cfbcce9227546b39558b6e4f8db5954ca05ba2697fb5362cf2de14ea6fe584                     0.3s
+ => => pushing layer sha256:46b7a8640e582a39f1ebea235721a217a1735cdfc0435ff771982832d4a69373                     0.1s
+ => => pushing layer sha256:83965697d0e33ad758efbeca293eb77a0c16aaa36aa23505f204b9a9310d8ec5                     0.3s
+ => => pushing layer sha256:65878f45bd2884b65be1c54a05e5ef4f75d1872990bf43cd1ea03505eebb67b7                     0.3s
+ => => pushing layer sha256:9f79fed958d7ff1f4639696c4ae0f489f64359e97f40d011e3897b26db6ba122                     0.2s
+ => => pushing layer sha256:942ed632458559f9a42966683a535a4b27aa0073ab4cc60bf53589ac0eca380d                     0.1s
+ => => pushing manifest for registry.fly.io/docker-blue-sound-1751:deployment-01K8RPVDV3D8MQ4KAMDKHGXCBT@sha256  0.1s
+--> Build Summary:  (​)
+--> Building image done
+image: registry.fly.io/docker-blue-sound-1751:deployment-01K8RPVDV3D8MQ4KAMDKHGXCBT
+image size: 331 MB
+
+Watch your deployment at https://fly.io/apps/docker-blue-sound-1751/monitoring
+
+-------
+Updating existing machines in 'docker-blue-sound-1751' with rolling strategy
+
+WARNING The app is not listening on the expected address and will not be reachable by fly-proxy.
+You can fix this by configuring your app to listen on the following addresses:
+  - 0.0.0.0:8080
+Found these processes inside the machine with open listening sockets:
+  PROCESS        | ADDRESSES                              
+-----------------*----------------------------------------
+  /.fly/hallpass | [fdaa:31:f8f1:a7b:510:7064:73ee:2]:22  
+
+
+-------
+ ✔ Cleared lease for 2873d3df690218
+-------
+Checking DNS configuration for docker-blue-sound-1751.fly.dev
+✓ DNS configuration verified
+
+Visit your newly deployed app at https://docker-blue-sound-1751.fly.dev/
+
+┌─[02:25 PM Wed Oct 29]─[mdc@mdcws]─[/chanslor/mdc/YOUTUBE/scripts/chanslor-usgs-river-levels/docker](24 files, 404Kb)
+└──╼ fly logs
+
+
+
+

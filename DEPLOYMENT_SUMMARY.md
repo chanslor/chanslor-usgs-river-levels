@@ -1,0 +1,389 @@
+# USGS River Levels - Deployment Summary
+
+**Last Updated**: November 19, 2025
+**Production URL**: https://docker-blue-sound-1751.fly.dev/
+**Status**: ✅ Fully Operational
+
+---
+
+## Quick Access Links
+
+| Resource | URL |
+|----------|-----|
+| **Dashboard** | https://docker-blue-sound-1751.fly.dev/ |
+| **API Info** | https://docker-blue-sound-1751.fly.dev/api |
+| **Health Check** | https://docker-blue-sound-1751.fly.dev/api/health |
+| **Little River API** | https://docker-blue-sound-1751.fly.dev/api/river-levels/02399200 |
+| **All Rivers API** | https://docker-blue-sound-1751.fly.dev/api/river-levels |
+
+---
+
+## Current Architecture
+
+### System Components
+
+```
+┌──────────────────────────────────────────────────┐
+│  Fly.io Cloud (docker-blue-sound-1751)          │
+│  - Region: iad (US East)                         │
+│  - VM: 512MB RAM, 1 shared CPU                   │
+│  - Storage: Persistent volume at /data           │
+└──────────────────────────────────────────────────┘
+                      ↓
+┌──────────────────────────────────────────────────┐
+│  Container: Containerfile.api.simple             │
+│  - Base: Ubuntu 22.04                            │
+│  - Entrypoint: entrypoint-api.sh                 │
+│  - Port: 8080 (internal)                         │
+└──────────────────────────────────────────────────┘
+                      ↓
+        ┌─────────────┴─────────────┐
+        ↓                           ↓
+┌────────────────┐          ┌───────────────┐
+│ Background     │          │ Flask API     │
+│ Worker         │          │ Server        │
+│ (every 60s)    │          │ (port 8080)   │
+└────────────────┘          └───────────────┘
+        ↓                           ↓
+    Generates:               Serves:
+    - gauges.json            - Dashboard (/)
+    - index.html             - API (/api/*)
+    - site_*.html            - JSON data
+```
+
+---
+
+## Features
+
+### ✨ Web Dashboard Features
+- **Real-time Updates**: Refreshes every 60 seconds
+- **Color-Coded Rivers**: Multi-level classification for Little River Canyon
+- **Visual Alerts**: Temperature < 55°F (blue), Wind > 10mph (yellow)
+- **Trend Indicators**: 8-hour rising/falling/steady analysis
+- **Historical Charts**: 7-day sparkline graphs
+- **Detail Pages**: Individual river pages with Chart.js visualizations
+- **Weather Integration**: Temperature and wind from NWS observations
+- **Precipitation Forecast**: 3-day QPF data from NWS
+
+### 🔌 API Features
+- **REST Endpoints**: JSON data for all monitored rivers
+- **ESP32 Optimized**: 5-line display format for OLED screens
+- **CORS Enabled**: Accessible from web applications
+- **Fast Responses**: ~10ms (reads from cached JSON)
+- **Health Checks**: Built-in health monitoring
+- **Search by Name**: Case-insensitive partial matching
+
+---
+
+## Monitored Rivers
+
+| Site ID | Name | Measurement | Location | Min Threshold |
+|---------|------|-------------|----------|---------------|
+| 02455000 | Locust Fork | Stage | AL | 1.70 ft |
+| 03572900 | Town Creek | Stage | AL | 2.00 ft |
+| 03572690 | South Sauty | Stage | AL | 8.34 ft |
+| 03518500 | Tellico River | Stage | TN | 1.70 ft |
+| 02399200 | Little River Canyon | Flow | AL | 300 cfs |
+| streambeam:1 | Short Creek | Stage | AL | 0.5 ft |
+
+---
+
+## Configuration
+
+### fly.toml
+```toml
+app = 'docker-blue-sound-1751'
+primary_region = 'iad'
+
+[build]
+  dockerfile = "Containerfile.api.simple"
+
+[env]
+  RUN_INTERVAL_SEC = "60"
+  NWS_UA = "mdchansl-usgs-alert/1.0"
+  QPF_TTL_HOURS = "3"
+  QPF_CACHE = "/data/qpf_cache.sqlite"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[mounts]
+  source = "usgs_data"
+  destination = "/data"
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+```
+
+### Environment Variables
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `RUN_INTERVAL_SEC` | 60 | Data refresh interval |
+| `NWS_UA` | mdchansl-usgs-alert/1.0 | NWS API User-Agent |
+| `NWS_CONTACT` | michael.chanslor@gmail.com | NWS API contact |
+| `QPF_TTL_HOURS` | 3 | QPF cache duration |
+| `QPF_CACHE` | /data/qpf_cache.sqlite | QPF cache location |
+| `CONFIG_PATH` | /app/gauges.conf.json | Config file path |
+| `SITE_DIR` | /site | Output directory |
+| `PORT` | 8080 | Flask server port |
+
+---
+
+## Deployment Process
+
+### From Local Machine
+
+```bash
+# Navigate to project directory
+cd /chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker
+
+# Deploy to Fly.io (uses local Docker/Podman)
+fly deploy --local-only
+
+# Monitor deployment
+fly status
+
+# View logs
+fly logs
+
+# Check health
+curl https://docker-blue-sound-1751.fly.dev/api/health
+```
+
+### Rollback Process
+
+```bash
+# List previous releases
+fly releases
+
+# Rollback to previous version
+fly releases rollback <version>
+```
+
+---
+
+## File Structure
+
+```
+/chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker/
+├── Core Application
+│   ├── usgs_multi_alert.py      # Main monitoring script
+│   ├── api_app.py               # Flask REST API server
+│   ├── qpf.py                   # NWS precipitation forecast
+│   ├── observations.py          # NWS weather observations
+│   ├── site_detail.py           # Detail page generator
+│   └── streambeam_multi_scrape.py # StreamBeam integration
+│
+├── Container Configuration
+│   ├── Containerfile.api.simple # ⭐ PRODUCTION (Ubuntu + Flask)
+│   ├── Containerfile            # Legacy (Alpine, no API)
+│   ├── Containerfile.cloud      # Cloud-optimized (Alpine)
+│   ├── Containerfile.cloud.api  # Cloud + API (Alpine)
+│   ├── Containerfile.ubuntu     # Ubuntu base (no API)
+│   ├── entrypoint-api.sh        # ⭐ PRODUCTION entrypoint
+│   └── entrypoint.sh            # Legacy entrypoint
+│
+├── Configuration
+│   ├── gauges.conf.cloud.json   # ⭐ PRODUCTION config
+│   ├── gauges.conf.json         # Local development config
+│   ├── streambeam_sites.conf.json # StreamBeam site config
+│   └── fly.toml                 # Fly.io deployment config
+│
+├── Documentation
+│   ├── CLAUDE.md                # Project overview for AI
+│   ├── API_README.md            # REST API documentation
+│   ├── CONTAINERFILES.md        # Container build guide
+│   ├── DEPLOYMENT_SUMMARY.md    # This file
+│   ├── README.md                # General project info
+│   ├── VALIDATOR_README.md      # Dashboard validator docs
+│   └── VALIDATION_QUICKSTART.md # Quick validation guide
+│
+├── Testing
+│   ├── test_visual_indicators.py    # Visual indicator test generator
+│   ├── validate_dashboard.py        # Dashboard HTML validator
+│   └── demo-validation.sh           # Validation demo script
+│
+└── Data (runtime/persistent)
+    ├── usgs-data/               # SQLite databases (persistent)
+    │   ├── state.sqlite         # Alert state tracking
+    │   └── qpf_cache.sqlite     # QPF data cache
+    │
+    └── usgs-site/               # Generated output
+        ├── index.html           # Main dashboard
+        ├── gauges.json          # API data source
+        ├── test_visual_indicators.html # Test page
+        └── details/             # Individual river pages
+            ├── site_02399200.html
+            ├── site_02455000.html
+            └── ...
+```
+
+---
+
+## Monitoring & Maintenance
+
+### Health Checks
+
+```bash
+# API health check
+curl https://docker-blue-sound-1751.fly.dev/api/health
+
+# Expected response:
+# {"status": "ok", "timestamp": "2025-11-19T20:00:00Z"}
+```
+
+### Log Monitoring
+
+```bash
+# Real-time logs
+fly logs
+
+# Search for errors
+fly logs | grep -i error
+
+# Check specific time period
+fly logs --since=1h
+```
+
+### Resource Usage
+
+```bash
+# Check VM status
+fly status
+
+# Check machine metrics
+fly machine status
+
+# View volume status
+fly volumes list
+```
+
+### Common Issues
+
+**Issue**: Dashboard shows "Loading..."
+- **Cause**: Background worker hasn't completed first run
+- **Fix**: Wait 30-60 seconds, refresh page
+- **Check**: `fly logs` for "initial run failed"
+
+**Issue**: API returns 503 Service Unavailable
+- **Cause**: gauges.json file not generated yet
+- **Fix**: Wait for first data refresh cycle
+- **Check**: `fly ssh console` → `ls -la /site/gauges.json`
+
+**Issue**: No weather data showing
+- **Cause**: NWS_UA or NWS_CONTACT not set
+- **Fix**: Set environment variables in fly.toml
+- **Check**: Logs for "QPF client initialization failed"
+
+---
+
+## Performance Metrics
+
+| Metric | Value |
+|--------|-------|
+| **API Response Time** | ~10ms (cached) |
+| **Data Refresh Rate** | 60 seconds |
+| **Dashboard Load Time** | ~500ms |
+| **Container Startup** | ~30 seconds |
+| **Memory Usage** | ~150MB (typical) |
+| **Image Size** | ~450MB |
+
+---
+
+## Security Considerations
+
+1. **Secrets Management**:
+   - SMTP credentials in `gauges.conf.cloud.json`
+   - Consider using Fly.io secrets: `fly secrets set KEY=VALUE`
+
+2. **API Rate Limiting**:
+   - No rate limiting currently implemented
+   - Consider adding Flask-Limiter for production
+
+3. **CORS Policy**:
+   - Currently allows all origins
+   - Restrict in production if needed
+
+4. **HTTPS**:
+   - Enforced by Fly.io (force_https = true)
+   - Automatic TLS certificate management
+
+---
+
+## Future Enhancements
+
+- [ ] Add authentication for API endpoints
+- [ ] Implement rate limiting
+- [ ] Add WebSocket support for real-time updates
+- [ ] Create mobile app using API
+- [ ] Add more river sites
+- [ ] Implement alert notifications via webhook
+- [ ] Add Grafana dashboard for metrics
+- [ ] Support for additional weather APIs
+
+---
+
+## Support & Troubleshooting
+
+### Documentation
+- **API Guide**: See `API_README.md`
+- **Container Guide**: See `CONTAINERFILES.md`
+- **Validation**: See `VALIDATOR_README.md`
+
+### Logs & Debugging
+```bash
+# SSH into running container
+fly ssh console
+
+# Check generated files
+ls -la /site/
+
+# View gauges.json
+cat /site/gauges.json | jq
+
+# Check Python processes
+ps aux | grep python
+
+# Check Flask logs
+tail -f /tmp/flask.log  # if logging to file
+```
+
+### Contact
+- **Email**: michael.chanslor@gmail.com
+- **Project**: USGS Multi-Site River Gauge Alert System
+- **Repository**: (add your repo URL here)
+
+---
+
+## Changelog
+
+### 2025-11-19 - Flask API Integration
+- ✅ Added Flask REST API (`api_app.py`)
+- ✅ Created ESP32-optimized endpoints
+- ✅ Moved dashboard from API root to Flask-served HTML
+- ✅ Updated to `Containerfile.api.simple`
+- ✅ Deployed to production with dual-service architecture
+- ✅ Updated all documentation
+
+### 2025-11-01 - Visual Indicators
+- ✅ Added multi-level Little River Canyon classification
+- ✅ Added temperature alerts (< 55°F)
+- ✅ Added wind alerts (> 10 mph)
+- ✅ Created test suite generator
+
+### 2025-10-29 - Initial Production Release
+- ✅ Basic dashboard deployment
+- ✅ USGS data integration
+- ✅ NWS QPF integration
+- ✅ Email alerts
+
+---
+
+**Status**: 🎉 All systems operational!

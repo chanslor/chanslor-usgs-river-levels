@@ -1,0 +1,53 @@
+Set approval mode to “Ask before editing or running” (use the /approvals command).
+
+Create a new branch feat/ci-metrics-map and verify a clean working tree.
+
+unzip this file into a temp folder and then apply its contents into the repo root, backing up any files you overwrite to backup/:
+river-upgrades-2025-11-06.zip
+
+Add or update these files from the zip:
+
+.github/workflows/ci.yml
+
+.gitignore
+
+pyproject.toml
+
+metrics.py
+
+gauges.schema.json
+
+validate_config.py
+
+map.html
+
+Makefile
+
+If the project uses Flask (or similar), wire up a /metrics endpoint by importing register_metrics_endpoint from metrics.py and calling it on the app instance. Also use record_fetch("usgs") around network calls and call update_gauge_metrics(...) when readings are updated.
+
+Serve map.html at /map and add a minimal /api/gauges JSON route that returns the current in-memory/DB gauge list with: id, name, lat, lon, css_class, level_cfs, trend, link.
+
+Ensure requirements.txt includes prometheus-client>=0.20 and jsonschema>=4.23 (for the optional schema validation).
+
+Add a startup call to validate_config("gauges.conf.json"). If the file is missing, handle gracefully and log a helpful message.
+
+Update .gitignore to exclude secrets and state (.env*, gauges.conf*.json, *.db, usgs-data/, usgs-site/, caches). If any of those are tracked, stage a git rm --cached for them (but do not delete the working copy).
+
+Run ruff, black --check, and mypy using the pyproject.toml. If formatting changes are needed, apply them.
+
+Run tests (if present). If none, skip.
+
+Create a GHCR image tag strategy in the CI that publishes on main/master and on tags (already in the provided workflow).
+
+Open a PR with a concise summary “CI + metrics + map starter; harden .gitignore; optional config validation.”
+
+Important safety steps before making edits:
+
+Show me a plan of file changes and commands.
+
+Show me diffs before writing to disk.
+
+Ask for approval before running any shell commands, committing, or pushing.
+
+Rollback instructions for me: If I type “rollback”, discard uncommitted changes; if I type “reset”, hard-reset to the branch start; if I type “abort”, delete the branch and return to the previous branch.
+

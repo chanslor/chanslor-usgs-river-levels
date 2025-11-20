@@ -1,0 +1,28 @@
+# --- Secrets & local creds ---
+.env
+.env_creds
+.env.local
+gauges.conf.json
+gauges.conf.cloud.json
+
+# --- State & data ---
+*.db
+*.sqlite
+usgs-data/
+usgs-site/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.cache/
+
+# --- OS / misc ---
+.DS_Store
+Thumbs.db

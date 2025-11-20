@@ -1,0 +1,30 @@
+=> => pushing layer sha256:9f79fed958d7ff1f4639696c4ae0f489f64359e97f40d011e3897b26db6ba122                     0.6s
+ => => pushing layer sha256:83965697d0e33ad758efbeca293eb77a0c16aaa36aa23505f204b9a9310d8ec5                     1.9s
+ => => pushing layer sha256:9e8cf23479bcb35200749638b168bcf7c5aa8be373c6a41b3c199d22b1109fa8                     0.6s
+ => => pushing layer sha256:65878f45bd2884b65be1c54a05e5ef4f75d1872990bf43cd1ea03505eebb67b7                     0.6s
+ => => pushing layer sha256:08cfbcce9227546b39558b6e4f8db5954ca05ba2697fb5362cf2de14ea6fe584                     2.0s
+ => => pushing layer sha256:942ed632458559f9a42966683a535a4b27aa0073ab4cc60bf53589ac0eca380d                     3.1s
+ => => pushing layer sha256:924a9d764bb96aa34d37ed8d1e91a1b1e3391b102a98871c70b901c624057e9c                     0.6s
+ => => pushing layer sha256:52419f9d7612526578f71b0b92f103cb1cdbbd285e9990604353868f0cdb47c0                     0.5s
+ => => pushing layer sha256:46b7a8640e582a39f1ebea235721a217a1735cdfc0435ff771982832d4a69373                     1.0s
+ => => pushing layer sha256:c8c47b97c963eaed18772b8aecafdd8b946be819b63d54a294fe942a52711c2f                     0.5s
+ => => pushing manifest for registry.fly.io/docker-blue-sound-1751:deployment-01K8RPEC5T9QNBRXAQQG4S3GJQ@sha256  0.1s
+--> Build Summary:  (​)
+--> Building image done
+image: registry.fly.io/docker-blue-sound-1751:deployment-01K8RPEC5T9QNBRXAQQG4S3GJQ
+image size: 331 MB
+
+Watch your deployment at https://fly.io/apps/docker-blue-sound-1751/monitoring
+
+-------
+Updating existing machines in 'docker-blue-sound-1751' with rolling strategy
+
+-------
+ ✖ Failed to clear lease for 7849655c274638: lease not found
+-------
+Checking DNS configuration for docker-blue-sound-1751.fly.dev
+✓ DNS configuration verified
+
+Visit your newly deployed app at https://docker-blue-sound-1751.fly.dev/
+
+

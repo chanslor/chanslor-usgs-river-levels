@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>River Levels</title>
+<style>
+  :root { --green:#b7ff9c; }
+  body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; margin:0; color:#111; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 16px; }
+  h1 { margin:0 0 4px; font-size:22px; } .muted{color:#555;font-size:13px}
+  table { width:100%; border-collapse:collapse; margin-top:8px; }
+  thead td { font-weight:600; font-size:16px; padding:8px; border-bottom:1px solid #ddd; }
+  tbody tr td { padding:10px 6px; vertical-align:middle; }
+  tbody tr.in { background: var(--green); }
+  tbody tr.out { background: #f6f7f9; }
+  .river { font-weight:600; }
+  .sub{font-size:14px;color:#444}
+  .num { text-align:right; white-space:nowrap; }
+  .center { text-align:center; white-space:nowrap; }
+  .sparkline {
+    display: inline-flex;
+    align-items: flex-end;
+    height: 32px;
+    gap: 2px;
+    padding: 2px;
+  }
+  .sparkline-bar {
+    width: 4px;
+    min-height: 2px;
+    border-radius: 1px;
+  }
+  .sparkline-bar.sparkline-rising { background: #4ade80; }
+  .sparkline-bar.sparkline-falling { background: #ef4444; }
+  .sparkline-bar.sparkline-steady { background: #94a3b8; }
+  .rain-alert { color:#1e90ff; font-weight:600; }
+  .wind-alert { color:#ffc107; font-weight:600; }
+  .temp-alert { color:#add8e6; font-weight:600; }
+  .trend-rising { color:#4ade80; font-weight:600; }
+  .trend-falling { color:#f87171; font-weight:600; }
+</style>
+</head><body>
+<div class="wrap">
+  <table>
+    <thead><tr><td>River</td><td class="center">12hr</td><td class="center">CFS</td><td class="num">Feet</td><td class="center">Updated</td></tr></thead>
+    <tbody>
+        <tr class="in">
+          <td>
+            <div class="river"><a href="https://waterdata.usgs.gov/nwis/uv?site_no=03572900&legacy=1" target="_blank" rel="noopener">Town Creek</a></div>
+            <div class="sub">≥ 2.00 ft • <span class="trend-rising">↗ rising</span></div>
+            <div class="sub qpf">QPF Today: 0.25" · Tomorrow: 0.75" · Day 3: 0.10"</div>
+            <div class="sub obs">48.2°F · Wind: 8.5 mph SW (ALBVL)</div>
+            <div class="sub obs-secondary">52.1°F · Wind: <span class="wind-alert">12.3 mph</span> S (HNTSV)</div>
+          </td>
+          <td class="center"><div class="sparkline"><div class="sparkline-bar sparkline-steady" style="height:50%"></div><div class="sparkline-bar sparkline-rising" style="height:60%"></div><div class="sparkline-bar sparkline-rising" style="height:75%"></div><div class="sparkline-bar sparkline-rising" style="height:90%"></div><div class="sparkline-bar sparkline-rising" style="height:100%"></div></div></td>
+          <td class="center">1,250</td>
+          <td class="num">3.45</td>
+          <td class="num"><div class="time">10:29AM</div><div class="date">11-03-2025</div></td>
+        </tr>
+        <tr class="out">
+          <td>
+            <div class="river"><a href="https://waterdata.usgs.gov/nwis/uv?site_no=02455000&legacy=1" target="_blank" rel="noopener">Locust Fork</a></div>
+            <div class="sub">≥ 1.70 ft • <span class="trend-falling">↘ falling</span></div>
+            <div class="sub obs"><span class="temp-alert">52.5°F</span> · Wind: 5.2 mph NW (CULMAN)</div>
+          </td>
+          <td class="center"><div class="sparkline"><div class="sparkline-bar sparkline-falling" style="height:100%"></div><div class="sparkline-bar sparkline-falling" style="height:85%"></div><div class="sparkline-bar sparkline-falling" style="height:70%"></div><div class="sparkline-bar sparkline-falling" style="height:55%"></div><div class="sparkline-bar sparkline-steady" style="height:50%"></div></div></td>
+          <td class="center">450</td>
+          <td class="num">1.25</td>
+          <td class="num"><div class="time">10:15AM</div><div class="date">11-03-2025</div></td>
+        </tr>
+        <tr class="in">
+          <td>
+            <div class="river"><a href="https://waterdata.usgs.gov/nwis/uv?site_no=03572690&legacy=1" target="_blank" rel="noopener">South Sauty</a></div>
+            <div class="sub">≥ 8.34 ft</div>
+            <div class="sub qpf">QPF <span class="rain-alert">Today: 1.25" 🌧️</span> · Tomorrow: 0.50"</div>
+            <div class="sub obs">55.8°F · Wind: 6.1 mph E (FTPAYN)</div>
+          </td>
+          <td class="center"><div class="sparkline"><div class="sparkline-bar sparkline-steady" style="height:65%"></div><div class="sparkline-bar sparkline-rising" style="height:70%"></div><div class="sparkline-bar sparkline-rising" style="height:80%"></div></div></td>
+          <td class="center">2,150</td>
+          <td class="num">9.12</td>
+          <td class="num"><div class="time">10:30AM</div><div class="date">11-03-2025</div></td>
+        </tr>
+        <tr class="good-high">
+          <td>
+            <div class="river"><a href="https://waterdata.usgs.gov/nwis/uv?site_no=02399200&legacy=1" target="_blank" rel="noopener">Little River Canyon</a></div>
+            <div class="sub">≥ 300 cfs • → steady</div>
+            <div class="sub obs">58.2°F · Wind: 7.8 mph W (FTPAYN)</div>
+          </td>
+          <td class="center"><div class="sparkline"><div class="sparkline-bar sparkline-steady" style="height:75%"></div><div class="sparkline-bar sparkline-steady" style="height:76%"></div><div class="sparkline-bar sparkline-steady" style="height:75%"></div></div></td>
+          <td class="center">1,850</td>
+          <td class="num">2.85</td>
+          <td class="num"><div class="time">10:45AM</div><div class="date">11-03-2025</div></td>
+        </tr>
+    </tbody>
+  </table>
+  <div class="foot" style="margin-top:8px;"><a href="http://flowpage.alabamawhitewater.com/" target="_blank" rel="noopener">Alabama Flow Page</a></div>
+</div>
+</body></html>
