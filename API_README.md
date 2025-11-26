@@ -158,6 +158,13 @@ curl https://docker-blue-sound-1751.fly.dev/api/river-levels
       "flow": ">= 450 cfs",
       "trend": "^ rising",
       "stage_ft": 1.45,
+      "cfs": 450,
+      "thresholds": {
+        "min_ft": null,
+        "min_cfs": 300,
+        "good_ft": null,
+        "good_cfs": 500
+      },
       "qpf": {
         "today": 0.15,
         "tomorrow": 0.45,
@@ -204,6 +211,13 @@ curl https://docker-blue-sound-1751.fly.dev/api/river-levels/02399200
   "flow": ">= 450 cfs",
   "trend": "^ rising",
   "stage_ft": 1.45,
+  "cfs": 450,
+  "thresholds": {
+    "min_ft": null,
+    "min_cfs": 300,
+    "good_ft": null,
+    "good_cfs": 500
+  },
   "qpf": {
     "today": 0.15,
     "tomorrow": 0.45,
@@ -286,14 +300,43 @@ void fetchRiverData() {
 
 ## Available River Sites
 
-| Site ID | Name | Measurement |
-|---------|------|-------------|
-| 02455000 | Locust Fork | Stage (ft) |
-| 03572900 | Town Creek | Stage (ft) |
-| 03572690 | South Sauty | Stage (ft) |
-| 03518500 | Tellico River | Stage (ft) |
-| 02399200 | Little River | Flow (cfs) |
-| streambeam:1 | Short Creek | Stage (ft) |
+| Site ID | Name | Measurement | min | good |
+|---------|------|-------------|-----|------|
+| 02450000 | Mulberry Fork | Stage (ft) | 5.0 ft | 10.0 ft |
+| 02455000 | Locust Fork | Stage (ft) | 1.70 ft | 2.5 ft |
+| 03572900 | Town Creek | Flow (cfs) | 180 cfs | 250 cfs |
+| 03572690 | South Sauty | Stage (ft) | 8.34 ft | 8.9 ft |
+| 03518500 | Tellico River | Stage (ft) | 1.70 ft | 2.0 ft |
+| 02399200 | Little River Canyon | Flow (cfs) | 300 cfs | 500 cfs |
+| streambeam:1 | Short Creek | Stage (ft) | 0.5 ft | 1.0 ft |
+
+## Thresholds Explained
+
+Each river has configurable thresholds that determine its status:
+
+| Field | Description |
+|-------|-------------|
+| `min_ft` / `min_cfs` | Minimum level for river to be "runnable" (IN status) |
+| `good_ft` / `good_cfs` | Level at which conditions are "good/ideal" (GOOD status) |
+
+### Dashboard Color Coding
+
+| Status | Condition | Color |
+|--------|-----------|-------|
+| **OUT** | Below min threshold | Gray |
+| **IN** | At/above min, below good | Yellow |
+| **GOOD** | At/above good threshold | Light Green |
+
+**Note:** Little River Canyon uses a special 6-level classification based on expert paddler knowledge (Adam Goshorn):
+
+| CFS Range | Status | Color |
+|-----------|--------|-------|
+| < 250 | Not runnable | Gray |
+| 250-400 | Good low | Yellow |
+| 400-800 | Shitty medium | Brown |
+| 800-1,500 | Good medium | Light Green |
+| 1,500-2,500 | Good high (BEST!) | Green |
+| 2,500+ | Too high | Red |
 
 ## Data Update Frequency
 

@@ -78,12 +78,27 @@ The dashboard uses intelligent color coding and visual indicators to help you qu
 
 *Note: Little River Canyon has been successfully run up to ~4,000 CFS by expert boaters.*
 
-**All Other Rivers** use simple binary classification:
+**All Other Rivers** use three-level classification based on configurable thresholds:
 
-| Condition | Color | Meaning |
-|-----------|-------|---------|
-| Above threshold | Green | IN - runnable |
-| Below threshold | Gray | OUT - not runnable |
+| Condition | Color | Meaning | CSS Class |
+|-----------|-------|---------|-----------|
+| Below min threshold | Gray | OUT - not runnable | `out` |
+| At/above min, below good | Yellow | IN - runnable but not ideal | `in` |
+| At/above good threshold | Light Green | GOOD - ideal conditions | `good` |
+
+### Current River Thresholds
+
+Thresholds are configured in `gauges.conf.json` and exposed via the API:
+
+| River | min | good |
+|-------|-----|------|
+| Mulberry Fork | 5.0 ft | 10.0 ft |
+| Locust Fork | 1.70 ft | 2.5 ft |
+| Town Creek | 180 cfs | 250 cfs |
+| South Sauty | 8.34 ft | 8.9 ft |
+| Tellico River | 1.70 ft | 2.0 ft |
+| Little River Canyon | 300 cfs | (uses special 6-level above) |
+| Short Creek | 0.5 ft | 1.0 ft |
 
 ### Weather Alerts
 

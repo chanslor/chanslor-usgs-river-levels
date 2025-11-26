@@ -364,8 +364,43 @@ Per-site configuration supports:
 - `site`: USGS site ID (can include text like "River Name (USGS 12345678)")
 - `name`: Display name for alerts and dashboard
 - `include_discharge`: Whether to fetch CFS data (00060 parameter)
-- `min_ft`: Minimum stage in feet (can be null)
-- `min_cfs`: Minimum discharge in CFS (can be null)
+- `min_ft`: Minimum stage in feet for "IN" status (can be null)
+- `min_cfs`: Minimum discharge in CFS for "IN" status (can be null)
+- `good_ft`: Stage threshold for "GOOD" status - ideal conditions (can be null)
+- `good_cfs`: CFS threshold for "GOOD" status - ideal conditions (can be null)
+
+### Dashboard Color Coding
+
+Rivers are color-coded based on their thresholds:
+
+| Status | Condition | Color | Hex |
+|--------|-----------|-------|-----|
+| **OUT** | Below min threshold | Gray | `#f6f7f9` |
+| **IN** | At/above min, below good | Yellow | `#fff9c4` |
+| **GOOD** | At/above good threshold | Light Green | `#c8e6c9` |
+
+**Exception:** Little River Canyon uses a special 6-level classification based on expert paddler knowledge (Adam Goshorn):
+
+| CFS Range | Status | Color |
+|-----------|--------|-------|
+| < 250 | Not runnable | Gray |
+| 250-400 | Good low | Yellow |
+| 400-800 | Shitty medium | Brown |
+| 800-1,500 | Good medium | Light Green |
+| 1,500-2,500 | Good high (BEST!) | Green |
+| 2,500+ | Too high | Red |
+
+### Current River Thresholds
+
+| River | min | good |
+|-------|-----|------|
+| Mulberry Fork | 5.0 ft | 10.0 ft |
+| Locust Fork | 1.70 ft | 2.5 ft |
+| Town Creek | 180 cfs | 250 cfs |
+| South Sauty | 8.34 ft | 8.9 ft |
+| Tellico River | 1.70 ft | 2.0 ft |
+| Little River Canyon | 300 cfs | 500 cfs (uses special 6-level) |
+| Short Creek | 0.5 ft | 1.0 ft |
 
 ## Systemd Integration
 

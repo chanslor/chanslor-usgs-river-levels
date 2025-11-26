@@ -15,6 +15,8 @@
       "include_discharge": true,
       "min_ft": 5.0,
       "min_cfs": null,
+      "good_ft": 10.0,
+      "good_cfs": null,
       "lat": 34.0120,
       "lon": -86.7367
     },
@@ -24,6 +26,8 @@
       "include_discharge": true,
       "min_ft": 1.70,
       "min_cfs": null,
+      "good_ft": 2.5,
+      "good_cfs": null,
       "lat": 33.9803,
       "lon": -86.5686
     },
@@ -31,8 +35,10 @@
       "site": "03572900",
       "name": "Town Creek",
       "include_discharge": true,
-      "min_ft": 2.00,
-      "min_cfs": null,
+      "min_ft": null,
+      "min_cfs": 180,
+      "good_ft": null,
+      "good_cfs": 250,
       "lat": 34.3631,
       "lon": -86.0064
     },
@@ -42,6 +48,8 @@
       "include_discharge": true,
       "min_ft": 8.34,
       "min_cfs": null,
+      "good_ft": 8.9,
+      "good_cfs": null,
       "lat": 34.6211,
       "lon": -86.0492
     },
@@ -51,6 +59,8 @@
       "include_discharge": true,
       "min_ft": 1.70,
       "min_cfs": null,
+      "good_ft": 2.0,
+      "good_cfs": null,
       "lat": 35.3628,
       "lon": -84.2808
     },
@@ -60,6 +70,8 @@
       "include_discharge": true,
       "min_ft": null,
       "min_cfs": 300,
+      "good_ft": null,
+      "good_cfs": 500,
       "lat": 34.1736,
       "lon": -85.6164
     },
@@ -74,6 +86,8 @@
       "name": "Short Creek",
       "min_ft": 0.5,
       "min_cfs": null,
+      "good_ft": 1.0,
+      "good_cfs": null,
       "lat": 34.3580,
       "lon": -86.2950
     }

@@ -101,6 +101,13 @@ def format_for_display(site_data):
         "flow": flow_status,
         "trend": f"{trend_arrow} {trend}",
         "stage_ft": stage_ft,
+        "cfs": cfs,
+        "thresholds": {
+            "min_ft": site_data.get('threshold_ft'),
+            "min_cfs": site_data.get('threshold_cfs'),
+            "good_ft": site_data.get('good_ft'),
+            "good_cfs": site_data.get('good_cfs')
+        },
         "qpf": {
             "today": qpf_today,
             "tomorrow": qpf_tomorrow,

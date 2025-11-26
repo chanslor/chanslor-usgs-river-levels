@@ -601,7 +601,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
         site_id = r.get('site', '')
         name = r.get('name', '')
 
-        if site_id == "02399200":  # Little River Canyon
+        if site_id == "02399200":  # Little River Canyon - special multi-level
             cfs = r.get('cfs')
             if cfs is None:
                 cls = "out"
@@ -617,19 +617,29 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
                 cls = "good-high"
             else:  # 2500+
                 cls = "too-high"
-        elif "Short Creek" in name:  # Short Creek (StreamBeam)
-            stage_ft = r.get('stage_ft')
-            if stage_ft is None:
-                cls = "out"
-            elif stage_ft < 0.5:
-                cls = "out"  # Too low
-            elif stage_ft <= 1.5:
-                cls = "in"   # Good range (0.5-1.5 ft)
-            else:
-                cls = "too-high"  # Too high, dangerous
         else:
-            # Standard binary classification for other sites
-            cls = "in" if r.get("in_range") else "out"
+            # Config-based classification using good_ft/good_cfs thresholds
+            # OUT (gray) -> IN (yellow) -> GOOD (light green)
+            stage_ft = r.get('stage_ft')
+            cfs = r.get('cfs')
+            th_ft = r.get('threshold_ft')
+            th_cfs = r.get('threshold_cfs')
+            good_ft = r.get('good_ft')
+            good_cfs = r.get('good_cfs')
+
+            # Check if we're at "good" level (light green)
+            is_good = False
+            if good_ft is not None and stage_ft is not None and stage_ft >= good_ft:
+                is_good = True
+            if good_cfs is not None and cfs is not None and cfs >= good_cfs:
+                is_good = True
+
+            if is_good:
+                cls = "good"  # Light green background
+            elif r.get("in_range"):
+                cls = "in"    # Yellow background (runnable but not ideal)
+            else:
+                cls = "out"   # Gray background (not runnable)
 
         # Check if data is stale (> 1 hour old)
         stale_indicator = ""
@@ -781,8 +791,9 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   table {{ width:100%; border-collapse:collapse; margin-top:8px; }}
   thead td {{ font-weight:600; font-size:16px; padding:8px; border-bottom:1px solid #ddd; }}
   tbody tr td {{ padding:10px 6px; vertical-align:middle; }}
-  tbody tr.in {{ background: var(--green); }}
+  tbody tr.in {{ background: #fff9c4; }}
   tbody tr.out {{ background: #f6f7f9; }}
+  tbody tr.good {{ background: #c8e6c9; }}
   tbody tr.good-low {{ background: #fff9c4; }}
   tbody tr.shitty-medium {{ background: #d4a574; }}
   tbody tr.good-medium {{ background: #c8e6c9; }}
@@ -1047,6 +1058,8 @@ def main():
             name = entry.get("name", site_raw)
             th_ft = entry.get("min_ft", def_default_ft)
             th_cfs = entry.get("min_cfs", def_default_cfs)
+            good_ft = entry.get("good_ft")
+            good_cfs = entry.get("good_cfs")
 
             streambeam_error = None
             try:
@@ -1082,6 +1095,8 @@ def main():
             include_q = bool(entry.get("include_discharge", False) or args.cfs)
             th_ft = entry.get("min_ft", def_default_ft)
             th_cfs = entry.get("min_cfs", def_default_cfs)
+            good_ft = entry.get("good_ft")
+            good_cfs = entry.get("good_cfs")
 
             try:
                 data = fetch_latest(site, include_discharge=include_q)
@@ -1169,6 +1184,8 @@ def main():
             "ts_iso": ts_iso,
             "threshold_ft": th_ft,
             "threshold_cfs": th_cfs,
+            "good_ft": good_ft,
+            "good_cfs": good_cfs,
             "in_range": in_range,
             "trend_8h": trend_label if args.trend_hours else None,
             "trend_data": trend_data,
