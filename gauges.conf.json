@@ -10,6 +10,15 @@
 
   "sites": [
     {
+      "site": "02450000",
+      "name": "Mulberry Fork",
+      "include_discharge": true,
+      "min_ft": 5.0,
+      "min_cfs": null,
+      "lat": 34.0120,
+      "lon": -86.7367
+    },
+    {
       "site": "02455000",
       "name": "Locust Fork",
       "include_discharge": true,
@@ -57,8 +66,11 @@
     {
       "source": "streambeam",
       "streambeam_site_id": "1",
-      "streambeam_zero_offset": 21.85,
-      "streambeam_floor_at_zero": true,
+      "streambeam_zero_offset": 22.39,
+      "streambeam_floor_at_zero": false,
+      "streambeam_min_valid_ft": -5.0,
+      "streambeam_max_valid_ft": 15.0,
+      "streambeam_max_change_ft": 5.0,
       "name": "Short Creek",
       "min_ft": 0.5,
       "min_cfs": null,

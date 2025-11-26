@@ -73,7 +73,7 @@ def format_for_display(site_data):
     qpf_day3 = qpf.get(qpf_dates[2], 0.0) if len(qpf_dates) > 2 else 0.0
 
     # Weather observations
-    obs = site_data.get('obs', {})
+    obs = site_data.get('obs') or {}
     temp_f = obs.get('temp_f')
     wind_mph = obs.get('wind_mph', 0.0)
     wind_dir = obs.get('wind_dir', 'N')

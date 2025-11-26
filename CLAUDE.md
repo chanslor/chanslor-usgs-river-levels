@@ -11,6 +11,49 @@ USGS Multi-Site River Gauge Alert System — Monitors USGS river gauges and send
 - **API Info**: https://docker-blue-sound-1751.fly.dev/api (API documentation)
 - **ESP32 API**: https://docker-blue-sound-1751.fly.dev/api/river-levels/{site_id}
 
+## Short Creek StreamBeam Calibration Status (2025-11-25)
+
+**IMPORTANT: Short Creek gauge is currently UNCALIBRATED and showing raw StreamBeam readings.**
+
+### Current Status:
+- **Configuration Date**: 2025-11-25 11:00 AM CST
+- **Offset Setting**: `streambeam_zero_offset: 0.0` (raw readings)
+- **Floor Setting**: `streambeam_floor_at_zero: false` (allows negative values)
+- **StreamBeam Site ID**: 1
+- **Gauge Location**: Short Creek near Hustleville Road
+
+### What Happened:
+1. StreamBeam developer confirmed they are doing data conversions on their end
+2. Readings were inconsistent during conversion process:
+   - Browser showed: 21.85 ft at 11:00 AM CST
+   - API/scraper showed: -9.23 ft at 10:45 AM CST (likely cached/old data)
+3. Decided to reset offset to 0.0 to see raw readings and monitor for stability
+
+### Next Steps (WHEN READY TO CALIBRATE):
+1. **Monitor StreamBeam readings** for 24-48 hours to ensure conversions are complete and stable
+2. **Go on-site** with staff gauge or known reference point
+3. **Measure actual creek level** at the gauge location
+4. **Record both values**:
+   - What StreamBeam website shows: X.XX ft
+   - What actual staff gauge/reference shows: Y.YY ft
+5. **Calculate offset**: `streambeam_zero_offset = X.XX - Y.YY`
+6. **Update both config files**:
+   - `gauges.conf.json` (local dev)
+   - `gauges.conf.cloud.json` (production)
+7. **Set floor behavior**:
+   - `streambeam_floor_at_zero: true` (prevents negative readings)
+   - Or `false` if you want to see below-zero readings for debugging
+8. **Deploy**: `fly deploy -a docker-blue-sound-1751 --local-only`
+9. **Verify**: Check dashboard shows calibrated readings
+
+### Reference Links:
+- StreamBeam Gauge: https://www.streambeam.net/Home/Gauge?siteID=1
+- Production API: https://docker-blue-sound-1751.fly.dev/api/river-levels/name/short
+
+### Historical Note:
+- Previous offset was `21.85 ft` which gave 0.0 ft readings when StreamBeam showed 21.85 ft
+- This may or may not be correct after StreamBeam's conversions are complete
+
 ## Container Build & Run
 
 ### Current Production Build (Flask API + Dashboard)

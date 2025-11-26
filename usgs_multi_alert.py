@@ -333,6 +333,50 @@ def fetch_trend_data(site: str, hours: int):
         return None
 
 # ---------------- StreamBeam helpers ----------------
+# Cache for last known good StreamBeam readings (to detect wild swings)
+_streambeam_last_good = {}
+_streambeam_db_path = None  # Set by main() from config
+
+def _init_streambeam_table(db_path: str):
+    """Create the streambeam_last_good table if it doesn't exist."""
+    global _streambeam_db_path
+    _streambeam_db_path = db_path
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS streambeam_last_good (
+                site_name TEXT PRIMARY KEY,
+                last_good_ft REAL NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+
+def _load_streambeam_last_good(db_path: str):
+    """Load last known good values from SQLite into memory cache."""
+    global _streambeam_last_good
+    try:
+        with sqlite3.connect(db_path) as conn:
+            rows = conn.execute("SELECT site_name, last_good_ft FROM streambeam_last_good").fetchall()
+            for site_name, last_good_ft in rows:
+                _streambeam_last_good[site_name] = last_good_ft
+    except Exception:
+        pass  # Table might not exist yet
+
+def _save_streambeam_last_good(site_name: str, value_ft: float):
+    """Save last known good value to SQLite."""
+    global _streambeam_db_path
+    if _streambeam_db_path is None:
+        return
+    try:
+        with sqlite3.connect(_streambeam_db_path) as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO streambeam_last_good (site_name, last_good_ft, updated_at)
+                VALUES (?, ?, ?)
+            """, (site_name, value_ft, datetime.now().isoformat()))
+            conn.commit()
+    except Exception:
+        pass  # Don't fail the whole fetch if DB write fails
+
 def convert_streambeam_timestamp_to_iso(timestamp_str: str) -> str:
     """
     Convert StreamBeam timestamp format to ISO 8601.
@@ -369,13 +413,27 @@ def fetch_streambeam_latest(entry):
     """
     Fetch latest StreamBeam gauge reading for a site.
     Returns data in same format as fetch_latest() for compatibility.
+
+    Includes sanity checking to reject wild readings:
+    - streambeam_min_valid_ft: minimum valid reading (default: -10.0)
+    - streambeam_max_valid_ft: maximum valid reading (default: 50.0)
+    - streambeam_max_change_ft: max change from last good reading (default: 5.0)
     """
+    global _streambeam_last_good
+
     if not STREAMBEAM_AVAILABLE:
         raise RuntimeError("StreamBeam scraper not available")
 
+    site_name = entry.get("name", "unknown")
+
+    # Sanity check thresholds from config
+    min_valid_ft = float(entry.get("streambeam_min_valid_ft", -10.0))
+    max_valid_ft = float(entry.get("streambeam_max_valid_ft", 50.0))
+    max_change_ft = float(entry.get("streambeam_max_change_ft", 5.0))
+
     # Build StreamBeam entry format
     sb_entry = {
-        "name": entry.get("name", "unknown"),
+        "name": site_name,
         "site_id": entry.get("streambeam_site_id"),
         "url": entry.get("streambeam_url"),
         "zero_offset_ft": float(entry.get("streambeam_zero_offset", 0.0)),
@@ -388,6 +446,30 @@ def fetch_streambeam_latest(entry):
     if not result.get("ok"):
         raise RuntimeError(f"StreamBeam fetch failed: {result.get('error', 'Unknown error')}")
 
+    adjusted_ft = result.get("adjusted_ft")
+
+    # SANITY CHECK 1: Absolute bounds
+    if adjusted_ft < min_valid_ft or adjusted_ft > max_valid_ft:
+        raise ValueError(
+            f"StreamBeam reading {adjusted_ft:.2f} ft is outside valid range "
+            f"[{min_valid_ft}, {max_valid_ft}] - rejecting as bad data"
+        )
+
+    # SANITY CHECK 2: Rate of change from last known good value
+    last_good = _streambeam_last_good.get(site_name)
+    if last_good is not None:
+        change = abs(adjusted_ft - last_good)
+        if change > max_change_ft:
+            raise ValueError(
+                f"StreamBeam reading {adjusted_ft:.2f} ft changed {change:.2f} ft from last good "
+                f"reading ({last_good:.2f} ft) - exceeds max change of {max_change_ft} ft - "
+                f"rejecting as bad data"
+            )
+
+    # Reading passed sanity checks - update last known good value (memory + SQLite)
+    _streambeam_last_good[site_name] = adjusted_ft
+    _save_streambeam_last_good(site_name, adjusted_ft)
+
     # Convert StreamBeam timestamp to ISO format
     streambeam_timestamp = result.get("observed_at_local", "")
     iso_timestamp = convert_streambeam_timestamp_to_iso(streambeam_timestamp)
@@ -399,7 +481,7 @@ def fetch_streambeam_latest(entry):
         "site": entry.get("streambeam_site_id", entry.get("name")),
         "url": result.get("url"),
         "ts_iso": iso_timestamp,
-        "stage_ft": result.get("adjusted_ft"),
+        "stage_ft": adjusted_ft,
         "discharge_cfs": None  # StreamBeam doesn't provide CFS
     }
 
@@ -917,6 +999,9 @@ def main():
         conn = open_state_db(state_db)
         if state_file_legacy:
             migrate_json_to_db(state_file_legacy, conn)
+        # Initialize StreamBeam last-good tracking in same database
+        _init_streambeam_table(state_db)
+        _load_streambeam_last_good(state_db)
 
     def get_site_state(site):
         if conn:
@@ -963,16 +1048,30 @@ def main():
             th_ft = entry.get("min_ft", def_default_ft)
             th_cfs = entry.get("min_cfs", def_default_cfs)
 
+            streambeam_error = None
             try:
                 data = fetch_streambeam_latest(entry)
+                stage = data["stage_ft"]; ts_iso = data["ts_iso"]; discharge = data["discharge_cfs"]
             except (RuntimeError, ValueError) as e:
+                streambeam_error = str(e)
                 if not args.quiet:
                     print(f"[ERROR] StreamBeam fetch {site_raw} failed: {e}")
-                continue
+                # Try to use last known good value from cache
+                last_good = _streambeam_last_good.get(name)
+                if last_good is not None:
+                    if not args.quiet:
+                        print(f"[INFO] Using last known good value for {name}: {last_good:.2f} ft")
+                    stage = last_good
+                    ts_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%S") + "-06:00"  # Mark as now but stale
+                    discharge = None
+                else:
+                    # No last known good value - skip this site entirely
+                    if not args.quiet:
+                        print(f"[WARN] No last known good value for {name}, skipping")
+                    continue
 
-            stage = data["stage_ft"]; ts_iso = data["ts_iso"]; discharge = data["discharge_cfs"]
             # StreamBeam doesn't provide historical data, so no trend data
-            trend_label = None
+            trend_label = "⚠ stale" if streambeam_error else None
             trend_data = None
 
         else:
