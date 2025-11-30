@@ -118,5 +118,67 @@
     "temp_cold_alert_color": "#1e90ff"
   },
 
+  "predictions": {
+    "enabled": true,
+    "river_characteristics": {
+      "02450000": {
+        "name": "Mulberry Fork",
+        "avg_response_hours": 33,
+        "response_range": [24, 39],
+        "rain_needed_inches": 2.25,
+        "responsiveness": "slow",
+        "notes": "Large watershed, needs sustained heavy rain"
+      },
+      "02455000": {
+        "name": "Locust Fork",
+        "avg_response_hours": 33,
+        "response_range": [26, 38],
+        "rain_needed_inches": 1.75,
+        "responsiveness": "moderate",
+        "notes": "Medium watershed, responds to concentrated rain"
+      },
+      "03572900": {
+        "name": "Town Creek",
+        "avg_response_hours": 32,
+        "response_range": [24, 36],
+        "rain_needed_inches": 1.25,
+        "responsiveness": "moderate",
+        "notes": "Responds well to NE Alabama rain events"
+      },
+      "03572690": {
+        "name": "South Sauty",
+        "avg_response_hours": 33,
+        "response_range": [26, 36],
+        "rain_needed_inches": 2.0,
+        "responsiveness": "slow",
+        "notes": "Needs sustained rain event"
+      },
+      "03518500": {
+        "name": "Tellico River",
+        "avg_response_hours": 24,
+        "response_range": [18, 30],
+        "rain_needed_inches": 1.5,
+        "responsiveness": "moderate",
+        "notes": "Mountain watershed in TN"
+      },
+      "02399200": {
+        "name": "Little River Canyon",
+        "avg_response_hours": 33,
+        "response_range": [26, 36],
+        "rain_needed_inches": 1.75,
+        "responsiveness": "moderate",
+        "notes": "Canyon watershed, needs concentrated rain for 300+ cfs"
+      },
+      "short_creek": {
+        "name": "Short Creek",
+        "avg_response_hours": 12,
+        "response_range": [6, 18],
+        "rain_needed_inches": 0.65,
+        "responsiveness": "fast",
+        "notes": "Small creek, first to rise, first to drop"
+      }
+    }
+  },
+
   "state_db": "/data/state.sqlite"
 }

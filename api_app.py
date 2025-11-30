@@ -243,23 +243,57 @@ def details(filename):
     details_dir = os.path.join(SITE_DIR, 'details')
     return send_from_directory(details_dir, filename)
 
+@app.route('/api/predictions', methods=['GET'])
+def get_predictions():
+    """
+    Get river predictions based on QPF forecast and historical patterns.
+    Returns likelihood and timing estimates for each monitored river.
+    """
+    data = load_gauges_data()
+
+    if not data:
+        return jsonify({
+            "error": "Data not available",
+            "message": "Unable to load river data"
+        }), 503
+
+    predictions = data.get('predictions', [])
+
+    if not predictions:
+        return jsonify({
+            "message": "No predictions available",
+            "note": "Predictions are generated when QPF data is available"
+        }), 200
+
+    return jsonify({
+        "generated_at": data.get('generated_at'),
+        "prediction_count": len(predictions),
+        "predictions": predictions
+    })
+
+
 @app.route('/api')
 def api_info():
     """API documentation endpoint"""
     return jsonify({
         "name": "USGS River Levels API",
-        "version": "1.0",
+        "version": "1.1",
         "dashboard": "/",
         "endpoints": {
             "health": "/api/health",
             "all_rivers": "/api/river-levels",
             "by_site_id": "/api/river-levels/{site_id}",
-            "by_name": "/api/river-levels/name/{name}"
+            "by_name": "/api/river-levels/name/{name}",
+            "predictions": "/api/predictions"
         },
         "examples": {
             "little_river": "/api/river-levels/02399200",
             "little_river_by_name": "/api/river-levels/name/little",
-            "locust_fork": "/api/river-levels/02455000"
+            "locust_fork": "/api/river-levels/02455000",
+            "predictions": "/api/predictions"
+        },
+        "new_features": {
+            "predictions": "River predictions based on QPF forecast and 90-day historical response patterns"
         }
     })
 

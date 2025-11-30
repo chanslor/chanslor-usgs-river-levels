@@ -29,12 +29,22 @@ try:
 except ImportError:
     QPF_AVAILABLE = False
 
-# Import weather observations
+# Import weather observations (NWS official stations)
 try:
     from observations import fetch_latest_observation, fmt_dir
-    OBS_AVAILABLE = True
+    NWS_OBS_AVAILABLE = True
 except ImportError:
-    OBS_AVAILABLE = False
+    NWS_OBS_AVAILABLE = False
+
+# Import PWS weather observations (Weather Underground Personal Weather Stations)
+try:
+    from pws_observations import fetch_observation_for_river, get_station_label, fmt_wind_dir as pws_fmt_dir
+    PWS_OBS_AVAILABLE = True
+except ImportError:
+    PWS_OBS_AVAILABLE = False
+
+# Combined availability flag
+OBS_AVAILABLE = NWS_OBS_AVAILABLE or PWS_OBS_AVAILABLE
 
 # Import site detail page generator
 try:
@@ -53,17 +63,34 @@ try:
 except ImportError:
     STREAMBEAM_AVAILABLE = False
 
+# Import predictions module for river forecasts
+try:
+    from predictions import calculate_predictions, generate_predictions_html, get_predictions_css
+    PREDICTIONS_AVAILABLE = True
+except ImportError:
+    PREDICTIONS_AVAILABLE = False
+
 # Weather station mapping for each river site
-# For sites that need multiple stations for operational decisions, use primary station here
-WEATHER_STATIONS = {
+# PWS = Weather Underground Personal Weather Stations (primary, more local)
+# NWS = National Weather Service official stations (fallback)
+#
+# PWS stations are tried first (via pws_observations.py which has fallback chains)
+# If PWS fails, fall back to NWS station
+#
+# NWS fallback stations (official airport stations)
+NWS_WEATHER_STATIONS = {
     "Locust Fork": "KCMD",           # Cullman Regional Airport
-    "Town Creek": "KBFZ",            # Albertville Regional Airport (ultra-local, near shore)
+    "Town Creek": "KBFZ",            # Albertville Regional Airport
     "South Sauty": "K4A9",           # Fort Payne / Isbell Field Airport
     "Tellico River": "KMNV",         # Monroe County Airport, Madisonville TN
     "Little River": "K4A9",          # Fort Payne / Isbell Field Airport
     "Little River Canyon": "K4A9",   # Fort Payne / Isbell Field Airport (cloud config name)
-    "Short Creek": "KBFZ",           # Albertville Regional Airport (ultra-local for lake paddling)
+    "Short Creek": "KBFZ",           # Albertville Regional Airport
+    "Mulberry Fork": "KCMD",         # Cullman Regional Airport
 }
+
+# Keep WEATHER_STATIONS as alias for backward compatibility
+WEATHER_STATIONS = NWS_WEATHER_STATIONS
 
 # Secondary weather stations for sites that need valley trend data
 WEATHER_STATIONS_SECONDARY = {
@@ -72,12 +99,21 @@ WEATHER_STATIONS_SECONDARY = {
 }
 
 # Friendly city abbreviations for weather station codes (for display)
+# Includes both NWS airport codes and PWS station labels
 STATION_CITY_LABELS = {
+    # NWS stations
     "KCMD": "CULMAN",      # Cullman Regional Airport
     "KBFZ": "ALBVL",       # Albertville Regional Airport
     "K4A9": "FTPAYN",      # Fort Payne / Isbell Field Airport
     "KMNV": "MADSNVL",     # Monroe County Airport, Madisonville TN
     "KHSV": "HNTSV",       # Huntsville International Airport
+    # PWS stations (labels from pws_observations.py)
+    "KALBLOUN24": "BLNTVL",   # Blountsville
+    "KALGUNTE26": "GNTVL",    # Guntersville Shores
+    "KALFYFFE7": "FYFFE",     # Lakeview/Fyffe
+    "KALLANGS7": "LNGSTN",    # Langston
+    "KALCEDAR14": "CDBLF",    # Cedar Bluff
+    "KALHAYDE19": "BANGOR",   # Bangor
 }
 
 USGS_IV = "https://waterservices.usgs.gov/nwis/iv/"
@@ -578,7 +614,7 @@ def format_timestamp_stacked(iso_str: str) -> str:
         # If parsing fails, return original
         return iso_str
 
-def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: float = 10, wind_alert_color: str = "#ffc107", temp_threshold_f: float = 55, temp_alert_color: str = "#add8e6", temp_cold_threshold_f: float = 45, temp_cold_alert_color: str = "#1e90ff"):
+def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: float = 10, wind_alert_color: str = "#ffc107", temp_threshold_f: float = 55, temp_alert_color: str = "#add8e6", temp_cold_threshold_f: float = 45, temp_cold_alert_color: str = "#1e90ff", predictions_html: str = ""):
     def row_html(r):
         trend = r.get("trend_8h")
         trend_icon = "↗" if trend == "rising" else ("↘" if trend == "falling" else ("→" if trend else ""))
@@ -860,6 +896,76 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   .trend-rising {{ color:#4ade80; font-weight:600; }}
   .trend-falling {{ color:#f87171; font-weight:600; }}
 
+  /* Predictions Panel */
+  .predictions-panel {{
+    margin: 16px 0;
+    padding: 16px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }}
+  .pred-title {{
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }}
+  .pred-subtitle {{
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 16px;
+  }}
+  .pred-row {{
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+  }}
+  .pred-header {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }}
+  .pred-name {{
+    font-weight: 600;
+    font-size: 15px;
+  }}
+  .pred-likelihood {{
+    font-weight: 700;
+    font-size: 16px;
+  }}
+  .pred-bar-container {{
+    height: 8px;
+    background: rgba(0,0,0,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }}
+  .pred-bar {{
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+  }}
+  .pred-details {{
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #555;
+  }}
+  .pred-rain {{
+    font-weight: 500;
+  }}
+  .pred-timing {{
+    color: #666;
+  }}
+  .pred-footer {{
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #eee;
+    font-size: 11px;
+    color: #888;
+    text-align: center;
+  }}
+
   /* Mobile optimizations */
   @media (max-width: 768px) {{
     .wrap {{ padding: 12px; }}
@@ -895,6 +1001,12 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
     .river, .sub {{ word-wrap: break-word; }}
 
     .foot {{ font-size: 11px; margin-top: 12px; }}
+
+    /* Mobile predictions */
+    .predictions-panel {{ padding: 12px; }}
+    .pred-title {{ font-size: 16px; }}
+    .pred-name {{ font-size: 14px; }}
+    .pred-details {{ flex-direction: column; gap: 2px; }}
   }}
 
   /* Extra small phones */
@@ -921,6 +1033,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
     <thead><tr><td>River</td><td class="center">12hr</td><td class="center">CFS</td><td class="num">Feet</td><td class="center">Updated</td></tr></thead>
     <tbody>{trs}</tbody>
   </table>
+  {predictions_html}
   <div class="foot" style="margin-top:8px;"><a href="http://flowpage.alabamawhitewater.com/" target="_blank" rel="noopener">Alabama Flow Page</a></div>
   <div class="foot" style="margin-top:8px;"><a href="https://syotr.org/" target="_blank" rel="noopener">See You On The River</a></div>
   <div class="foot" style="margin-top:8px;"><a href="https://rainpursuit.org/map/?supporter=true" target="_blank" rel="noopener">Rain Pursuit</a></div>
@@ -1133,9 +1246,40 @@ def main():
                     print(f"[WARN] QPF fetch failed for {site}: {e}")
 
         # Fetch weather observations (temp, wind) if available
+        # Try PWS (Personal Weather Stations) first, then fall back to NWS (official airport stations)
         obs_data = None
-        if OBS_AVAILABLE and name in WEATHER_STATIONS:
-            station = WEATHER_STATIONS[name]
+        pws_success = False
+
+        # Try PWS first (more local, hyperlocal data)
+        if PWS_OBS_AVAILABLE:
+            try:
+                pws_obs, pws_station = fetch_observation_for_river(name)
+                if pws_obs and pws_obs.get("temp_f") is not None:
+                    # Calculate wind chill
+                    wind_chill_temp, wind_chill_emoji, wind_chill_desc = calculate_wind_chill(
+                        pws_obs["temp_f"], pws_obs["wind_mph"]
+                    )
+                    obs_data = {
+                        "station": pws_station,
+                        "temp_f": pws_obs["temp_f"],
+                        "wind_mph": pws_obs["wind_mph"],
+                        "wind_dir": pws_fmt_dir(pws_obs["wind_dir_deg"]),
+                        "wind_gust_mph": pws_obs["wind_gust_mph"],
+                        "wind_chill_f": wind_chill_temp,
+                        "wind_chill_emoji": wind_chill_emoji,
+                        "wind_chill_desc": wind_chill_desc
+                    }
+                    pws_success = True
+                    if not args.quiet:
+                        label = get_station_label(pws_station)
+                        print(f"[PWS] {name}: {pws_obs['temp_f']}°F, {pws_obs['wind_mph']} mph from {pws_station} ({label})")
+            except Exception as e:
+                if not args.quiet:
+                    print(f"[WARN] PWS fetch failed for {name}: {e}")
+
+        # Fall back to NWS if PWS failed or unavailable
+        if not pws_success and NWS_OBS_AVAILABLE and name in NWS_WEATHER_STATIONS:
+            station = NWS_WEATHER_STATIONS[name]
             try:
                 obs = fetch_latest_observation(station)
                 # Calculate wind chill
@@ -1150,13 +1294,16 @@ def main():
                     "wind_chill_emoji": wind_chill_emoji,
                     "wind_chill_desc": wind_chill_desc
                 }
+                if not args.quiet:
+                    print(f"[NWS] {name}: {obs['temp_f']}°F, {obs['wind_mph']} mph from {station} (fallback)")
             except Exception as e:
                 if not args.quiet:
-                    print(f"[WARN] Weather observation fetch failed for {name} [{station}]: {e}")
+                    print(f"[WARN] NWS weather observation fetch failed for {name} [{station}]: {e}")
 
         # Fetch secondary weather observations for sites that need valley trend data
+        # Secondary observations are always from NWS (official stations for valley trend data)
         obs_secondary = None
-        if OBS_AVAILABLE and name in WEATHER_STATIONS_SECONDARY:
+        if NWS_OBS_AVAILABLE and name in WEATHER_STATIONS_SECONDARY:
             station_secondary = WEATHER_STATIONS_SECONDARY[name]
             try:
                 obs = fetch_latest_observation(station_secondary)
@@ -1299,16 +1446,30 @@ def main():
 
         set_site_state(site, site_state)
 
+    # Generate predictions if available (for both JSON and HTML)
+    predictions_data = []
+    if PREDICTIONS_AVAILABLE:
+        predictions_cfg = cfg.get("predictions", {})
+        if predictions_cfg.get("enabled", False):
+            river_chars = predictions_cfg.get("river_characteristics", {})
+            predictions_data = calculate_predictions(feed_rows, river_chars)
+
     # Publish feeds/pages
     if args.dump_json:
-        payload = {"generated_at": now_iso, "sites": feed_rows}
+        payload = {"generated_at": now_iso, "sites": feed_rows, "predictions": predictions_data}
         ensure_parent_dir(args.dump_json)
         with open(args.dump_json, "w") as f:
             json.dump(payload, f, indent=2)
-        if not args.quiet: print(f"[FEED] wrote {args.dump_json} ({len(feed_rows)} sites)")
+        if not args.quiet: print(f"[FEED] wrote {args.dump_json} ({len(feed_rows)} sites, {len(predictions_data)} predictions)")
 
     if args.dump_html:
-        html = render_static_html(now_iso, feed_rows, wind_threshold_mph, wind_alert_color, temp_threshold_f, temp_alert_color, temp_cold_threshold_f, temp_cold_alert_color)
+        # Generate predictions HTML from already-calculated predictions
+        predictions_html = ""
+        if PREDICTIONS_AVAILABLE and predictions_data:
+            predictions_html = generate_predictions_html(predictions_data)
+            if not args.quiet: print(f"[PRED] generated predictions panel for {len(predictions_data)} rivers")
+
+        html = render_static_html(now_iso, feed_rows, wind_threshold_mph, wind_alert_color, temp_threshold_f, temp_alert_color, temp_cold_threshold_f, temp_cold_alert_color, predictions_html)
         ensure_parent_dir(args.dump_html)
         with open(args.dump_html, "w", encoding="utf-8") as f:
             f.write(html)

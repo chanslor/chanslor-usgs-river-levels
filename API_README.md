@@ -94,18 +94,23 @@ curl https://docker-blue-sound-1751.fly.dev/api
 ```json
 {
   "name": "USGS River Levels API",
-  "version": "1.0",
+  "version": "1.1",
   "dashboard": "/",
   "endpoints": {
     "health": "/api/health",
     "all_rivers": "/api/river-levels",
     "by_site_id": "/api/river-levels/{site_id}",
-    "by_name": "/api/river-levels/name/{name}"
+    "by_name": "/api/river-levels/name/{name}",
+    "predictions": "/api/predictions"
   },
   "examples": {
     "little_river": "/api/river-levels/02399200",
     "little_river_by_name": "/api/river-levels/name/little",
-    "locust_fork": "/api/river-levels/02455000"
+    "locust_fork": "/api/river-levels/02455000",
+    "predictions": "/api/predictions"
+  },
+  "new_features": {
+    "predictions": "River predictions based on QPF forecast and 90-day historical response patterns"
   }
 }
 ```
@@ -254,6 +259,107 @@ Returns data for a site by name (case-insensitive partial match).
 curl https://docker-blue-sound-1751.fly.dev/api/river-levels/name/little
 ```
 
+---
+
+### Get River Predictions
+```bash
+GET /api/predictions
+```
+
+Returns predictions for which rivers are likely to reach runnable levels based on QPF forecast and historical response patterns.
+
+**Example:**
+```bash
+curl https://docker-blue-sound-1751.fly.dev/api/predictions
+```
+
+**Response:**
+```json
+{
+  "generated_at": "2025-11-30T10:15:00-0600",
+  "prediction_count": 7,
+  "predictions": [
+    {
+      "site_id": "streambeam_1",
+      "name": "Short Creek",
+      "likelihood": 95,
+      "status": "likely",
+      "status_emoji": "🟢",
+      "status_text": "Likely",
+      "qpf_total": 1.47,
+      "rain_needed": 0.65,
+      "rain_surplus": 0.82,
+      "responsiveness": "fast",
+      "avg_response_hours": 12,
+      "peak_window": {
+        "earliest": "2025-12-02T12:00:00+00:00",
+        "latest": "2025-12-02T18:00:00+00:00",
+        "earliest_local": "Mon morning",
+        "latest_local": "Mon evening"
+      },
+      "notes": "Small creek, first to rise, first to drop",
+      "in_range": false,
+      "qpf_breakdown": {
+        "today": 0.23,
+        "tomorrow": 0.62,
+        "day3": 0.62
+      }
+    },
+    {
+      "site_id": "03572900",
+      "name": "Town Creek",
+      "likelihood": 84,
+      "status": "likely",
+      "status_emoji": "🟢",
+      "status_text": "Likely",
+      "qpf_total": 1.61,
+      "rain_needed": 1.25,
+      "rain_surplus": 0.36,
+      "responsiveness": "moderate",
+      "avg_response_hours": 32,
+      "peak_window": {
+        "earliest": "2025-12-03T06:00:00+00:00",
+        "latest": "2025-12-03T18:00:00+00:00",
+        "earliest_local": "Wed night",
+        "latest_local": "Wed afternoon"
+      },
+      "notes": "Responds well to NE Alabama rain events",
+      "in_range": false
+    }
+  ]
+}
+```
+
+### Prediction Fields
+
+| Field | Description |
+|-------|-------------|
+| `likelihood` | Percentage chance (0-100%) of river reaching runnable level |
+| `status` | Category: `likely`, `possible`, `unlikely`, `very_unlikely`, or `running` |
+| `status_emoji` | Visual indicator: 🟢 (likely), 🟡 (possible), 🟠 (unlikely), 🔴 (very unlikely), ✅ (running) |
+| `qpf_total` | Total forecasted rainfall over 72 hours (inches) |
+| `rain_needed` | Amount of rain typically needed to reach runnable level (inches) |
+| `rain_surplus` | Difference between forecast and needed (positive = excess rain expected) |
+| `responsiveness` | River speed: `fast`, `moderate`, or `slow` |
+| `avg_response_hours` | Average time from rain start to peak level |
+| `peak_window` | Estimated time range when river will reach peak level |
+| `in_range` | `true` if river is already at/above runnable threshold |
+
+### Prediction Algorithm
+
+Predictions are calculated using:
+1. **QPF Forecast** - NWS 72-hour rainfall totals for each river's watershed
+2. **Historical Response** - Based on 90-day analysis of USGS gauge data
+3. **Rain-to-Runnable** - How much rain each river typically needs
+
+**Likelihood Formula:**
+- 70%+ if QPF ≥ rain_needed
+- 40-69% if QPF ≥ 75% of rain_needed
+- 15-39% if QPF ≥ 50% of rain_needed
+- <15% if QPF < 50% of rain_needed
+
+---
+
 ## ESP32/Heltec Integration
 
 The API returns a `display_lines` array optimized for the Heltec ESP32 LoRa V3 OLED display (128x64 pixels, 5 lines).
@@ -342,6 +448,30 @@ Each river has configurable thresholds that determine its status:
 
 River data is refreshed every 60 seconds by the background worker. API responses are served from the cached `gauges.json` file.
 
+## Weather Data Sources
+
+Weather data is fetched from two sources with automatic fallback:
+
+1. **Primary: Weather Underground PWS** (Personal Weather Stations)
+   - Hyperlocal weather data from nearby personal weather stations
+   - Each river has a chain of 4 PWS stations to try in order
+   - Uses embedded public API key (no account required)
+
+2. **Fallback: NWS Airport Stations**
+   - Official National Weather Service airport stations
+   - Used only when all PWS stations fail
+   - Stations: KCMD (Cullman), KBFZ (Albertville), K4A9 (Fort Payne), etc.
+
+PWS Station Mapping (from `pws_observations.py`):
+| River | PWS Stations (in fallback order) |
+|-------|----------------------------------|
+| Locust Fork | KALBLOUN24, KALBLOUN23, KALHANCE17, KALONEON42 |
+| Short Creek | KALGUNTE26, KALALBER97, KALALBER66, KALALBER69 |
+| Town Creek | KALFYFFE7, KALFYFFE11, KALALBER111, KALGROVE15 |
+| South Sauty | KALLANGS7, KALGROVE15, KALFYFFE11, KALRAINS14 |
+| Little River Canyon | KALCEDAR14, KALGAYLE19, KALGAYLE16, KALGAYLE7 |
+| Mulberry Fork | KALHAYDE19, KALHAYDE21, KALHAYDE13, KALWARRI54 |
+
 ## Error Responses
 
 ### 503 Service Unavailable
@@ -373,7 +503,9 @@ The system uses a dual-service architecture:
 ┌─────────────────────────────────────────┐
 │  Background Worker (every 60s)          │
 │  - Fetches USGS river data              │
-│  - Fetches NWS weather/QPF data         │
+│  - Fetches PWS weather (primary)        │
+│  - Falls back to NWS weather if needed  │
+│  - Fetches NWS QPF forecast data        │
 │  - Generates gauges.json                │
 │  - Generates index.html dashboard       │
 │  - Updates SQLite state DB              │

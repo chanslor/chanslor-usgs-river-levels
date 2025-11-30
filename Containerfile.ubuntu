@@ -26,6 +26,7 @@ RUN mkdir -p /app /data /site \
 COPY usgs_multi_alert.py /app/usgs_multi_alert.py
 COPY qpf.py             /app/qpf.py
 COPY observations.py    /app/observations.py
+COPY pws_observations.py /app/pws_observations.py
 COPY site_detail.py     /app/site_detail.py
 COPY streambeam_multi_scrape.py /app/streambeam_multi_scrape.py
 COPY api_app.py         /app/api_app.py
@@ -33,8 +34,9 @@ COPY entrypoint-api.sh  /app/entrypoint-api.sh
 COPY gauges.conf.cloud.json /app/gauges.conf.json
 COPY test_visual_indicators.html /site/test_visual_indicators.html
 
-# Make scripts executable
-RUN chmod 0755 /app/entrypoint-api.sh /app/usgs_multi_alert.py /app/api_app.py
+# Make scripts executable and Python files readable
+RUN chmod 0755 /app/entrypoint-api.sh /app/usgs_multi_alert.py /app/api_app.py \
+ && chmod 0644 /app/*.py /app/*.json
 
 # Run as non-root
 USER 10001:0

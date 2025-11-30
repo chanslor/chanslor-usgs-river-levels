@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Working Directory
+
+**Always use this directory for all commands:**
+```
+/chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker
+```
+
+When running bash commands, use absolute paths or `cd` to this directory first.
+
 ## Project Overview
 
 USGS Multi-Site River Gauge Alert System — Monitors USGS river gauges and sends email alerts when water levels exceed configurable thresholds. Generates live HTML dashboard with river levels, CFS (cubic feet per second), and trend indicators. Integrates NWS Quantitative Precipitation Forecast (QPF) data with SQLite caching. Includes Flask REST API for ESP32/IoT device integration.
@@ -11,50 +20,36 @@ USGS Multi-Site River Gauge Alert System — Monitors USGS river gauges and send
 - **API Info**: https://docker-blue-sound-1751.fly.dev/api (API documentation)
 - **ESP32 API**: https://docker-blue-sound-1751.fly.dev/api/river-levels/{site_id}
 
-## Short Creek StreamBeam Calibration Status (2025-11-25)
+## Short Creek StreamBeam Calibration Status (2025-11-26)
 
-**IMPORTANT: Short Creek gauge is currently UNCALIBRATED and showing raw StreamBeam readings.**
+**Current Status**: Calibrated with offset `22.39`
 
-### Current Status:
-- **Configuration Date**: 2025-11-25 11:00 AM CST
-- **Offset Setting**: `streambeam_zero_offset: 0.0` (raw readings)
-- **Floor Setting**: `streambeam_floor_at_zero: false` (allows negative values)
+### Configuration:
+- **Offset Setting**: `streambeam_zero_offset: 22.39`
+- **Floor Setting**: `streambeam_floor_at_zero: false` (allows negative values for debugging)
 - **StreamBeam Site ID**: 1
 - **Gauge Location**: Short Creek near Hustleville Road
-
-### What Happened:
-1. StreamBeam developer confirmed they are doing data conversions on their end
-2. Readings were inconsistent during conversion process:
-   - Browser showed: 21.85 ft at 11:00 AM CST
-   - API/scraper showed: -9.23 ft at 10:45 AM CST (likely cached/old data)
-3. Decided to reset offset to 0.0 to see raw readings and monitor for stability
-
-### Next Steps (WHEN READY TO CALIBRATE):
-1. **Monitor StreamBeam readings** for 24-48 hours to ensure conversions are complete and stable
-2. **Go on-site** with staff gauge or known reference point
-3. **Measure actual creek level** at the gauge location
-4. **Record both values**:
-   - What StreamBeam website shows: X.XX ft
-   - What actual staff gauge/reference shows: Y.YY ft
-5. **Calculate offset**: `streambeam_zero_offset = X.XX - Y.YY`
-6. **Update both config files**:
-   - `gauges.conf.json` (local dev)
-   - `gauges.conf.cloud.json` (production)
-7. **Set floor behavior**:
-   - `streambeam_floor_at_zero: true` (prevents negative readings)
-   - Or `false` if you want to see below-zero readings for debugging
-8. **Deploy**: `fly deploy -a docker-blue-sound-1751 --local-only`
-9. **Verify**: Check dashboard shows calibrated readings
 
 ### Reference Links:
 - StreamBeam Gauge: https://www.streambeam.net/Home/Gauge?siteID=1
 - Production API: https://docker-blue-sound-1751.fly.dev/api/river-levels/name/short
 
-### Historical Note:
-- Previous offset was `21.85 ft` which gave 0.0 ft readings when StreamBeam showed 21.85 ft
-- This may or may not be correct after StreamBeam's conversions are complete
+### To Recalibrate (if needed):
+1. **Go on-site** with staff gauge or known reference point
+2. **Record both values**:
+   - What StreamBeam website shows: X.XX ft
+   - What actual staff gauge/reference shows: Y.YY ft
+3. **Calculate offset**: `streambeam_zero_offset = X.XX - Y.YY`
+4. **Update both config files**:
+   - `gauges.conf.json` (local dev)
+   - `gauges.conf.cloud.json` (production)
+5. **Deploy**: `fly deploy -a docker-blue-sound-1751 --local-only`
 
 ## Container Build & Run
+
+### Containerfile Setup
+
+`Containerfile` is a symbolic link to `Containerfile.api.simple` (the production Flask API + Dashboard build). This means `podman build .` uses the correct production configuration by default.
 
 ### Current Production Build (Flask API + Dashboard)
 
@@ -62,8 +57,8 @@ Build the container:
 ```bash
 cd /chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker
 
-# Build with current production Containerfile
-podman build -f Containerfile.api.simple -t usgs-api:latest .
+# Build using default Containerfile (symlink to Containerfile.api.simple)
+podman build -t usgs-api:latest .
 ```
 
 Run the container locally:
@@ -104,7 +99,7 @@ cd /chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker
 fly deploy --local-only
 ```
 
-The `fly.toml` is configured to use `Containerfile.api.simple` with persistent storage mounted at `/data`.
+The `fly.toml` is configured to use `Containerfile.api.simple` (same as the default `Containerfile` symlink) with persistent storage mounted at `/data`.
 
 ## Development Commands
 
@@ -172,19 +167,32 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Implements SQLite cache with configurable TTL (default 3 hours)
    - NWS API requires proper User-Agent with contact info
 
-3. **observations.py** — Weather observations integration
-   - Fetches current weather conditions from NWS API
+3. **observations.py** — NWS Weather observations (fallback)
+   - Fetches current weather conditions from NWS API (official airport stations)
    - Retrieves temperature, wind speed, and other meteorological data
-   - Uses station IDs to get location-specific observations
-   - Integrates with dashboard to show weather alerts
+   - Uses airport station IDs (KCMD, KBFZ, K4A9, etc.)
+   - Used as fallback when PWS stations are unavailable
 
-4. **site_detail.py** — Site detail page generator
+4. **pws_observations.py** — Personal Weather Station observations (primary)
+   - Fetches weather from Weather Underground Personal Weather Stations
+   - Uses embedded public API key (no account required)
+   - More local/hyperlocal data than airport stations
+   - Supports fallback chains: tries 4 PWS stations per river in order
+   - PWS station mapping from GPS.txt:
+     - Locust Fork: KALBLOUN24, KALBLOUN23, KALHANCE17, KALONEON42
+     - Short Creek: KALGUNTE26, KALALBER97, KALALBER66, KALALBER69
+     - Town Creek: KALFYFFE7, KALFYFFE11, KALALBER111, KALGROVE15
+     - South Sauty: KALLANGS7, KALGROVE15, KALFYFFE11, KALRAINS14
+     - Little River Canyon: KALCEDAR14, KALGAYLE19, KALGAYLE16, KALGAYLE7
+     - Mulberry Fork: KALHAYDE19, KALHAYDE21, KALHAYDE13, KALWARRI54
+
+5. **site_detail.py** — Site detail page generator
    - Creates individual detail pages for each gauge
    - Generates 7-day historical charts using Chart.js
    - Provides detailed historical data and trend analysis
    - Linked from main dashboard for deep-dive analysis
 
-5. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
+6. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
    - Runs initial gauge check immediately on startup
    - Launches background loop to refresh data every `RUN_INTERVAL_SEC` (default 60s)
    - Starts Flask API server on port 8080
@@ -195,19 +203,60 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - No API endpoints, dashboard only
    - Use entrypoint-api.sh for production deployments
 
-6. **gauges.conf.json** — Configuration file
+7. **gauges.conf.json** — Configuration file
    - SMTP settings for email alerts (server, port, credentials)
    - Site definitions with USGS site IDs and custom thresholds
    - Alert behavior: `notify.mode` ("rising" or "any"), cooldown periods
    - State persistence path (`state_db`)
 
-7. **test_visual_indicators.py** — Test suite generator
+8. **test_visual_indicators.py** — Test suite generator
    - Generates comprehensive test HTML for all visual indicators
    - Tests all 6 Little River Canyon color zones with 22 test cases
    - Validates temperature alerts (10 cases: 35-85°F)
    - Validates wind alerts (8 cases: 0-30 mph)
    - Creates standalone HTML test file with color legend
    - Run with: `python3 test_visual_indicators.py`
+
+9. **predictions.py** — River Predictions Module (NEW - 2025-11-30)
+   - Calculates likelihood of rivers reaching runnable levels
+   - Uses QPF (rainfall forecast) + historical response patterns
+   - Based on 90-day analysis of USGS gauge data
+   - Generates HTML panel showing predictions with:
+     - Likelihood percentage (0-100%)
+     - Rain needed vs forecast comparison
+     - Estimated peak timing window
+   - API endpoint: `/api/predictions`
+
+### River Predictions Feature
+
+The dashboard includes a **River Predictions** panel that forecasts which rivers are likely to run based on:
+
+1. **QPF Forecast** - NWS Quantitative Precipitation Forecast (72-hour rainfall)
+2. **Historical Response Times** - How long each river takes to rise after rain (24-36 hours typical)
+3. **Rain-to-Runnable Correlation** - How much rain each river needs to reach threshold
+
+![River Predictions Panel](new-predictive.png)
+
+**Prediction Status Colors:**
+| Status | Color | Likelihood |
+|--------|-------|------------|
+| 🟢 Likely | Green | 70%+ |
+| 🟡 Possible | Yellow | 40-69% |
+| 🟠 Unlikely | Orange | 15-39% |
+| 🔴 Very Unlikely | Gray | <15% |
+| ✅ Running Now | Green | 100% |
+
+**River Response Characteristics (from config):**
+
+| River | Avg Response | Rain Needed | Responsiveness |
+|-------|--------------|-------------|----------------|
+| Short Creek | 12 hours | 0.65" | Fast |
+| Town Creek | 32 hours | 1.25" | Moderate |
+| Tellico River | 24 hours | 1.50" | Moderate |
+| Little River Canyon | 33 hours | 1.75" | Moderate |
+| Locust Fork | 33 hours | 1.75" | Moderate |
+| South Sauty | 33 hours | 2.00" | Slow |
+| Mulberry Fork | 33 hours | 2.25" | Slow |
 
 ### Data Flow
 
@@ -216,8 +265,9 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
 │  External APIs                                             │
 │  - USGS Instantaneous Values API                          │
 │  - NWS Quantitative Precipitation Forecast (QPF)          │
-│  - NWS Observations API                                    │
-│  - StreamBeam API                                          │
+│  - Weather Underground PWS API (primary weather)          │
+│  - NWS Observations API (fallback weather)                │
+│  - StreamBeam API (Short Creek gauge)                     │
 └────────────────────────────────────────────────────────────┘
                          ↓
 ┌────────────────────────────────────────────────────────────┐
@@ -234,12 +284,13 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
                          ↓
 ┌────────────────────────────────────────────────────────────┐
 │  Flask API Server (api_app.py) - Port 8080                 │
-│  - GET / → index.html (sparkly dashboard)                  │
+│  - GET / → index.html (sparkly dashboard + predictions)    │
 │  - GET /api → API documentation                            │
 │  - GET /api/health → health check                          │
 │  - GET /api/river-levels → all rivers JSON                 │
 │  - GET /api/river-levels/{site_id} → single river          │
 │  - GET /api/river-levels/name/{name} → search by name      │
+│  - GET /api/predictions → river predictions JSON           │
 │  - GET /gauges.json → raw data feed                        │
 │  - GET /details/{site}.html → detail pages                 │
 └────────────────────────────────────────────────────────────┘
@@ -287,6 +338,7 @@ The Flask API provides the following endpoints:
 - **`GET /api/river-levels`** - All monitored rivers with formatted data
 - **`GET /api/river-levels/{site_id}`** - Single river by USGS site ID (e.g., 02399200)
 - **`GET /api/river-levels/name/{name}`** - Single river by name search (case-insensitive)
+- **`GET /api/predictions`** - River predictions based on QPF and historical patterns
 
 ### ESP32 Response Format
 
@@ -340,7 +392,8 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
 - `/app/`: Application code
   - `usgs_multi_alert.py` - Main monitoring script
   - `qpf.py` - QPF weather forecast integration
-  - `observations.py` - Current weather observations
+  - `observations.py` - NWS weather observations (fallback)
+  - `pws_observations.py` - PWS weather observations (primary)
   - `site_detail.py` - Detail page generator
   - `entrypoint.sh` - Container startup script
   - `gauges.conf.json` - Configuration file
@@ -495,7 +548,7 @@ systemctl --user is-enabled usgs-alert.service
 
 ## Git Repository State
 
-**Current Production Status**: Working as of 11-19-2025
+**Current Production Status**: Working as of 11-26-2025
 
 **Production Deployment:**
 - URL: https://docker-blue-sound-1751.fly.dev/
@@ -504,6 +557,9 @@ systemctl --user is-enabled usgs-alert.service
 - Features: Flask API + Dashboard + ESP32 endpoints
 
 **Recent Updates:**
+- Added PWS (Weather Underground Personal Weather Stations) as primary weather source
+- NWS airport stations now used as fallback when PWS unavailable
+- Fixed Containerfile permissions for pws_observations.py
 - Added Flask REST API (`api_app.py`) for ESP32/IoT integration
 - Created dual-service architecture (background worker + API server)
 - Migrated from Python HTTP server to Flask

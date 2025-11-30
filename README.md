@@ -30,10 +30,13 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 - ⏳ Stale data warnings for gauges not updating
 - 🗄️ SQLite state persistence with alert cooldowns
 - 🌧️ NWS Quantitative Precipitation Forecast (QPF) integration
+- 🔮 **River Predictions** - AI-powered forecasts of which rivers will run based on QPF + historical patterns (NEW!)
+- 🌡️ **Weather Underground PWS** (Personal Weather Stations) for hyperlocal weather data
+- 🛡️ NWS airport stations as weather fallback
 - 📱 Mobile-responsive dashboard with 7-day historical charts
 - 🎨 **Multi-level color coding for river conditions**
 - 🌡️ **Temperature alerts** (< 45°F with ❄️ snowflake in dark blue, < 55°F in light blue)
-- 💨 **Wind alerts** (> 10 mph highlighted in yellow)
+- 💨 **Wind alerts** (> 15 mph highlighted in yellow)
 - 📈 **Color-coded trend indicators** (rising = green, falling = light red)
 - 🧪 **Comprehensive test suite** for visual indicator verification
 
@@ -41,6 +44,7 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 
 ## Table of Contents
 
+- [River Predictions](#-river-predictions)
 - [Visual Indicators & Color Coding](#visual-indicators--color-coding)
 - [Testing Visual Indicators](#-testing-visual-indicators)
 - [Quick Start](#quick-start)
@@ -56,6 +60,58 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 - [Quick Reference](#quick-reference)
 - [Troubleshooting](#troubleshooting)
 - [Security Checklist](#sharing-on-github---security-checklist)
+
+---
+
+## 🔮 River Predictions
+
+The dashboard includes an intelligent **River Predictions** panel that forecasts which rivers are likely to reach runnable levels based on incoming rain.
+
+![River Predictions Panel](new-predictive.png)
+
+### How It Works
+
+Predictions combine three data sources:
+
+1. **QPF Forecast** - NWS Quantitative Precipitation Forecast (72-hour rainfall totals)
+2. **Historical Response Times** - How long each river typically takes to rise after rain (based on 90-day USGS data analysis)
+3. **Rain-to-Runnable Correlation** - How much rain each river needs to reach its minimum threshold
+
+### Prediction Status Colors
+
+| Status | Indicator | Likelihood | Meaning |
+|--------|-----------|------------|---------|
+| 🟢 Likely | Green bar | 70%+ | Good chance of running |
+| 🟡 Possible | Yellow bar | 40-69% | Might run, depends on rain intensity |
+| 🟠 Unlikely | Orange bar | 15-39% | Probably won't reach threshold |
+| 🔴 Very Unlikely | Gray bar | <15% | Insufficient rain forecast |
+| ✅ Running Now | Green | 100% | Currently at/above threshold |
+
+### River Response Characteristics
+
+Each river has unique characteristics that affect how it responds to rain:
+
+| River | Avg Response | Rain Needed | Speed |
+|-------|--------------|-------------|-------|
+| Short Creek | 12 hours | 0.65" | ⚡ Fast |
+| Town Creek | 32 hours | 1.25" | 🔄 Moderate |
+| Tellico River | 24 hours | 1.50" | 🔄 Moderate |
+| Little River Canyon | 33 hours | 1.75" | 🔄 Moderate |
+| Locust Fork | 33 hours | 1.75" | 🔄 Moderate |
+| South Sauty | 33 hours | 2.00" | 🐢 Slow |
+| Mulberry Fork | 33 hours | 2.25" | 🐢 Slow |
+
+**Tips:**
+- Short Creek is the "canary in the coal mine" - if it's not running, nothing else will be
+- Mulberry Fork needs sustained heavy rain events to reach runnable levels
+- Peak timing shows the window when the river is expected to reach its highest level
+
+### API Endpoint
+
+Predictions are also available via API:
+```bash
+curl https://docker-blue-sound-1751.fly.dev/api/predictions
+```
 
 ---
 
@@ -108,8 +164,8 @@ Thresholds are configured in `gauges.conf.json` and exposed via the API:
 - ≥ 55°F: Normal text color - comfortable paddling temperature
 
 **Wind Indicator:**
-- 💨 **> 10 mph**: Wind speed and "mph" displayed in **yellow** (#ffc107)
-- ≤ 10 mph: Normal text color
+- 💨 **> 15 mph**: Wind speed and "mph" displayed in **yellow** (#ffc107)
+- ≤ 15 mph: Normal text color
 
 **Rainfall Forecast:**
 - 🌧️ **> 0.5"**: Significant rainfall highlighted in **blue** with rain emoji
@@ -784,7 +840,8 @@ All development work, testing, and temporary files should be kept within the pro
 ├── usgs_multi_alert.py          # Main application
 ├── qpf.py                        # Weather forecast integration
 ├── site_detail.py                # Site detail pages
-├── observations.py               # Weather observations
+├── observations.py               # NWS weather observations (fallback)
+├── pws_observations.py           # Weather Underground PWS (primary)
 ├── gauges.conf.json              # Site configuration
 ├── Containerfile                 # Container build instructions
 ├── entrypoint.sh                 # Container startup script
@@ -815,6 +872,11 @@ This keeps your workspace organized and makes the project portable across differ
 ---
 
 ## Screenshots
+
+### Dashboard with River Predictions (11-30-2025)
+![River Predictions Dashboard](./new-predictive.png)
+
+*Latest version with River Predictions panel showing likelihood percentages, rain needed vs forecast, and estimated peak timing*
 
 ### Working Dashboard (10-29-2025)
 ![Working Dashboard](./working.10-29-2025.png)
