@@ -317,18 +317,24 @@ def fetch_trend_label(site: str, hours: int):
     except Exception:
         return None
 
-def fetch_trend_data(site: str, hours: int):
-    """Fetch historical data points for sparkline visualization"""
+def fetch_trend_data(site: str, hours: int, param_code: str = "00065"):
+    """Fetch historical data points for sparkline visualization.
+
+    Args:
+        site: USGS site ID
+        hours: Number of hours of history to fetch
+        param_code: USGS parameter code - "00065" for gauge height (ft), "00060" for discharge (cfs)
+    """
     if hours <= 0:
         return None
     site_id = normalize_site_id(site)
     period = f"PT{int(hours)}H"
-    url = f"{USGS_IV}?{up.urlencode({'sites': site_id, 'parameterCd': '00065', 'format': 'json', 'period': period})}"
+    url = f"{USGS_IV}?{up.urlencode({'sites': site_id, 'parameterCd': param_code, 'format': 'json', 'period': period})}"
     try:
         data = _get(url)
         series = None
         for ts in data["value"]["timeSeries"]:
-            if ts["variable"]["variableCode"][0]["value"] == "00065":
+            if ts["variable"]["variableCode"][0]["value"] == param_code:
                 series = ts["values"][0]["value"]
                 break
         if not series or len(series) < 2:
@@ -521,8 +527,14 @@ def fetch_streambeam_latest(entry):
         "discharge_cfs": None  # StreamBeam doesn't provide CFS
     }
 
-def generate_sparkline_html(trend_data, site_id):
-    """Generate CSS bar chart sparkline HTML with individual bar colors, wrapped in detail page link"""
+def generate_sparkline_html(trend_data, site_id, threshold=None):
+    """Generate CSS bar chart sparkline HTML with individual bar colors, wrapped in detail page link.
+
+    Args:
+        trend_data: Dict with "values" list of historical readings
+        site_id: USGS site ID for building detail page link
+        threshold: Minimum value for "runnable" status. Bars >= threshold are green, < threshold are red.
+    """
     # Build link to our custom detail page
     detail_url = f"details/{site_id}.html"
 
@@ -536,24 +548,17 @@ def generate_sparkline_html(trend_data, site_id):
     max_val = max(values)
     range_val = max_val - min_val if max_val > min_val else 1
 
-    # Generate bar divs with individual colors based on change from previous bar
+    # Generate bar divs with colors based on whether value meets threshold
     bars = []
     for i, v in enumerate(values):
         height = int(((v - min_val) / range_val) * 100)
 
-        # Color each bar based on whether it's higher or lower than previous
-        if i == 0:
-            # First bar is gray (no previous to compare)
-            color_class = "sparkline-steady"
-        elif v > values[i-1]:
-            # Rising from previous bar = green
-            color_class = "sparkline-rising"
-        elif v < values[i-1]:
-            # Falling from previous bar = red
-            color_class = "sparkline-falling"
+        # Color each bar based on whether it meets the runnable threshold
+        # Green = runnable (at or above threshold), Red = not runnable (below threshold)
+        if threshold is not None and v >= threshold:
+            color_class = "sparkline-runnable"
         else:
-            # Same as previous = gray
-            color_class = "sparkline-steady"
+            color_class = "sparkline-not-runnable"
 
         bars.append(f'<div class="sparkline-bar {color_class}" style="height:{height}%"></div>')
 
@@ -795,8 +800,9 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
         # Build USGS site URL
         site_id = r.get('site', '')
 
-        # Generate sparkline for trend (with clickable link to USGS graph)
-        sparkline_html = generate_sparkline_html(r.get("trend_data"), site_id)
+        # Generate sparkline for trend (with clickable link to detail page)
+        # Pass the sparkline_threshold to color bars green (runnable) or red (not runnable)
+        sparkline_html = generate_sparkline_html(r.get("trend_data"), site_id, r.get("sparkline_threshold"))
         usgs_url = f"https://waterdata.usgs.gov/nwis/uv?site_no={site_id}&legacy=1" if site_id else "#"
 
         return f"""
@@ -866,9 +872,8 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
     border-radius: 1px;
     transition: opacity 0.2s;
   }}
-  .sparkline-bar.sparkline-rising {{ background: #4ade80; }}  /* Green for rising */
-  .sparkline-bar.sparkline-falling {{ background: #ef4444; }}  /* Red for falling */
-  .sparkline-bar.sparkline-steady {{ background: #94a3b8; }}  /* Gray for steady */
+  .sparkline-bar.sparkline-runnable {{ background: #4ade80; }}  /* Green for runnable (at/above threshold) */
+  .sparkline-bar.sparkline-not-runnable {{ background: #ef4444; }}  /* Red for not runnable (below threshold) */
   .sparkline-empty {{ color: #94a3b8; font-size: 18px; }}
 
   /* Clickable sparkline link styling */
@@ -1199,6 +1204,7 @@ def main():
             # StreamBeam doesn't provide historical data, so no trend data
             trend_label = "⚠ stale" if streambeam_error else None
             trend_data = None
+            sparkline_threshold = th_ft  # StreamBeam uses ft threshold
 
         else:
             # USGS source (default)
@@ -1221,8 +1227,20 @@ def main():
             stage = data["stage_ft"]; ts_iso = data["ts_iso"]; discharge = data["discharge_cfs"]
 
             # Fetch trend data for USGS sites
+            # Use CFS data if threshold is CFS-based (no ft threshold), otherwise use gauge height
             trend_label = fetch_trend_label(site, args.trend_hours) if (args.trend_hours and (args.dump_json or args.dump_html)) else None
-            trend_data = fetch_trend_data(site, 12) if (args.dump_json or args.dump_html) else None
+            if args.dump_json or args.dump_html:
+                if th_cfs is not None and th_ft is None:
+                    # CFS-based threshold (e.g., Town Creek, Little River Canyon)
+                    trend_data = fetch_trend_data(site, 12, param_code="00060")
+                    sparkline_threshold = th_cfs
+                else:
+                    # Gauge height threshold (default)
+                    trend_data = fetch_trend_data(site, 12, param_code="00065")
+                    sparkline_threshold = th_ft
+            else:
+                trend_data = None
+                sparkline_threshold = None
 
         # Common processing for both sources
         in_range = is_in(stage, discharge, th_ft, th_cfs)
@@ -1336,6 +1354,7 @@ def main():
             "in_range": in_range,
             "trend_8h": trend_label if args.trend_hours else None,
             "trend_data": trend_data,
+            "sparkline_threshold": sparkline_threshold,
             "qpf": qpf_data,
             "obs": obs_data,
             "obs_secondary": obs_secondary,
