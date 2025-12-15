@@ -70,6 +70,13 @@ try:
 except ImportError:
     PREDICTIONS_AVAILABLE = False
 
+# Import drought monitor module
+try:
+    from drought import DroughtClient, get_drought_display_html
+    DROUGHT_AVAILABLE = True
+except ImportError:
+    DROUGHT_AVAILABLE = False
+
 # Weather station mapping for each river site
 # PWS = Weather Underground Personal Weather Stations (primary, more local)
 # NWS = National Weather Service official stations (fallback)
@@ -797,6 +804,16 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
                 station_label = f" ({city_label})" if city_label else ""
                 obs_secondary_line = f'<div class="sub obs-secondary">{" · ".join(obs_sec_parts)}{station_label}</div>'
 
+        # Format drought status if available (Alabama rivers only)
+        drought_line = ""
+        drought = r.get("drought")
+        if drought and drought.get("level") != "none":
+            emoji = drought.get("emoji", "🏜️")
+            name_d = drought.get("name", "")
+            desc = drought.get("description", "")
+            color = drought.get("color", "#888")
+            drought_line = f'<div class="sub drought-info">{emoji} <span class="drought-level" style="color:{color}">{name_d} {desc}</span></div>'
+
         # Build USGS site URL
         site_id = r.get('site', '')
 
@@ -813,6 +830,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
             {qpf_line}
             {obs_line}
             {obs_secondary_line}
+            {drought_line}
           </td>
           <td class="sparkline-cell">{sparkline_html}</td>
           <td class="center">{("" if r.get('cfs') is None else f"{int(round(r['cfs'])):,}")}</td>
@@ -898,6 +916,8 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   .temp-alert {{ color:{temp_alert_color}; font-weight:600; }}
   .temp-cold-alert {{ color:{temp_cold_alert_color}; font-weight:600; }}
   .wind-chill {{ color:#87ceeb; font-weight:600; }}
+  .drought-info {{ font-size:12px; }}
+  .drought-level {{ font-weight:600; }}
   .trend-rising {{ color:#4ade80; font-weight:600; }}
   .trend-falling {{ color:#f87171; font-weight:600; }}
 
@@ -1117,6 +1137,17 @@ def main():
             if not args.quiet:
                 print(f"[WARN] QPF client initialization failed: {e}")
 
+    # Initialize drought monitor client
+    drought_client = None
+    if DROUGHT_AVAILABLE:
+        drought_cache = os.environ.get("DROUGHT_CACHE", "/data/drought_cache.sqlite")
+        drought_ttl_hours = int(os.environ.get("DROUGHT_TTL_HOURS", "12"))
+        try:
+            drought_client = DroughtClient(cache_db=drought_cache, cache_ttl_hours=drought_ttl_hours)
+        except Exception as e:
+            if not args.quiet:
+                print(f"[WARN] Drought client initialization failed: {e}")
+
     state_db = cfg.get("state_db"); state_file_legacy = cfg.get("state_file")
 
     now = time.time()
@@ -1263,6 +1294,20 @@ def main():
                 if not args.quiet:
                     print(f"[WARN] QPF fetch failed for {site}: {e}")
 
+        # Fetch drought status if FIPS code is configured (AL rivers only, not Tellico in TN)
+        drought_data = None
+        fips_code = entry.get("fips")
+        if drought_client and fips_code:
+            try:
+                drought_data = drought_client.fetch_drought_status(fips_code)
+                if drought_data and not args.quiet:
+                    level = drought_data.get("level", "none")
+                    if level != "none":
+                        print(f"[DROUGHT] {name}: {drought_data.get('name')} - {drought_data.get('description')}")
+            except Exception as e:
+                if not args.quiet:
+                    print(f"[WARN] Drought fetch failed for {name} (FIPS {fips_code}): {e}")
+
         # Fetch weather observations (temp, wind) if available
         # Try PWS (Personal Weather Stations) first, then fall back to NWS (official airport stations)
         obs_data = None
@@ -1356,6 +1401,7 @@ def main():
             "trend_data": trend_data,
             "sparkline_threshold": sparkline_threshold,
             "qpf": qpf_data,
+            "drought": drought_data,
             "obs": obs_data,
             "obs_secondary": obs_secondary,
             "waterdata_url": f"https://waterdata.usgs.gov/monitoring-location/{site}/#parameterCode=00065&period=P7D"

@@ -1,6 +1,6 @@
 # USGS River Levels - Deployment Summary
 
-**Last Updated**: November 19, 2025
+**Last Updated**: December 15, 2025
 **Production URL**: https://docker-blue-sound-1751.fly.dev/
 **Status**: ✅ Fully Operational
 
@@ -446,6 +446,24 @@ tail -f /tmp/flask.log  # if logging to file
 ---
 
 ## Changelog
+
+### 2025-12-15 - Sparkline Threshold-Based Coloring & Drought Monitor
+- ✅ Changed sparkline bars to show runnable status instead of rising/falling
+- ✅ Green bars = at or above threshold (runnable)
+- ✅ Red bars = below threshold (not runnable)
+- ✅ CFS-based rivers (Town Creek, Little River Canyon) now use CFS data in sparklines
+- ✅ Removed gray "steady" coloring for simpler visual feedback
+- ✅ Added US Drought Monitor integration for Alabama rivers
+- ✅ New `drought.py` module fetches county-level drought status by FIPS code
+- ✅ Drought levels D0-D4 displayed with emoji and color coding:
+  - D0: Abnormally Dry (orange `#e89b3c`)
+  - D1: Moderate Drought (tan `#fcd37f`)
+  - D2: Severe Drought (dark orange `#ffaa00`)
+  - D3: Extreme Drought (red `#e60000`)
+  - D4: Exceptional Drought (dark red `#730000`)
+- ✅ Tellico River (TN) excluded from drought monitoring
+- ✅ SQLite caching with 12-hour TTL for drought data
+- ✅ FIPS codes added to config: Blount (01009), DeKalb (01049), Marshall (01095)
 
 ### 2025-11-19 - Flask API Integration
 - ✅ Added Flask REST API (`api_app.py`)

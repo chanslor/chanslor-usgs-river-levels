@@ -171,12 +171,29 @@ Thresholds are configured in `gauges.conf.json` and exposed via the API:
 - 🌧️ **> 0.5"**: Significant rainfall highlighted in **blue** with rain emoji
 - ≤ 0.5": Normal text color
 
+**Drought Status (Alabama rivers only):**
+- 🏜️ **D0**: Abnormally Dry (orange `#e89b3c`)
+- 🏜️ **D1**: Moderate Drought (tan `#fcd37f`)
+- 🏜️ **D2**: Severe Drought (dark orange `#ffaa00`)
+- 🔥 **D3**: Extreme Drought (red `#e60000`)
+- 🔥 **D4**: Exceptional Drought (dark red `#730000`)
+- No indicator shown when there's no drought
+
+*Data from [US Drought Monitor](https://droughtmonitor.unl.edu/) - updates weekly. Cached for 12 hours.*
+
+**How Drought Monitoring Works:**
+- Each Alabama river is mapped to its county via FIPS code in the config
+- The system queries the USDM REST API for county-level drought statistics
+- Displays the worst active drought level for that county
+- Tellico River (Tennessee) is excluded from drought monitoring
+
 ### Trend Indicators
 
 **12hr Sparkline Chart:**
-- 🟢 Green bars: Water level rising
-- 🔴 Red bars: Water level falling
-- ⚪ Gray bars: Water level steady
+- 🟢 Green bars: **Runnable** - water level at or above threshold
+- 🔴 Red bars: **Not runnable** - water level below threshold
+
+*The sparkline uses the appropriate data type for each river: CFS for rivers with CFS thresholds (Town Creek, Little River Canyon), gauge height for others.*
 
 **Text Indicators (Color-Coded):**
 - ↗ **rising**: Displayed in **green** (#4ade80) - water level increasing

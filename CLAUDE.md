@@ -192,7 +192,24 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Provides detailed historical data and trend analysis
    - Linked from main dashboard for deep-dive analysis
 
-6. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
+6. **drought.py** — US Drought Monitor integration
+   - Fetches county-level drought status from USDM REST API
+   - API endpoint: `https://usdmdataservices.unl.edu/api/CountyStatistics/GetDroughtSeverityStatisticsByArea`
+   - Uses FIPS county codes (configured per river in gauges.conf.json)
+   - SQLite caching with configurable TTL (default 12 hours)
+   - Only applies to Alabama rivers (Tellico River in TN excluded)
+   - Drought levels and colors:
+     | Level | Description | Color | Hex |
+     |-------|-------------|-------|-----|
+     | D0 | Abnormally Dry | Orange | `#e89b3c` |
+     | D1 | Moderate Drought | Tan | `#fcd37f` |
+     | D2 | Severe Drought | Dark Orange | `#ffaa00` |
+     | D3 | Extreme Drought | Red | `#e60000` |
+     | D4 | Exceptional Drought | Dark Red | `#730000` |
+   - Cache is stored at `/data/drought_cache.sqlite`
+   - To force refresh: delete cache file and restart container
+
+7. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
    - Runs initial gauge check immediately on startup
    - Launches background loop to refresh data every `RUN_INTERVAL_SEC` (default 60s)
    - Starts Flask API server on port 8080
@@ -203,13 +220,14 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - No API endpoints, dashboard only
    - Use entrypoint-api.sh for production deployments
 
-7. **gauges.conf.json** — Configuration file
+8. **gauges.conf.json** — Configuration file
    - SMTP settings for email alerts (server, port, credentials)
    - Site definitions with USGS site IDs and custom thresholds
+   - FIPS county codes for drought monitoring (Alabama rivers only)
    - Alert behavior: `notify.mode` ("rising" or "any"), cooldown periods
    - State persistence path (`state_db`)
 
-8. **test_visual_indicators.py** — Test suite generator
+9. **test_visual_indicators.py** — Test suite generator
    - Generates comprehensive test HTML for all visual indicators
    - Tests all 6 Little River Canyon color zones with 22 test cases
    - Validates temperature alerts (10 cases: 35-85°F)
@@ -217,7 +235,7 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Creates standalone HTML test file with color legend
    - Run with: `python3 test_visual_indicators.py`
 
-9. **predictions.py** — River Predictions Module (NEW - 2025-11-30)
+10. **predictions.py** — River Predictions Module (NEW - 2025-11-30)
    - Calculates likelihood of rivers reaching runnable levels
    - Uses QPF (rainfall forecast) + historical response patterns
    - Based on 90-day analysis of USGS gauge data
@@ -386,6 +404,8 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
 - `NWS_CONTACT`: Contact email for NWS API (required for qpf.py and observations.py)
 - `QPF_TTL_HOURS`: Cache TTL for QPF data (default: 3)
 - `QPF_CACHE`: Path to QPF SQLite cache (default: /data/qpf_cache.sqlite)
+- `DROUGHT_TTL_HOURS`: Cache TTL for drought data (default: 12)
+- `DROUGHT_CACHE`: Path to drought SQLite cache (default: /data/drought_cache.sqlite)
 
 ### File Locations (in container)
 
@@ -394,12 +414,14 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
   - `qpf.py` - QPF weather forecast integration
   - `observations.py` - NWS weather observations (fallback)
   - `pws_observations.py` - PWS weather observations (primary)
+  - `drought.py` - US Drought Monitor integration
   - `site_detail.py` - Detail page generator
   - `entrypoint.sh` - Container startup script
   - `gauges.conf.json` - Configuration file
 - `/data/`: Persistent state (bind mount required)
   - `state.sqlite` - Alert state database
   - `qpf_cache.sqlite` - QPF cache database
+  - `drought_cache.sqlite` - Drought monitor cache database
 - `/site/`: Generated output (bind mount required)
   - `index.html` - Main dashboard
   - `gauges.json` - JSON data feed
@@ -421,6 +443,19 @@ Per-site configuration supports:
 - `min_cfs`: Minimum discharge in CFS for "IN" status (can be null)
 - `good_ft`: Stage threshold for "GOOD" status - ideal conditions (can be null)
 - `good_cfs`: CFS threshold for "GOOD" status - ideal conditions (can be null)
+- `fips`: 5-digit county FIPS code for drought monitoring (Alabama rivers only, omit for TN)
+
+### County FIPS Codes for Drought Monitoring
+
+| River | County | FIPS |
+|-------|--------|------|
+| Mulberry Fork | Blount County, AL | 01009 |
+| Locust Fork | Blount County, AL | 01009 |
+| Town Creek | DeKalb County, AL | 01049 |
+| South Sauty | Marshall County, AL | 01095 |
+| Little River Canyon | DeKalb County, AL | 01049 |
+| Short Creek | Marshall County, AL | 01095 |
+| Tellico River | Monroe County, TN | (not configured - TN excluded) |
 
 ### Dashboard Color Coding
 
@@ -546,9 +581,48 @@ systemctl --user disable usgs-alert.service
 systemctl --user is-enabled usgs-alert.service
 ```
 
+## Cache Management
+
+The system uses SQLite caching for external API data to reduce load and improve performance.
+
+### Cache Files (in `/data/`)
+
+| File | Data | TTL | Source |
+|------|------|-----|--------|
+| `qpf_cache.sqlite` | Rainfall forecasts | 3 hours | NWS API |
+| `drought_cache.sqlite` | Drought status | 12 hours | USDM API |
+| `state.sqlite` | Alert state | Permanent | Internal |
+
+### Clearing Caches
+
+**On Fly.io (production):**
+```bash
+# Clear drought cache (to pick up new colors/settings)
+fly ssh console -a docker-blue-sound-1751 -C "rm -f /data/drought_cache.sqlite"
+
+# Clear QPF cache
+fly ssh console -a docker-blue-sound-1751 -C "rm -f /data/qpf_cache.sqlite"
+
+# Restart to fetch fresh data
+fly machine restart <machine-id> -a docker-blue-sound-1751
+```
+
+**Locally (podman/systemd):**
+```bash
+# Clear caches
+rm -f usgs-data/drought_cache.sqlite usgs-data/qpf_cache.sqlite
+
+# Restart container
+podman restart usgs-api
+# or
+systemctl --user restart usgs-alert.service
+```
+
+**Note:** After changing drought colors or other cached data settings, you must clear the cache for changes to take effect.
+
 ## Git Repository State
 
-**Current Production Status**: Working as of 11-26-2025
+**Current Production Status**: Working as of 12-15-2025
 
 **Production Deployment:**
 - URL: https://docker-blue-sound-1751.fly.dev/
@@ -557,6 +631,10 @@ systemctl --user is-enabled usgs-alert.service
 - Features: Flask API + Dashboard + ESP32 endpoints
 
 **Recent Updates:**
+- Added US Drought Monitor integration (`drought.py`) for Alabama rivers
+- Drought status displayed below weather with color-coded D0-D4 levels
+- Sparklines now show runnable status (green=above threshold, red=below)
+- CFS-based rivers use discharge data in sparklines
 - Added PWS (Weather Underground Personal Weather Stations) as primary weather source
 - NWS airport stations now used as fallback when PWS unavailable
 - Fixed Containerfile permissions for pws_observations.py

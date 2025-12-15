@@ -472,6 +472,30 @@ PWS Station Mapping (from `pws_observations.py`):
 | Little River Canyon | KALCEDAR14, KALGAYLE19, KALGAYLE16, KALGAYLE7 |
 | Mulberry Fork | KALHAYDE19, KALHAYDE21, KALHAYDE13, KALWARRI54 |
 
+## Drought Data
+
+The dashboard displays US Drought Monitor status for Alabama rivers (Tellico River in TN is excluded). Drought data is fetched by county FIPS code and cached for 12 hours.
+
+**Data Source:** [US Drought Monitor](https://droughtmonitor.unl.edu/)
+
+**County FIPS Mapping:**
+| County | FIPS | Rivers |
+|--------|------|--------|
+| Blount County, AL | 01009 | Mulberry Fork, Locust Fork |
+| DeKalb County, AL | 01049 | Town Creek, Little River Canyon |
+| Marshall County, AL | 01095 | South Sauty, Short Creek |
+
+**Drought Level Colors (on dashboard):**
+| Level | Description | Color |
+|-------|-------------|-------|
+| D0 | Abnormally Dry | Orange (#e89b3c) |
+| D1 | Moderate Drought | Tan (#fcd37f) |
+| D2 | Severe Drought | Dark Orange (#ffaa00) |
+| D3 | Extreme Drought | Red (#e60000) |
+| D4 | Exceptional Drought | Dark Red (#730000) |
+
+**Note:** Drought status is displayed on the HTML dashboard only. It is not currently exposed via the JSON API endpoints.
+
 ## Error Responses
 
 ### 503 Service Unavailable
@@ -506,6 +530,7 @@ The system uses a dual-service architecture:
 │  - Fetches PWS weather (primary)        │
 │  - Falls back to NWS weather if needed  │
 │  - Fetches NWS QPF forecast data        │
+│  - Fetches US Drought Monitor data      │
 │  - Generates gauges.json                │
 │  - Generates index.html dashboard       │
 │  - Updates SQLite state DB              │

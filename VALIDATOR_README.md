@@ -240,7 +240,7 @@ jobs:
 
 ### Optional Data
 - **CFS**: Discharge data (some sites may not have this)
-- **Sparkline**: 12-hour visual trend chart
+- **Sparkline**: 12-hour visual chart showing runnable status (green = at/above threshold, red = below)
 - **Trend**: Rising/falling/steady indicator with colored text
 - **Weather**: Temperature and wind observations
 - **City Labels**: Friendly abbreviations (ALBVL, HNTSV, etc.) instead of airport codes
