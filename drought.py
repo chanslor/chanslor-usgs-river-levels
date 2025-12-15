@@ -27,11 +27,11 @@ USDM_API = "https://usdmdataservices.unl.edu/api/CountyStatistics/GetDroughtSeve
 # Drought level descriptions and display info
 DROUGHT_LEVELS = {
     "none": {"level": -1, "name": "None", "description": "No Drought", "color": "#4ade80", "emoji": ""},
-    "d0": {"level": 0, "name": "D0", "description": "Abnormally Dry", "color": "#e89b3c", "emoji": "🏜️"},
-    "d1": {"level": 1, "name": "D1", "description": "Moderate Drought", "color": "#fcd37f", "emoji": "🏜️"},
-    "d2": {"level": 2, "name": "D2", "description": "Severe Drought", "color": "#ffaa00", "emoji": "🏜️"},
-    "d3": {"level": 3, "name": "D3", "description": "Extreme Drought", "color": "#e60000", "emoji": "🔥"},
-    "d4": {"level": 4, "name": "D4", "description": "Exceptional Drought", "color": "#730000", "emoji": "🔥"},
+    "d0": {"level": 0, "name": "D0", "description": "Abnormally Dry", "color": "#e89b3c", "emoji": "Drought Monitor:"},
+    "d1": {"level": 1, "name": "D1", "description": "Moderate Drought", "color": "#fcd37f", "emoji": "Drought Monitor:"},
+    "d2": {"level": 2, "name": "D2", "description": "Severe Drought", "color": "#ffaa00", "emoji": "Drought Monitor:"},
+    "d3": {"level": 3, "name": "D3", "description": "Extreme Drought", "color": "#e60000", "emoji": "Drought Monitor:"},
+    "d4": {"level": 4, "name": "D4", "description": "Exceptional Drought", "color": "#730000", "emoji": "Drought Monitor:"},
 }
 
 # Cache settings
@@ -116,7 +116,7 @@ class DroughtClient:
                 "name": "D0",
                 "description": "Abnormally Dry",
                 "color": "#ffff00",
-                "emoji": "🏜️",
+                "emoji": "Drought Monitor:",
                 "map_date": "2025-12-09",
                 "area_sq_mi": {
                     "none": 0.0,
@@ -218,7 +218,7 @@ def get_drought_display_html(drought_data: dict, css_class: str = "drought-info"
         css_class: CSS class for the container div
 
     Returns:
-        HTML string like: <div class="drought-info">🏜️ <span style="color:#ffff00">D0 Abnormally Dry</span></div>
+        HTML string like: <div class="drought-info">Drought Monitor: <span style="color:#ffff00">D0 Abnormally Dry</span></div>
     """
     if not drought_data:
         return ""
@@ -229,7 +229,7 @@ def get_drought_display_html(drought_data: dict, css_class: str = "drought-info"
     if level == "none":
         return ""
 
-    emoji = drought_data.get("emoji", "🏜️")
+    emoji = drought_data.get("emoji", "Drought Monitor:")
     name = drought_data.get("name", "")
     description = drought_data.get("description", "")
     color = drought_data.get("color", "#888")

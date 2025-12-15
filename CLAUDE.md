@@ -593,18 +593,47 @@ The system uses SQLite caching for external API data to reduce load and improve 
 | `drought_cache.sqlite` | Drought status | 12 hours | USDM API |
 | `state.sqlite` | Alert state | Permanent | Internal |
 
-### Clearing Caches
+### Deploying Code Changes That Affect Cached Data
+
+**IMPORTANT:** If you change code that affects cached data (like drought display text, colors, etc.), you must clear the cache AND restart for changes to appear. Just deploying is NOT enough!
+
+**Step-by-step for Fly.io:**
+
+```bash
+# Step 1: Deploy your code changes
+cd /chanslor/mdc/YOUTUBE/chanslor-usgs-river-levels/docker
+fly deploy -a docker-blue-sound-1751 --local-only
+
+# Step 2: Find your machine ID
+fly status -a docker-blue-sound-1751
+# Look for the ID in the Machines table (e.g., d8994e4a0d6138)
+
+# Step 3: Delete the relevant cache file(s)
+fly ssh console -a docker-blue-sound-1751 -C "rm -f /data/drought_cache.sqlite"
+# For QPF changes:
+fly ssh console -a docker-blue-sound-1751 -C "rm -f /data/qpf_cache.sqlite"
+
+# Step 4: Restart the machine to regenerate data with new code
+fly machine restart d8994e4a0d6138 -a docker-blue-sound-1751
+
+# Step 5: Wait ~10 seconds, then verify the change
+fly ssh console -a docker-blue-sound-1751 -C "grep 'your-search-term' /site/index.html"
+```
+
+**Why this matters:** The cache stores the formatted output (including text/colors). Even after deploying new code, the old cached data is still used until it expires (up to 12 hours for drought). Deleting the cache forces a fresh fetch with the new code.
+
+### Clearing Caches (Quick Reference)
 
 **On Fly.io (production):**
 ```bash
-# Clear drought cache (to pick up new colors/settings)
+# Clear drought cache
 fly ssh console -a docker-blue-sound-1751 -C "rm -f /data/drought_cache.sqlite"
 
 # Clear QPF cache
 fly ssh console -a docker-blue-sound-1751 -C "rm -f /data/qpf_cache.sqlite"
 
-# Restart to fetch fresh data
-fly machine restart <machine-id> -a docker-blue-sound-1751
+# Restart to fetch fresh data (replace with your machine ID)
+fly machine restart d8994e4a0d6138 -a docker-blue-sound-1751
 ```
 
 **Locally (podman/systemd):**
@@ -617,8 +646,6 @@ podman restart usgs-api
 # or
 systemctl --user restart usgs-alert.service
 ```
-
-**Note:** After changing drought colors or other cached data settings, you must clear the cache for changes to take effect.
 
 ## Git Repository State
 

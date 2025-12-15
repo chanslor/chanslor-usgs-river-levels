@@ -535,12 +535,12 @@ def fetch_streambeam_latest(entry):
     }
 
 def generate_sparkline_html(trend_data, site_id, threshold=None):
-    """Generate CSS bar chart sparkline HTML with individual bar colors, wrapped in detail page link.
+    """Generate smooth SVG line sparkline HTML, wrapped in detail page link.
 
     Args:
         trend_data: Dict with "values" list of historical readings
         site_id: USGS site ID for building detail page link
-        threshold: Minimum value for "runnable" status. Bars >= threshold are green, < threshold are red.
+        threshold: Minimum value for "runnable" status. Line is green if current value >= threshold, red otherwise.
     """
     # Build link to our custom detail page
     detail_url = f"details/{site_id}.html"
@@ -549,28 +549,84 @@ def generate_sparkline_html(trend_data, site_id, threshold=None):
         return f'<a href="{detail_url}" class="sparkline-link"><div class="sparkline-empty">—</div></a>'
 
     values = trend_data["values"]
+    if len(values) < 2:
+        return f'<a href="{detail_url}" class="sparkline-link"><div class="sparkline-empty">—</div></a>'
 
-    # Normalize values to 0-100 scale for bar heights
+    # SVG dimensions
+    width = 80
+    height = 32
+    padding = 2
+
+    # Normalize values to SVG coordinates
     min_val = min(values)
     max_val = max(values)
     range_val = max_val - min_val if max_val > min_val else 1
 
-    # Generate bar divs with colors based on whether value meets threshold
-    bars = []
+    # Generate points for the line
+    points = []
     for i, v in enumerate(values):
-        height = int(((v - min_val) / range_val) * 100)
+        x = padding + (i / (len(values) - 1)) * (width - 2 * padding)
+        # Invert Y since SVG Y grows downward
+        y = padding + (1 - (v - min_val) / range_val) * (height - 2 * padding)
+        points.append((x, y))
 
-        # Color each bar based on whether it meets the runnable threshold
-        # Green = runnable (at or above threshold), Red = not runnable (below threshold)
-        if threshold is not None and v >= threshold:
-            color_class = "sparkline-runnable"
+    # Create smooth bezier curve path
+    path_d = _smooth_sparkline_path(points)
+
+    # Color based on most recent value vs threshold
+    current_value = values[-1]
+    if threshold is not None and current_value >= threshold:
+        stroke_color = "#4ade80"  # Green - runnable
+    else:
+        stroke_color = "#ef4444"  # Red - not runnable
+
+    svg = f'''<svg class="sparkline-svg" viewBox="0 0 {width} {height}" preserveAspectRatio="none">
+        <path d="{path_d}" fill="none" stroke="{stroke_color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>'''
+
+    return f'<a href="{detail_url}" class="sparkline-link">{svg}</a>'
+
+
+def _smooth_sparkline_path(points):
+    """Generate a smooth bezier curve SVG path through the given points."""
+    if len(points) < 2:
+        return ""
+
+    # Start at first point
+    path = f"M {points[0][0]:.1f} {points[0][1]:.1f}"
+
+    # Use cubic bezier curves for smoothing
+    for i in range(1, len(points)):
+        # Current and previous points
+        x0, y0 = points[i - 1]
+        x1, y1 = points[i]
+
+        # Control point distance (tension factor)
+        tension = 0.3
+        dx = (x1 - x0) * tension
+
+        # For first segment, use simpler curve
+        if i == 1:
+            # Control points
+            cp1x = x0 + dx
+            cp1y = y0
+            cp2x = x1 - dx
+            cp2y = y1
         else:
-            color_class = "sparkline-not-runnable"
+            # Get previous point for better control point calculation
+            x_prev, y_prev = points[i - 2]
 
-        bars.append(f'<div class="sparkline-bar {color_class}" style="height:{height}%"></div>')
+            # Control point 1: influenced by previous segment direction
+            cp1x = x0 + dx
+            cp1y = y0 + (y1 - y_prev) * tension * 0.5
 
-    sparkline_div = f'<div class="sparkline">{"".join(bars)}</div>'
-    return f'<a href="{detail_url}" class="sparkline-link">{sparkline_div}</a>'
+            # Control point 2: approaching current point
+            cp2x = x1 - dx
+            cp2y = y1
+
+        path += f" C {cp1x:.1f} {cp1y:.1f}, {cp2x:.1f} {cp2y:.1f}, {x1:.1f} {y1:.1f}"
+
+    return path
 
 # ---------------- Email ----------------
 def send_email(smtp: dict, subject: str, body: str):
@@ -808,7 +864,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
         drought_line = ""
         drought = r.get("drought")
         if drought and drought.get("level") != "none":
-            emoji = drought.get("emoji", "🏜️")
+            emoji = drought.get("emoji", "Drought Monitor:")
             name_d = drought.get("name", "")
             desc = drought.get("description", "")
             color = drought.get("color", "#888")
@@ -842,6 +898,9 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
     return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500&display=swap" rel="stylesheet">
 <title>River Levels</title>
 <style>
   :root {{ --green:#b7ff9c; }}
@@ -877,21 +936,12 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
 
   /* Sparkline styling */
   .sparkline-cell {{ text-align: center; padding: 10px 8px !important; }}
-  .sparkline {{
-    display: inline-flex;
-    align-items: flex-end;
+  .sparkline-svg {{
+    width: 80px;
     height: 32px;
-    gap: 2px;
-    padding: 2px;
+    display: inline-block;
+    vertical-align: middle;
   }}
-  .sparkline-bar {{
-    width: 4px;
-    min-height: 2px;
-    border-radius: 1px;
-    transition: opacity 0.2s;
-  }}
-  .sparkline-bar.sparkline-runnable {{ background: #4ade80; }}  /* Green for runnable (at/above threshold) */
-  .sparkline-bar.sparkline-not-runnable {{ background: #ef4444; }}  /* Red for not runnable (below threshold) */
   .sparkline-empty {{ color: #94a3b8; font-size: 18px; }}
 
   /* Clickable sparkline link styling */
@@ -917,7 +967,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   .temp-cold-alert {{ color:{temp_cold_alert_color}; font-weight:600; }}
   .wind-chill {{ color:#87ceeb; font-weight:600; }}
   .drought-info {{ font-size:12px; }}
-  .drought-level {{ font-weight:600; }}
+  .drought-level {{ font-family: 'Fira Code', monospace; font-weight:500; }}
   .trend-rising {{ color:#4ade80; font-weight:600; }}
   .trend-falling {{ color:#f87171; font-weight:600; }}
 
