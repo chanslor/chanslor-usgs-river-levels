@@ -96,6 +96,18 @@
       "lat": 34.3580,
       "lon": -86.2950,
       "fips": "01095"
+    },
+    {
+      "source": "tva",
+      "tva_site_code": "HADT1",
+      "name": "Hiwassee Dries",
+      "include_discharge": true,
+      "min_ft": null,
+      "min_cfs": 3000,
+      "good_ft": null,
+      "good_cfs": 5000,
+      "lat": 35.168,
+      "lon": -84.298
     }
   ],
 
@@ -184,6 +196,14 @@
         "rain_needed_inches": 0.65,
         "responsiveness": "fast",
         "notes": "Small creek, first to rise, first to drop"
+      },
+      "hiwassee_dries": {
+        "name": "Hiwassee Dries",
+        "avg_response_hours": 0,
+        "response_range": [0, 0],
+        "rain_needed_inches": 0,
+        "responsiveness": "dam-controlled",
+        "notes": "TVA dam release - not rain responsive. Runs when Apalachia Dam spillway opens."
       }
     }
   },

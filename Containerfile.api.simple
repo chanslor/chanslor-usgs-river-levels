@@ -29,6 +29,7 @@ COPY pws_observations.py /app/pws_observations.py
 COPY site_detail.py     /app/site_detail.py
 COPY predictions.py     /app/predictions.py
 COPY drought.py         /app/drought.py
+COPY tva_fetch.py       /app/tva_fetch.py
 COPY streambeam_multi_scrape.py /app/streambeam_multi_scrape.py
 COPY api_app.py         /app/api_app.py
 COPY entrypoint-api.sh  /app/entrypoint-api.sh

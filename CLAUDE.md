@@ -185,14 +185,24 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
      - South Sauty: KALLANGS7, KALGROVE15, KALFYFFE11, KALRAINS14
      - Little River Canyon: KALCEDAR14, KALGAYLE19, KALGAYLE16, KALGAYLE7
      - Mulberry Fork: KALHAYDE19, KALHAYDE21, KALHAYDE13, KALWARRI54
+     - Hiwassee Dries: KNCMURPH4, KTNBENTO3, KTNCLEVE20
 
-5. **site_detail.py** — Site detail page generator
+5. **tva_fetch.py** — TVA Dam Data Fetcher (NEW - 2025-12-18)
+   - Fetches observed data from TVA REST API for dam monitoring
+   - Used for sites like Apalachia Dam (Hiwassee Dries) that don't have USGS gauges
+   - API endpoint: `https://www.tva.com/RestApi/observed-data/{SITE_CODE}.json`
+   - Returns discharge (CFS), pool elevation, tailwater elevation
+   - No authentication required
+   - Supports trend calculation from recent observations
+   - Site code: HADT1 (Hiwassee Above Dam Tennessee 1)
+
+6. **site_detail.py** — Site detail page generator
    - Creates individual detail pages for each gauge
    - Generates 7-day historical charts using Chart.js
    - Provides detailed historical data and trend analysis
    - Linked from main dashboard for deep-dive analysis
 
-6. **drought.py** — US Drought Monitor integration
+7. **drought.py** — US Drought Monitor integration
    - Fetches county-level drought status from USDM REST API
    - API endpoint: `https://usdmdataservices.unl.edu/api/CountyStatistics/GetDroughtSeverityStatisticsByArea`
    - Uses FIPS county codes (configured per river in gauges.conf.json)
@@ -209,7 +219,7 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Cache is stored at `/data/drought_cache.sqlite`
    - To force refresh: delete cache file and restart container
 
-7. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
+8. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
    - Runs initial gauge check immediately on startup
    - Launches background loop to refresh data every `RUN_INTERVAL_SEC` (default 60s)
    - Starts Flask API server on port 8080
@@ -220,14 +230,14 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - No API endpoints, dashboard only
    - Use entrypoint-api.sh for production deployments
 
-8. **gauges.conf.json** — Configuration file
+9. **gauges.conf.json** — Configuration file
    - SMTP settings for email alerts (server, port, credentials)
    - Site definitions with USGS site IDs and custom thresholds
    - FIPS county codes for drought monitoring (Alabama rivers only)
    - Alert behavior: `notify.mode` ("rising" or "any"), cooldown periods
    - State persistence path (`state_db`)
 
-9. **test_visual_indicators.py** — Test suite generator
+10. **test_visual_indicators.py** — Test suite generator
    - Generates comprehensive test HTML for all visual indicators
    - Tests all 6 Little River Canyon color zones with 22 test cases
    - Validates temperature alerts (10 cases: 35-85°F)
@@ -235,7 +245,7 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Creates standalone HTML test file with color legend
    - Run with: `python3 test_visual_indicators.py`
 
-10. **predictions.py** — River Predictions Module (NEW - 2025-11-30)
+11. **predictions.py** — River Predictions Module (NEW - 2025-11-30)
    - Calculates likelihood of rivers reaching runnable levels
    - Uses QPF (rainfall forecast) + historical response patterns
    - Based on 90-day analysis of USGS gauge data
@@ -286,6 +296,7 @@ The dashboard includes a **River Predictions** panel that forecasts which rivers
 │  - Weather Underground PWS API (primary weather)          │
 │  - NWS Observations API (fallback weather)                │
 │  - StreamBeam API (Short Creek gauge)                     │
+│  - TVA REST API (Hiwassee Dries / Apalachia Dam)          │
 └────────────────────────────────────────────────────────────┘
                          ↓
 ┌────────────────────────────────────────────────────────────┐
@@ -415,8 +426,11 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
   - `observations.py` - NWS weather observations (fallback)
   - `pws_observations.py` - PWS weather observations (primary)
   - `drought.py` - US Drought Monitor integration
+  - `tva_fetch.py` - TVA dam data fetcher (Hiwassee Dries)
   - `site_detail.py` - Detail page generator
-  - `entrypoint.sh` - Container startup script
+  - `predictions.py` - River predictions module
+  - `api_app.py` - Flask REST API server
+  - `entrypoint-api.sh` - Container startup script
   - `gauges.conf.json` - Configuration file
 - `/data/`: Persistent state (bind mount required)
   - `state.sqlite` - Alert state database
@@ -480,15 +494,16 @@ Rivers are color-coded based on their thresholds:
 
 ### Current River Thresholds
 
-| River | min | good |
-|-------|-----|------|
-| Mulberry Fork | 5.0 ft | 10.0 ft |
-| Locust Fork | 1.70 ft | 2.5 ft |
-| Town Creek | 180 cfs | 250 cfs |
-| South Sauty | 8.34 ft | 8.9 ft |
-| Tellico River | 1.70 ft | 2.0 ft |
-| Little River Canyon | 300 cfs | 500 cfs (uses special 6-level) |
-| Short Creek | 0.5 ft | 1.0 ft |
+| River | min | good | Data Source |
+|-------|-----|------|-------------|
+| Mulberry Fork | 5.0 ft | 10.0 ft | USGS |
+| Locust Fork | 1.70 ft | 2.5 ft | USGS |
+| Town Creek | 180 cfs | 250 cfs | USGS |
+| South Sauty | 8.34 ft | 8.9 ft | USGS |
+| Tellico River | 1.70 ft | 2.0 ft | USGS |
+| Little River Canyon | 300 cfs | 500 cfs (uses special 6-level) | USGS |
+| Short Creek | 0.5 ft | 1.0 ft | StreamBeam |
+| Hiwassee Dries | 3,000 cfs | 5,000 cfs | TVA |
 
 ## Systemd Integration
 
@@ -649,15 +664,23 @@ systemctl --user restart usgs-alert.service
 
 ## Git Repository State
 
-**Current Production Status**: Working as of 12-15-2025
+**Current Production Status**: Working as of 12-18-2025
 
 **Production Deployment:**
 - URL: https://docker-blue-sound-1751.fly.dev/
 - Containerfile: `Containerfile.api.simple`
 - Entrypoint: `entrypoint-api.sh`
-- Features: Flask API + Dashboard + ESP32 endpoints
+- Features: Flask API + Dashboard + ESP32 endpoints + TVA integration
+- **Total Sites Monitored**: 8 rivers
 
 **Recent Updates:**
+- **2025-12-18: Added TVA Hiwassee Dries Integration**
+  - New `tva_fetch.py` module for TVA REST API
+  - Monitors Apalachia Dam spillway releases via `HADT1` site code
+  - API endpoint: `https://www.tva.com/RestApi/observed-data/HADT1.json`
+  - Threshold: 3,000 CFS for runnable status
+  - PWS weather stations: KNCMURPH4 (Murphy NC), KTNBENTO3 (Benton TN), KTNCLEVE20 (Cleveland TN)
+  - See `TVA_HIWASSEE_DRIES.md` for full documentation
 - Added US Drought Monitor integration (`drought.py`) for Alabama rivers
 - Drought status displayed below weather with color-coded D0-D4 levels
 - Sparklines now show runnable status (green=above threshold, red=below)
@@ -682,6 +705,7 @@ systemctl --user restart usgs-alert.service
 - `CONTAINERFILES.md` - Complete guide to all Containerfiles
 - `README.md` - General project information
 - `VALIDATOR_README.md` - Dashboard validation tool documentation
+- `TVA_HIWASSEE_DRIES.md` - TVA API discovery and Hiwassee Dries integration details
 
 **Backup Files:**
 Backup files exist in backups/ directory. Several experimental/patched versions present:

@@ -77,6 +77,13 @@ try:
 except ImportError:
     DROUGHT_AVAILABLE = False
 
+# Import TVA dam data fetcher
+try:
+    from tva_fetch import get_latest_tva_observation, get_tva_trend
+    TVA_AVAILABLE = True
+except ImportError:
+    TVA_AVAILABLE = False
+
 # Weather station mapping for each river site
 # PWS = Weather Underground Personal Weather Stations (primary, more local)
 # NWS = National Weather Service official stations (fallback)
@@ -94,6 +101,7 @@ NWS_WEATHER_STATIONS = {
     "Little River Canyon": "K4A9",   # Fort Payne / Isbell Field Airport (cloud config name)
     "Short Creek": "KBFZ",           # Albertville Regional Airport
     "Mulberry Fork": "KCMD",         # Cullman Regional Airport
+    "Hiwassee Dries": "KMNV",        # Monroe County Airport, Madisonville TN (nearest NWS)
 }
 
 # Keep WEATHER_STATIONS as alias for backward compatibility
@@ -1365,6 +1373,56 @@ def main():
             trend_label = "⚠ stale" if streambeam_error else None
             trend_data = None
             sparkline_threshold = th_ft  # StreamBeam uses ft threshold
+
+        elif source == "tva":
+            # TVA dam source - uses TVA REST API
+            if not TVA_AVAILABLE:
+                if not args.quiet:
+                    print(f"[ERROR] TVA module not available, skipping {entry.get('name', 'unknown')}")
+                continue
+
+            tva_site_code = entry.get("tva_site_code")
+            if not tva_site_code:
+                if not args.quiet:
+                    print(f"[ERROR] TVA site missing tva_site_code: {entry}")
+                continue
+
+            site = tva_site_code
+            name = entry.get("name", tva_site_code)
+            th_ft = entry.get("min_ft", def_default_ft)
+            th_cfs = entry.get("min_cfs", def_default_cfs)
+            good_ft = entry.get("good_ft")
+            good_cfs = entry.get("good_cfs")
+
+            tva_error = None
+            try:
+                tva_data = get_latest_tva_observation(tva_site_code)
+                if not tva_data:
+                    raise RuntimeError(f"No data returned for TVA site {tva_site_code}")
+
+                # TVA provides discharge (CFS) as primary measurement
+                discharge = tva_data["discharge_cfs"]
+                stage = tva_data.get("pool_elevation_ft")  # Pool elevation (not gauge height)
+                ts_iso = tva_data["timestamp"].isoformat() if tva_data["timestamp"] else None
+
+                # Get trend from TVA data
+                trend_label = get_tva_trend(tva_site_code, hours=4)
+
+            except Exception as e:
+                tva_error = str(e)
+                if not args.quiet:
+                    print(f"[ERROR] TVA fetch {tva_site_code} failed: {e}")
+                continue
+
+            # TVA doesn't provide USGS-style historical data, so no sparkline trend data
+            trend_data = None
+            sparkline_threshold = th_cfs  # TVA sites use CFS threshold
+
+            # Create a compatible data dict for alerts
+            data = {
+                "url": f"https://www.tva.com/environment/lake-levels/apalachia",
+                "site": tva_site_code
+            }
 
         else:
             # USGS source (default)

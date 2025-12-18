@@ -30,7 +30,7 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 - ⏳ Stale data warnings for gauges not updating
 - 🗄️ SQLite state persistence with alert cooldowns
 - 🌧️ NWS Quantitative Precipitation Forecast (QPF) integration
-- 🔮 **River Predictions** - AI-powered forecasts of which rivers will run based on QPF + historical patterns (NEW!)
+- 🔮 **River Predictions** - AI-powered forecasts of which rivers will run based on QPF + historical patterns
 - 🌡️ **Weather Underground PWS** (Personal Weather Stations) for hyperlocal weather data
 - 🛡️ NWS airport stations as weather fallback
 - 📱 Mobile-responsive dashboard with 7-day historical charts
@@ -39,6 +39,7 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 - 💨 **Wind alerts** (> 15 mph highlighted in yellow)
 - 📈 **Color-coded trend indicators** (rising = green, falling = light red)
 - 🧪 **Comprehensive test suite** for visual indicator verification
+- 🏭 **TVA Dam monitoring** - Hiwassee Dries (Apalachia Dam spillway releases)
 
 ---
 
@@ -100,11 +101,13 @@ Each river has unique characteristics that affect how it responds to rain:
 | Locust Fork | 33 hours | 1.75" | 🔄 Moderate |
 | South Sauty | 33 hours | 2.00" | 🐢 Slow |
 | Mulberry Fork | 33 hours | 2.25" | 🐢 Slow |
+| Hiwassee Dries | N/A | N/A | 🏭 Dam-controlled |
 
 **Tips:**
 - Short Creek is the "canary in the coal mine" - if it's not running, nothing else will be
 - Mulberry Fork needs sustained heavy rain events to reach runnable levels
 - Peak timing shows the window when the river is expected to reach its highest level
+- **Hiwassee Dries** runs only when TVA opens the Apalachia Dam spillway gates - not rain responsive
 
 ### API Endpoint
 
@@ -146,15 +149,16 @@ The dashboard uses intelligent color coding and visual indicators to help you qu
 
 Thresholds are configured in `gauges.conf.json` and exposed via the API:
 
-| River | min | good |
-|-------|-----|------|
-| Mulberry Fork | 5.0 ft | 10.0 ft |
-| Locust Fork | 1.70 ft | 2.5 ft |
-| Town Creek | 180 cfs | 250 cfs |
-| South Sauty | 8.34 ft | 8.9 ft |
-| Tellico River | 1.70 ft | 2.0 ft |
-| Little River Canyon | 300 cfs | (uses special 6-level above) |
-| Short Creek | 0.5 ft | 1.0 ft |
+| River | min | good | Data Source |
+|-------|-----|------|-------------|
+| Mulberry Fork | 5.0 ft | 10.0 ft | USGS |
+| Locust Fork | 1.70 ft | 2.5 ft | USGS |
+| Town Creek | 180 cfs | 250 cfs | USGS |
+| South Sauty | 8.34 ft | 8.9 ft | USGS |
+| Tellico River | 1.70 ft | 2.0 ft | USGS |
+| Little River Canyon | 300 cfs | (uses special 6-level above) | USGS |
+| Short Creek | 0.5 ft | 1.0 ft | StreamBeam |
+| Hiwassee Dries | 3,000 cfs | 5,000 cfs | TVA |
 
 ### Weather Alerts
 

@@ -406,15 +406,16 @@ void fetchRiverData() {
 
 ## Available River Sites
 
-| Site ID | Name | Measurement | min | good |
-|---------|------|-------------|-----|------|
-| 02450000 | Mulberry Fork | Stage (ft) | 5.0 ft | 10.0 ft |
-| 02455000 | Locust Fork | Stage (ft) | 1.70 ft | 2.5 ft |
-| 03572900 | Town Creek | Flow (cfs) | 180 cfs | 250 cfs |
-| 03572690 | South Sauty | Stage (ft) | 8.34 ft | 8.9 ft |
-| 03518500 | Tellico River | Stage (ft) | 1.70 ft | 2.0 ft |
-| 02399200 | Little River Canyon | Flow (cfs) | 300 cfs | 500 cfs |
-| streambeam:1 | Short Creek | Stage (ft) | 0.5 ft | 1.0 ft |
+| Site ID | Name | Measurement | min | good | Source |
+|---------|------|-------------|-----|------|--------|
+| 02450000 | Mulberry Fork | Stage (ft) | 5.0 ft | 10.0 ft | USGS |
+| 02455000 | Locust Fork | Stage (ft) | 1.70 ft | 2.5 ft | USGS |
+| 03572900 | Town Creek | Flow (cfs) | 180 cfs | 250 cfs | USGS |
+| 03572690 | South Sauty | Stage (ft) | 8.34 ft | 8.9 ft | USGS |
+| 03518500 | Tellico River | Stage (ft) | 1.70 ft | 2.0 ft | USGS |
+| 02399200 | Little River Canyon | Flow (cfs) | 300 cfs | 500 cfs | USGS |
+| streambeam:1 | Short Creek | Stage (ft) | 0.5 ft | 1.0 ft | StreamBeam |
+| HADT1 | Hiwassee Dries | Flow (cfs) | 3,000 cfs | 5,000 cfs | TVA |
 
 ## Thresholds Explained
 
@@ -471,6 +472,7 @@ PWS Station Mapping (from `pws_observations.py`):
 | South Sauty | KALLANGS7, KALGROVE15, KALFYFFE11, KALRAINS14 |
 | Little River Canyon | KALCEDAR14, KALGAYLE19, KALGAYLE16, KALGAYLE7 |
 | Mulberry Fork | KALHAYDE19, KALHAYDE21, KALHAYDE13, KALWARRI54 |
+| Hiwassee Dries | KNCMURPH4, KTNBENTO3, KTNCLEVE20 |
 
 ## Drought Data
 
@@ -527,6 +529,8 @@ The system uses a dual-service architecture:
 ┌─────────────────────────────────────────┐
 │  Background Worker (every 60s)          │
 │  - Fetches USGS river data              │
+│  - Fetches TVA dam data (Hiwassee)      │
+│  - Fetches StreamBeam data (Short Creek)│
 │  - Fetches PWS weather (primary)        │
 │  - Falls back to NWS weather if needed  │
 │  - Fetches NWS QPF forecast data        │

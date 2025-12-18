@@ -28,6 +28,7 @@ PWS_STATIONS = {
     "Little River Canyon": ["KALCEDAR14", "KALGAYLE19", "KALGAYLE16", "KALGAYLE7"],
     "Little River": ["KALCEDAR14", "KALGAYLE19", "KALGAYLE16", "KALGAYLE7"],  # alias
     "Mulberry Fork": ["KALHAYDE19", "KALHAYDE21", "KALHAYDE13", "KALWARRI54"],
+    "Hiwassee Dries": ["KNCMURPH4", "KTNBENTO3", "KTNCLEVE20"],
 }
 
 # Friendly labels for display
@@ -54,6 +55,9 @@ PWS_LABELS = {
     "KALHAYDE21": "HAYDEN",   # Hayden
     "KALHAYDE13": "HAYDEN",   # Hayden
     "KALWARRI54": "SMOKRS",   # Smoke Rise
+    "KNCMURPH4": "MURPHY",    # Murphy NC (Tarheel)
+    "KTNBENTO3": "BENTON",    # Benton TN
+    "KTNCLEVE20": "CLEVE",    # Cleveland TN (Prospect)
 }
 
 # Browser-style User-Agent
