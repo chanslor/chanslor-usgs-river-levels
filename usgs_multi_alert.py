@@ -535,7 +535,7 @@ def fetch_streambeam_latest(entry):
     }
 
 def generate_sparkline_html(trend_data, site_id, threshold=None):
-    """Generate smooth SVG line sparkline HTML, wrapped in detail page link.
+    """Generate smooth SVG line sparkline HTML with threshold line and endpoint dot.
 
     Args:
         trend_data: Dict with "values" list of historical readings
@@ -552,14 +552,20 @@ def generate_sparkline_html(trend_data, site_id, threshold=None):
     if len(values) < 2:
         return f'<a href="{detail_url}" class="sparkline-link"><div class="sparkline-empty">—</div></a>'
 
-    # SVG dimensions
-    width = 80
+    # SVG dimensions - wider for better trend visibility
+    width = 120
     height = 32
-    padding = 2
+    padding = 4
 
     # Normalize values to SVG coordinates
     min_val = min(values)
     max_val = max(values)
+
+    # Include threshold in range calculation so threshold line is always visible
+    if threshold is not None:
+        min_val = min(min_val, threshold)
+        max_val = max(max_val, threshold)
+
     range_val = max_val - min_val if max_val > min_val else 1
 
     # Generate points for the line
@@ -577,14 +583,70 @@ def generate_sparkline_html(trend_data, site_id, threshold=None):
     current_value = values[-1]
     if threshold is not None and current_value >= threshold:
         stroke_color = "#4ade80"  # Green - runnable
+        dot_color = "#22c55e"     # Slightly darker green for dot
     else:
         stroke_color = "#ef4444"  # Red - not runnable
+        dot_color = "#dc2626"     # Slightly darker red for dot
+
+    # Build SVG elements
+    svg_elements = []
+
+    # Add threshold line (dashed horizontal line)
+    if threshold is not None:
+        threshold_y = padding + (1 - (threshold - min_val) / range_val) * (height - 2 * padding)
+        svg_elements.append(
+            f'<line x1="{padding}" y1="{threshold_y:.1f}" x2="{width - padding}" y2="{threshold_y:.1f}" '
+            f'stroke="#9ca3af" stroke-width="1" stroke-dasharray="3,2" opacity="0.6"/>'
+        )
+
+    # Add the main sparkline path
+    svg_elements.append(
+        f'<path d="{path_d}" fill="none" stroke="{stroke_color}" stroke-width="2" '
+        f'stroke-linecap="round" stroke-linejoin="round"/>'
+    )
+
+    # Add endpoint dot (current value)
+    end_x, end_y = points[-1]
+    svg_elements.append(
+        f'<circle cx="{end_x:.1f}" cy="{end_y:.1f}" r="3" fill="{dot_color}"/>'
+    )
 
     svg = f'''<svg class="sparkline-svg" viewBox="0 0 {width} {height}" preserveAspectRatio="none">
-        <path d="{path_d}" fill="none" stroke="{stroke_color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        {''.join(svg_elements)}
     </svg>'''
 
     return f'<a href="{detail_url}" class="sparkline-link">{svg}</a>'
+
+
+def calculate_percent_change(trend_data):
+    """Calculate percent change from oldest to newest value in trend data.
+
+    Returns:
+        Tuple of (percent_change, direction) where direction is 'up', 'down', or 'flat'
+    """
+    if not trend_data or not trend_data.get("values"):
+        return None, "flat"
+
+    values = trend_data["values"]
+    if len(values) < 2:
+        return None, "flat"
+
+    old_val = values[0]
+    new_val = values[-1]
+
+    if old_val == 0:
+        return None, "flat"
+
+    pct_change = ((new_val - old_val) / old_val) * 100
+
+    if pct_change > 0.5:
+        direction = "up"
+    elif pct_change < -0.5:
+        direction = "down"
+    else:
+        direction = "flat"
+
+    return pct_change, direction
 
 
 def _smooth_sparkline_path(points):
@@ -878,6 +940,16 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
         sparkline_html = generate_sparkline_html(r.get("trend_data"), site_id, r.get("sparkline_threshold"))
         usgs_url = f"https://waterdata.usgs.gov/nwis/uv?site_no={site_id}&legacy=1" if site_id else "#"
 
+        # Calculate percent change for the trend
+        pct_change, pct_direction = calculate_percent_change(r.get("trend_data"))
+        if pct_change is not None:
+            pct_sign = "+" if pct_change > 0 else ""
+            pct_class = f"pct-{pct_direction}"
+            pct_arrow = "▲" if pct_direction == "up" else ("▼" if pct_direction == "down" else "")
+            pct_html = f'<span class="pct-change {pct_class}">{pct_arrow} {pct_sign}{pct_change:.0f}%</span>'
+        else:
+            pct_html = '<span class="pct-change pct-flat">—</span>'
+
         return f"""
         <tr class="{cls}">
           <td>
@@ -889,6 +961,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
             {drought_line}
           </td>
           <td class="sparkline-cell">{sparkline_html}</td>
+          <td class="center">{pct_html}</td>
           <td class="center">{("" if r.get('cfs') is None else f"{int(round(r['cfs'])):,}")}</td>
           <td class="num">{("" if r.get('stage_ft') is None else f"{r['stage_ft']:.2f}")}</td>
           <td class="num timestamp-cell"><a href="{h(r.get('waterdata_url') or '#')}">{format_timestamp_stacked(r.get('ts_iso') or '')}{stale_indicator}</a></td>
@@ -937,12 +1010,18 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   /* Sparkline styling */
   .sparkline-cell {{ text-align: center; padding: 10px 8px !important; }}
   .sparkline-svg {{
-    width: 80px;
+    width: 120px;
     height: 32px;
     display: inline-block;
     vertical-align: middle;
   }}
   .sparkline-empty {{ color: #94a3b8; font-size: 18px; }}
+
+  /* Percent change styling */
+  .pct-change {{ font-weight: 600; font-size: 14px; white-space: nowrap; }}
+  .pct-up {{ color: #22c55e; }}
+  .pct-down {{ color: #ef4444; }}
+  .pct-flat {{ color: #9ca3af; }}
 
   /* Clickable sparkline link styling */
   .sparkline-link {{
@@ -1105,7 +1184,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
 </head><body>
 <div class="wrap">
   <table>
-    <thead><tr><td>River</td><td class="center">12hr</td><td class="center">CFS</td><td class="num">Feet</td><td class="center">Updated</td></tr></thead>
+    <thead><tr><td>River</td><td class="center">12hr Trend</td><td class="center">Change</td><td class="center">CFS</td><td class="num">Feet</td><td class="center">Updated</td></tr></thead>
     <tbody>{trs}</tbody>
   </table>
   {predictions_html}
