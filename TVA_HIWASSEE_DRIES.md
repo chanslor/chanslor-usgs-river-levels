@@ -1,12 +1,36 @@
 # TVA Hiwassee Dries Integration
 
 **Created:** 2025-12-18
+**Updated:** 2025-12-18 (Evening - Added dual threshold gauges and tailwater documentation)
 **Status:** COMPLETE - Live in Production
 **Production URL:** https://docker-blue-sound-1751.fly.dev/
+**Detail Page:** https://docker-blue-sound-1751.fly.dev/details/HADT1.html
+
+## Dam Operations Forecast Panel (12-18-2025)
+
+![Hiwassee Dries Dam Operations Forecast](./Hiwassee-example.png)
+
+*The detail page for Hiwassee Dries features a 3-day Dam Operations Forecast panel showing current release status, inflow/outflow predictions, and runnable conditions.*
+
+### Panel Features
+
+- **Water Flow Diagram**: Visual representation of Inflow → Reservoir → Outflow
+- **Current Release Gauge**: Real-time CFS with visual gauge showing position relative to thresholds
+- **Dual Threshold Markers**:
+  - 💧 Blue marker at 500 CFS - "Spillway Opens" (water starts flowing into Dries)
+  - 🚣 Red marker at 3,000 CFS - "Runnable" (good paddling conditions)
+- **Trend Indicator**: Shows if release is Rising (↗), Steady (→), or Falling (↘)
+- **3-Day Forecast Cards**: Predicted inflow/outflow for Today, Tomorrow, and Day 3
+- **Runnable Status**: Color-coded badges (Green=YES!, Yellow=MAYBE, Gray=NO)
+- **Today's Story Table**: Hourly observations showing dam operations with plain-English explanations
 
 ## Overview
 
 The **Hiwassee Dries** is a 13-mile section of the Hiwassee River between Apalachia Dam and Apalachia Powerhouse in Tennessee/North Carolina. This section is normally dewatered because TVA diverts water through an 8.3-mile underground tunnel to the powerhouse.
+
+![Apalachia Flume/Tunnel Intake](./apalachia-flume.png)
+
+*The flume and tunnel intake structure at Apalachia Dam - this is where water enters the 8.3-mile tunnel to the powerhouse, bypassing the Dries section of the river.*
 
 **The Dries only run when:**
 - Apalachia Dam spillway gates are opened
@@ -61,6 +85,25 @@ https://www.tva.com/RestApi/observed-data/HADT1.json
 
 **Note:** These thresholds are estimates. Real-world calibration from paddlers who've run the Dries would improve accuracy.
 
+### Understanding Discharge vs Tailwater Elevation
+
+Based on observed data from 12/18/2025, here's the relationship between discharge (CFS) and tailwater elevation:
+
+| Discharge (CFS) | Tailwater Elevation | What's Happening |
+|-----------------|---------------------|------------------|
+| 30-45 CFS | ~837.3-837.6 ft | Dam quiet, Dries dry |
+| ~500 CFS | ~838-838.5 ft (estimated) | Spillway opening, water starts flowing |
+| ~1,500 CFS | ~839.5 ft | Dries filling up |
+| ~2,850 CFS | ~840.5 ft | Near runnable conditions |
+
+The tailwater rises about **2-3 feet** from "dry" (~837 ft) to "full release" (~840.5 ft) as more water pours through the spillway gates.
+
+**Important Distinction:** The tailwater elevation is measured right at the base of the dam - it shows how high the water is pooling immediately below the spillway. The "Dries" section extends **13 miles downstream** from there to the powerhouse, so the tailwater reading doesn't directly tell you the water level throughout the Dries - it's more of an indicator of how much water is being released.
+
+**Key Thresholds on the Dashboard Gauge:**
+- 💧 **500 CFS** (~838 ft tailwater) - "Spillway Opens" - Water starts flowing into Dries
+- 🚣 **3,000 CFS** (~840.5 ft tailwater) - "Runnable" - Good paddling conditions
+
 ## Technical Details
 
 ### API Characteristics
@@ -83,8 +126,47 @@ curl -s "https://www.tva.com/RestApi/observed-data/HADT1.json" \
 | Endpoint | Description | Status |
 |----------|-------------|--------|
 | `/RestApi/observed-data/HADT1.json` | Hourly observations | **WORKING** |
-| `/RestApi/predicted-data/HADT1.json` | Predicted levels | Empty array |
-| `/RestApi/predicted-data/DUGT1.json` | Douglas Dam predictions | Working (different site) |
+| `/RestApi/predicted-data/HADT1.json` | 3-day forecast | **WORKING** |
+| `/RestApi/predicted-data/DUGT1.json` | Douglas Dam predictions | Working |
+
+### Predicted Data API (3-Day Forecast)
+
+```
+https://www.tva.com/RestApi/predicted-data/HADT1.json
+```
+
+Returns 3-day operational forecast for dam releases:
+
+```json
+[
+    {
+        "Day": "12/18/2025",
+        "AverageInflow": "1,020",
+        "MidnightElevation": 1277.58,
+        "AverageOutflow": "1,222"
+    },
+    {
+        "Day": "12/19/2025",
+        "AverageInflow": "805",
+        "MidnightElevation": 1277.5,
+        "AverageOutflow": "850"
+    },
+    {
+        "Day": "12/20/2025",
+        "AverageInflow": "790",
+        "MidnightElevation": 1277.5,
+        "AverageOutflow": "790"
+    }
+]
+```
+
+| Field | Description | Use for Paddlers |
+|-------|-------------|------------------|
+| `AverageInflow` | Water entering reservoir (CFS) | High inflow = potential releases |
+| `MidnightElevation` | Expected pool level at midnight (ft MSL) | Pool management |
+| `AverageOutflow` | **Expected discharge (CFS)** | **Will Dries run tomorrow?** |
+
+**Key Insight:** If `AverageOutflow` >= 3,000 CFS, the Dries should be runnable that day!
 
 ### Site Code Pattern
 
@@ -93,6 +175,10 @@ TVA uses NWS-style location identifiers:
 - `DUGT1` = **DU**glas **G**? **T**ennessee **1**
 
 ## Apalachia Dam Facts
+
+![Apalachia Dam Pool](./apalachia-pool.png)
+
+*Apalachia Dam and reservoir pool - water is diverted through an 8.3-mile tunnel to the powerhouse, leaving the "Dries" section normally dewatered.*
 
 - **Location:** Cherokee County, NC (dam) / Polk County, TN (powerhouse)
 - **Built:** 1941-1943
@@ -123,7 +209,8 @@ All integration completed on 2025-12-18:
 
 | File | Action | Description |
 |------|--------|-------------|
-| `tva_fetch.py` | Created | TVA REST API client module with trend data support |
+| `tva_fetch.py` | Created | TVA REST API client with trend data + 3-day forecast panel |
+| `site_detail.py` | Modified | Integrated TVA forecast panel into detail pages |
 | `gauges.conf.json` | Modified | Added Hiwassee Dries site config |
 | `gauges.conf.cloud.json` | Modified | Added Hiwassee Dries site config |
 | `pws_observations.py` | Modified | Added PWS stations and labels |
@@ -131,25 +218,47 @@ All integration completed on 2025-12-18:
 | `Containerfile.api.simple` | Modified | Added COPY for tva_fetch.py |
 | `GPS.txt` | Modified | Added Hiwassee Dries PWS stations |
 
-### TVA Trend Data Functions
+### TVA Data Functions
 
-The `tva_fetch.py` module provides trend data in the same format as USGS data for sparkline visualization:
+The `tva_fetch.py` module provides comprehensive TVA data access:
+
+#### Trend Data (for sparklines)
 
 ```python
-# Get 12-hour trend data for sparklines
-from tva_fetch import get_tva_trend_data
+from tva_fetch import get_tva_trend_data, get_tva_trend
 
+# Get 12-hour trend data for sparklines
 trend_data = get_tva_trend_data('HADT1', hours=12)
-# Returns:
-# {
-#     "values": [1479.0, 62.0, 30.0, 45.0, 1497.0, 2845.0, 2854.0, 2852.0],
-#     "direction": "rising"
-# }
+# Returns: {"values": [1479.0, 62.0, ...], "direction": "rising"}
 
 # Get text trend label
-from tva_fetch import get_tva_trend
-
 trend = get_tva_trend('HADT1', hours=4)  # Returns: "rising", "falling", or "steady"
+```
+
+#### Forecast Data (3-day predictions)
+
+```python
+from tva_fetch import get_tva_forecast, generate_tva_forecast_html
+
+# Get parsed forecast with runnable status
+forecast = get_tva_forecast('HADT1', runnable_threshold=3000)
+# Returns list of dicts:
+# [
+#     {
+#         "day": "12/18/2025",
+#         "day_label": "Today",
+#         "inflow_cfs": 1020,
+#         "outflow_cfs": 1222,
+#         "pool_elevation_ft": 1277.58,
+#         "runnable_status": "no",
+#         "runnable_label": "NO",
+#         "runnable_color": "#9ca3af"
+#     },
+#     ...
+# ]
+
+# Generate complete HTML forecast panel for detail page
+html = generate_tva_forecast_html('HADT1', runnable_threshold=3000)
 ```
 
 **Sparkline Features:**

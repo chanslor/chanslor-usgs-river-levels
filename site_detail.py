@@ -10,6 +10,13 @@ import urllib.parse
 from datetime import datetime, timezone, timedelta
 import html
 
+# Import TVA forecast generator (optional - only for TVA sites)
+try:
+    from tva_fetch import generate_tva_forecast_html
+    TVA_FORECAST_AVAILABLE = True
+except ImportError:
+    TVA_FORECAST_AVAILABLE = False
+
 def calculate_wind_chill(temp_f, wind_mph):
     """
     Calculate wind chill temperature using NWS formula.
@@ -191,6 +198,18 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
     # Last runnable time
     last_runnable = last_in_time if last_in_time else "Never recorded"
 
+    # Check for TVA source and generate forecast panel
+    is_tva = site_data.get("is_tva", False)
+    tva_site_code = site_data.get("tva_site_code")
+    tva_forecast_html = ""
+    if is_tva and tva_site_code and TVA_FORECAST_AVAILABLE:
+        try:
+            runnable_threshold = int(threshold_cfs) if threshold_cfs else 3000
+            tva_forecast_html = generate_tva_forecast_html(tva_site_code, runnable_threshold)
+        except Exception as e:
+            print(f"[DETAIL] TVA forecast generation failed: {e}")
+            tva_forecast_html = ""
+
     # Get wind chill from passed data, or calculate if not provided
     wind_chill_temp = site_data.get("wind_chill_f")
     wind_chill_emoji = site_data.get("wind_chill_emoji")
@@ -206,7 +225,7 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{h(site_name)} - River Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{"" if is_tva else '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>'}
 <style>
 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
 body {{
@@ -335,13 +354,15 @@ body {{
     <h1>{h(site_name)}</h1>
     <div class="status">{status_text}</div>
     <div class="meta">
-      <span><strong>USGS Site:</strong> {h(site_id)}</span>
+      <span><strong>{"TVA Site" if is_tva else "USGS Site"}:</strong> {h(site_id)}</span>
       <span><strong>Threshold:</strong> {h(threshold_str)}</span>
       <span><strong>Last Runnable:</strong> {h(last_runnable)}</span>
     </div>
   </div>
 
-  <div class="chart-row">
+  {tva_forecast_html}
+
+  {"" if is_tva else f'''<div class="chart-row">
     <div class="chart-box">
       <h2>Discharge (CFS)</h2>
       <div class="chart-value">{f"{int(current_cfs):,}" if current_cfs is not None else "N/A"} <span style="font-size:18px; font-weight:normal;">CFS</span></div>
@@ -382,11 +403,11 @@ body {{
       <div class="value">{f"{wind_chill_temp:.1f}°F" if wind_chill_temp is not None else "N/A"}</div>
       <div class="range">{wind_chill_desc if wind_chill_desc else "No wind chill" if current_temp is not None and current_wind_mph is not None else "Data unavailable"}</div>
     </div>
-  </div>
+  </div>'''}
 
 </div>
 
-<script>
+{"" if is_tva else f'''<script>
 // Debug: Log data to console
 console.log('CFS Labels:', {json.dumps(cfs_labels)});
 console.log('CFS Values:', {json.dumps(cfs_values)});
@@ -398,14 +419,14 @@ const cfsCtx = document.getElementById('cfsChart').getContext('2d');
 const cfsLabels = {json.dumps(cfs_labels)};
 const cfsValues = {json.dumps(cfs_values)};
 
-if (cfsLabels.length === 0 || cfsValues.length === 0) {{
+if (cfsLabels.length === 0 || cfsValues.length === 0) {{{{
   cfsCtx.canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">No CFS data available for this site</div>';
-}} else {{
-  new Chart(cfsCtx, {{
+}}}} else {{{{
+  new Chart(cfsCtx, {{{{
     type: 'line',
-    data: {{
+    data: {{{{
       labels: cfsLabels,
-      datasets: [{{
+      datasets: [{{{{
         label: 'CFS',
         data: cfsValues,
       borderColor: '#1a73e8',
@@ -415,50 +436,50 @@ if (cfsLabels.length === 0 || cfsValues.length === 0) {{
       fill: true,
       pointRadius: 2,
       pointHoverRadius: 5
-    }}]
-  }},
-  options: {{
+    }}}}]
+  }}}},
+  options: {{{{
     responsive: true,
     maintainAspectRatio: false,
-    plugins: {{
-      legend: {{ display: false }},
-      tooltip: {{
+    plugins: {{{{
+      legend: {{{{ display: false }}}},
+      tooltip: {{{{
         mode: 'index',
         intersect: false,
-      }}
-    }},
-    scales: {{
-      x: {{
-        ticks: {{
+      }}}}
+    }}}},
+    scales: {{{{
+      x: {{{{
+        ticks: {{{{
           maxRotation: 45,
           minRotation: 45,
           autoSkip: true,
           maxTicksLimit: 10
-        }},
-        grid: {{ display: false }}
-      }},
-      y: {{
+        }}}},
+        grid: {{{{ display: false }}}}
+      }}}},
+      y: {{{{
         beginAtZero: false,
-        grid: {{ color: 'rgba(0,0,0,0.05)' }}
-      }}
-    }}
-  }}
-  }});
-}}
+        grid: {{{{ color: 'rgba(0,0,0,0.05)' }}}}
+      }}}}
+    }}}}
+  }}}}
+  }}}});
+}}}}
 
 // Feet Chart
 const feetCtx = document.getElementById('feetChart').getContext('2d');
 const feetLabels = {json.dumps(feet_labels)};
 const feetValues = {json.dumps(feet_values)};
 
-if (feetLabels.length === 0 || feetValues.length === 0) {{
+if (feetLabels.length === 0 || feetValues.length === 0) {{{{
   feetCtx.canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">No gage height data available for this site</div>';
-}} else {{
-  new Chart(feetCtx, {{
+}}}} else {{{{
+  new Chart(feetCtx, {{{{
     type: 'line',
-    data: {{
+    data: {{{{
       labels: feetLabels,
-      datasets: [{{
+      datasets: [{{{{
         label: 'Feet',
         data: feetValues,
       borderColor: '#1a73e8',
@@ -468,37 +489,37 @@ if (feetLabels.length === 0 || feetValues.length === 0) {{
       fill: true,
       pointRadius: 2,
       pointHoverRadius: 5
-    }}]
-  }},
-  options: {{
+    }}}}]
+  }}}},
+  options: {{{{
     responsive: true,
     maintainAspectRatio: false,
-    plugins: {{
-      legend: {{ display: false }},
-      tooltip: {{
+    plugins: {{{{
+      legend: {{{{ display: false }}}},
+      tooltip: {{{{
         mode: 'index',
         intersect: false,
-      }}
-    }},
-    scales: {{
-      x: {{
-        ticks: {{
+      }}}}
+    }}}},
+    scales: {{{{
+      x: {{{{
+        ticks: {{{{
           maxRotation: 45,
           minRotation: 45,
           autoSkip: true,
           maxTicksLimit: 10
-        }},
-        grid: {{ display: false }}
-      }},
-      y: {{
+        }}}},
+        grid: {{{{ display: false }}}}
+      }}}},
+      y: {{{{
         beginAtZero: false,
-        grid: {{ color: 'rgba(0,0,0,0.05)' }}
-      }}
-    }}
-  }}
-  }});
-}}
-</script>
+        grid: {{{{ color: 'rgba(0,0,0,0.05)' }}}}
+      }}}}
+    }}}}
+  }}}}
+  }}}});
+}}}}
+</script>'''}
 
 </body>
 </html>"""

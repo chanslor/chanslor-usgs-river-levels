@@ -946,7 +946,8 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
         # Generate sparkline for trend (with clickable link to detail page)
         # Pass the sparkline_threshold to color bars green (runnable) or red (not runnable)
         sparkline_html = generate_sparkline_html(r.get("trend_data"), site_id, r.get("sparkline_threshold"))
-        usgs_url = f"https://waterdata.usgs.gov/nwis/uv?site_no={site_id}&legacy=1" if site_id else "#"
+        # Use custom river_url if provided (for TVA sources), otherwise use USGS URL
+        river_url = r.get("river_url") or (f"https://waterdata.usgs.gov/nwis/uv?site_no={site_id}&legacy=1" if site_id else "#")
 
         # Calculate percent change for the trend
         pct_change, pct_direction = calculate_percent_change(r.get("trend_data"))
@@ -961,7 +962,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
         return f"""
         <tr class="{cls}">
           <td>
-            <div class="river"><a href="{usgs_url}" target="_blank" rel="noopener">{h(r.get('name') or r.get('site') or '')}</a></div>
+            <div class="river"><a href="{river_url}" target="_blank" rel="noopener">{h(r.get('name') or r.get('site') or '')}</a></div>
             <div class="sub">{sub}</div>
             {qpf_line}
             {obs_line}
@@ -1373,6 +1374,7 @@ def main():
             trend_label = "⚠ stale" if streambeam_error else None
             trend_data = None
             sparkline_threshold = th_ft  # StreamBeam uses ft threshold
+            river_url = None  # Use default USGS-style URL
 
         elif source == "tva":
             # TVA dam source - uses TVA REST API
@@ -1422,9 +1424,12 @@ def main():
 
             sparkline_threshold = th_cfs  # TVA sites use CFS threshold
 
+            # TVA-specific URL for the river name link
+            river_url = "https://www.tva.com/environment/lake-levels/apalachia"
+
             # Create a compatible data dict for alerts
             data = {
-                "url": f"https://www.tva.com/environment/lake-levels/apalachia",
+                "url": river_url,
                 "site": tva_site_code
             }
 
@@ -1464,7 +1469,9 @@ def main():
                 trend_data = None
                 sparkline_threshold = None
 
-        # Common processing for both sources
+            river_url = None  # Use default USGS URL
+
+        # Common processing for all sources
         in_range = is_in(stage, discharge, th_ft, th_cfs)
 
         if not args.quiet:
@@ -1595,6 +1602,7 @@ def main():
             "drought": drought_data,
             "obs": obs_data,
             "obs_secondary": obs_secondary,
+            "river_url": river_url,
             "waterdata_url": f"https://waterdata.usgs.gov/monitoring-location/{site}/#parameterCode=00065&period=P7D"
         })
 
@@ -1767,6 +1775,9 @@ def main():
                     # Use primary obs if temp_f is available, otherwise use secondary
                     active_obs = obs_data if obs_data and obs_data.get("temp_f") is not None else obs_secondary
 
+                    # Detect TVA source by checking if site_id is a TVA code (alphanumeric like HADT1)
+                    is_tva_source = site_id and not site_id.isdigit()
+
                     site_data = {
                         "name": row.get("name"),
                         "site": site_id,
@@ -1781,7 +1792,9 @@ def main():
                         "threshold_ft": row.get("threshold_ft"),
                         "threshold_cfs": row.get("threshold_cfs"),
                         "in_range": row.get("in_range", False),
-                        "last_in_time": last_in_time
+                        "last_in_time": last_in_time,
+                        "is_tva": is_tva_source,
+                        "tva_site_code": site_id if is_tva_source else None
                     }
 
                     # Generate HTML

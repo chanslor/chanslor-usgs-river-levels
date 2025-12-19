@@ -263,6 +263,812 @@ def get_tva_trend_data(site_code: str, hours: int = 12) -> Optional[Dict[str, An
     }
 
 
+def fetch_tva_predicted(site_code: str, timeout: int = 30) -> Optional[List[Dict]]:
+    """
+    Fetch predicted data from TVA API (3-day forecast).
+
+    Args:
+        site_code: TVA site code (e.g., 'HADT1' for Apalachia)
+        timeout: Request timeout in seconds
+
+    Returns:
+        List of prediction dicts, or None on error.
+        Each dict has keys:
+        - Day: "MM/DD/YYYY"
+        - AverageInflow: "X,XXX" (CFS, with commas)
+        - MidnightElevation: float (feet MSL)
+        - AverageOutflow: "X,XXX" (CFS, with commas)
+    """
+    url = f"https://www.tva.com/RestApi/predicted-data/{site_code}.json"
+    headers = {"User-Agent": USER_AGENT}
+
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read())
+
+            # API returns empty array [] if no predictions available
+            if not data:
+                return None
+
+            return data
+
+    except Exception as e:
+        print(f"[TVA] Error fetching predicted data for {site_code}: {e}")
+        return None
+
+
+def get_tva_forecast(site_code: str, runnable_threshold: int = 3000) -> Optional[List[Dict[str, Any]]]:
+    """
+    Get 3-day dam operations forecast with runnable status.
+
+    Args:
+        site_code: TVA site code (e.g., 'HADT1')
+        runnable_threshold: CFS threshold for runnable conditions (default 3000)
+
+    Returns:
+        List of forecast dicts with:
+        - day: "MM/DD/YYYY"
+        - day_label: "Today", "Tomorrow", "Day 3"
+        - day_name: "Thu", "Fri", etc.
+        - inflow_cfs: int
+        - outflow_cfs: int
+        - pool_elevation_ft: float
+        - runnable_status: "yes", "maybe", "no"
+        - runnable_label: "YES!", "MAYBE", "NO"
+        - runnable_color: CSS color
+
+        Returns None on error or no data.
+    """
+    data = fetch_tva_predicted(site_code)
+    if not data:
+        return None
+
+    forecasts = []
+    day_labels = ["Today", "Tomorrow", "Day 3"]
+
+    for i, pred in enumerate(data[:3]):  # Max 3 days
+        try:
+            # Parse values
+            inflow = int(parse_tva_value(pred.get("AverageInflow", "0")))
+            outflow = int(parse_tva_value(pred.get("AverageOutflow", "0")))
+            pool = pred.get("MidnightElevation", 0)
+            if isinstance(pool, str):
+                pool = parse_tva_value(pool)
+
+            # Parse date for day name
+            day_str = pred.get("Day", "")
+            try:
+                dt = datetime.strptime(day_str, "%m/%d/%Y")
+                day_name = dt.strftime("%a")  # Mon, Tue, etc.
+            except:
+                day_name = ""
+
+            # Determine runnable status
+            if outflow >= runnable_threshold:
+                status = "yes"
+                label = "YES!"
+                color = "#22c55e"  # Green
+            elif outflow >= runnable_threshold * 0.5:  # 50% of threshold = maybe
+                status = "maybe"
+                label = "MAYBE"
+                color = "#eab308"  # Yellow
+            else:
+                status = "no"
+                label = "NO"
+                color = "#9ca3af"  # Gray
+
+            forecasts.append({
+                "day": day_str,
+                "day_label": day_labels[i] if i < len(day_labels) else f"Day {i+1}",
+                "day_name": day_name,
+                "inflow_cfs": inflow,
+                "outflow_cfs": outflow,
+                "pool_elevation_ft": pool,
+                "runnable_status": status,
+                "runnable_label": label,
+                "runnable_color": color,
+            })
+
+        except Exception as e:
+            print(f"[TVA] Error parsing prediction: {e}")
+            continue
+
+    return forecasts if forecasts else None
+
+
+def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -> str:
+    """
+    Generate HTML for the Dam Operations Forecast panel.
+
+    Args:
+        site_code: TVA site code (e.g., 'HADT1')
+        runnable_threshold: CFS threshold for runnable conditions
+
+    Returns:
+        HTML string for the forecast panel, or empty string if no data
+    """
+    forecasts = get_tva_forecast(site_code, runnable_threshold)
+    if not forecasts:
+        return ""
+
+    # Get current observation for the header
+    current = get_latest_tva_observation(site_code)
+    current_outflow = current['discharge_cfs'] if current else 0
+    current_pool = current['pool_elevation_ft'] if current else 0
+    current_time = current.get('timestamp_str', '') if current else ''
+
+    # Get all observations for the "story" table
+    all_observations = fetch_tva_observed(site_code)
+
+    # Get trend for current release
+    current_trend = get_tva_trend(site_code, hours=4)
+    trend_arrow = "↗" if current_trend == "rising" else "↘" if current_trend == "falling" else "→"
+    trend_label = current_trend.title() if current_trend else "Steady"
+
+    # Calculate current release gauge values
+    max_gauge_cfs = 6000  # Max for visualization
+    spillway_opens_cfs = 500  # CFS when water starts spilling into the Dries
+    current_pct = min(100, (current_outflow / max_gauge_cfs) * 100)
+    threshold_pct_gauge = min(100, (runnable_threshold / max_gauge_cfs) * 100)
+    spillway_pct_gauge = min(100, (spillway_opens_cfs / max_gauge_cfs) * 100)
+
+    # Determine current status
+    if current_outflow >= runnable_threshold:
+        current_status = "RUNNABLE!"
+        current_color = "#22c55e"  # Green
+        status_desc = "The Dries are running!"
+    elif current_outflow >= runnable_threshold * 0.5:
+        current_status = "GETTING CLOSE"
+        current_color = "#eab308"  # Yellow
+        status_desc = f"Need {runnable_threshold - current_outflow:,} more CFS"
+    else:
+        current_status = "TOO LOW"
+        current_color = "#9ca3af"  # Gray
+        status_desc = f"Need {runnable_threshold - current_outflow:,} more CFS"
+
+    # Build the "Today's Story" table from observations
+    story_rows = ""
+    if all_observations:
+        prev_discharge = None
+        for obs in all_observations:
+            try:
+                time_str = obs.get("Time", "").replace(" EST", "").replace(" EDT", "")
+                discharge = int(parse_tva_value(obs.get("AverageHourlyDischarge", "0")))
+                pool = parse_tva_value(obs.get("ReservoirElevation", "0"))
+                tailwater = parse_tva_value(obs.get("TailwaterElevation", "0"))
+
+                # Determine what's happening
+                if discharge < 100:
+                    event = "Dam quiet, Dries dry"
+                    event_class = "event-quiet"
+                elif discharge < 500:
+                    event = "Minimal release"
+                    event_class = "event-quiet"
+                elif discharge < 1500:
+                    event = "Spillway opening!"
+                    event_class = "event-opening"
+                elif discharge < runnable_threshold:
+                    event = "Dries filling up"
+                    event_class = "event-filling"
+                else:
+                    event = "Full release - RUNNABLE!"
+                    event_class = "event-runnable"
+
+                # Check if this is a significant change
+                is_change = prev_discharge is not None and abs(discharge - prev_discharge) > 500
+                row_class = "story-highlight" if is_change else ""
+
+                story_rows += f'''
+                <tr class="{row_class}">
+                    <td class="story-time">{time_str}</td>
+                    <td class="story-pool">{pool:,.1f} ft</td>
+                    <td class="story-tailwater">{tailwater:,.1f} ft</td>
+                    <td class="story-discharge">{discharge:,} CFS</td>
+                    <td class="story-event {event_class}">{event}</td>
+                </tr>
+                '''
+                prev_discharge = discharge
+            except Exception:
+                continue
+
+    # Build the 3-day forecast cards
+    cards_html = ""
+    for f in forecasts:
+        # Calculate bar heights (max 100% at 5000 CFS for visualization)
+        max_cfs = 5000
+        inflow_pct = min(100, (f['inflow_cfs'] / max_cfs) * 100)
+        outflow_pct = min(100, (f['outflow_cfs'] / max_cfs) * 100)
+        threshold_pct = min(100, (runnable_threshold / max_cfs) * 100)
+
+        cards_html += f'''
+        <div class="forecast-card">
+          <div class="forecast-day">{f['day_label']}</div>
+          <div class="forecast-date">{f['day_name']} {f['day'].split('/')[0]}/{f['day'].split('/')[1]}</div>
+
+          <div class="forecast-bars">
+            <div class="bar-group">
+              <div class="bar-label">In</div>
+              <div class="bar-container">
+                <div class="bar bar-inflow" style="height: {inflow_pct}%;"></div>
+                <div class="threshold-line" style="bottom: {threshold_pct}%;"></div>
+              </div>
+              <div class="bar-value">{f['inflow_cfs']:,}</div>
+            </div>
+            <div class="bar-group">
+              <div class="bar-label">Out</div>
+              <div class="bar-container">
+                <div class="bar bar-outflow" style="height: {outflow_pct}%; background: {f['runnable_color']};"></div>
+                <div class="threshold-line" style="bottom: {threshold_pct}%;"></div>
+              </div>
+              <div class="bar-value">{f['outflow_cfs']:,}</div>
+            </div>
+          </div>
+
+          <div class="forecast-status" style="background: {f['runnable_color']};">
+            {f['runnable_label']}
+          </div>
+
+          <div class="forecast-pool">🌊 {f['pool_elevation_ft']:.1f} ft</div>
+        </div>
+        '''
+
+    html = f'''
+    <div class="forecast-panel">
+      <div class="forecast-header">
+        <div class="forecast-title">🌊 3-DAY APALACHIA OPERATIONS FORECAST</div>
+        <div class="forecast-subtitle">Apalachia Dam → Hiwassee Dries</div>
+      </div>
+
+      <div class="flow-diagram">
+        <div class="flow-section">
+          <div class="flow-label">INFLOW</div>
+          <div class="flow-arrow">▶▶▶</div>
+        </div>
+        <div class="flow-section reservoir">
+          <div class="reservoir-box">
+            <div class="reservoir-label">RESERVOIR</div>
+            <div class="reservoir-level">{current_pool:.1f} ft</div>
+          </div>
+        </div>
+        <div class="flow-section">
+          <div class="flow-arrow">▶▶▶</div>
+          <div class="flow-label">OUTFLOW</div>
+        </div>
+      </div>
+
+      <div class="current-release-panel">
+        <div class="current-release-header">
+          <div class="current-release-title">⚡ CURRENT RELEASE</div>
+          <div class="current-release-time">Updated: {current_time}</div>
+        </div>
+
+        <div class="current-release-content">
+          <div class="current-gauge-section">
+            <div class="current-gauge">
+              <div class="gauge-track">
+                <div class="gauge-fill" style="width: {current_pct}%; background: {current_color};"></div>
+                <div class="gauge-threshold spillway" style="left: {spillway_pct_gauge}%;"></div>
+                <div class="gauge-threshold-label spillway" style="left: {spillway_pct_gauge}%;">💧 {spillway_opens_cfs:,}</div>
+                <div class="gauge-threshold runnable" style="left: {threshold_pct_gauge}%;"></div>
+                <div class="gauge-threshold-label runnable" style="left: {threshold_pct_gauge}%;">🚣 {runnable_threshold:,}</div>
+              </div>
+              <div class="gauge-labels">
+                <span>0</span>
+                <span>{max_gauge_cfs:,} CFS</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="current-stats">
+            <div class="current-cfs">
+              <div class="current-cfs-value" style="color: {current_color};">{current_outflow:,}</div>
+              <div class="current-cfs-unit">CFS</div>
+            </div>
+            <div class="current-trend">
+              <span class="trend-arrow">{trend_arrow}</span>
+              <span class="trend-text">{trend_label}</span>
+            </div>
+            <div class="current-status-box" style="background: {current_color};">
+              {current_status}
+            </div>
+            <div class="current-status-desc">{status_desc}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="forecast-cards">
+        {cards_html}
+      </div>
+
+      <div class="forecast-legend">
+        <div class="legend-item">
+          <div class="legend-line spillway"></div>
+          <span>💧 Spillway Opens: {spillway_opens_cfs:,} CFS - Water starts flowing into Dries</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-line runnable"></div>
+          <span>🚣 Runnable: {runnable_threshold:,} CFS - Good paddling conditions!</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-box" style="background: #22c55e;"></div>
+          <span>YES! - Dries will run</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-box" style="background: #eab308;"></div>
+          <span>MAYBE - Close to threshold</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-box" style="background: #9ca3af;"></div>
+          <span>NO - Below threshold</span>
+        </div>
+      </div>
+
+      <div class="story-section">
+        <div class="story-header">
+          <div class="story-title">📖 Today's Story - What's Happening at the Dam</div>
+          <div class="story-subtitle">Hourly observations showing how the dam operates</div>
+        </div>
+        <div class="story-table-wrapper">
+          <table class="story-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Lake Level</th>
+                <th>Tailwater</th>
+                <th>Release</th>
+                <th>What's Happening</th>
+              </tr>
+            </thead>
+            <tbody>
+              {story_rows}
+            </tbody>
+          </table>
+        </div>
+        <div class="story-explainer">
+          <div class="explainer-item">
+            <strong>Lake Level</strong> = Water elevation in the reservoir (behind the dam)
+          </div>
+          <div class="explainer-item">
+            <strong>Tailwater</strong> = Water level below the dam (start of the Dries)
+          </div>
+          <div class="explainer-item">
+            <strong>Release</strong> = How much water is flowing through the spillway
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+    .forecast-panel {{
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      color: white;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }}
+    .forecast-header {{
+      text-align: center;
+      margin-bottom: 20px;
+    }}
+    .forecast-title {{
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }}
+    .forecast-subtitle {{
+      font-size: 14px;
+      opacity: 0.8;
+    }}
+    .flow-diagram {{
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin: 20px 0;
+      padding: 16px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+    }}
+    .flow-section {{
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }}
+    .flow-label {{
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+      opacity: 0.9;
+    }}
+    .flow-arrow {{
+      color: #60a5fa;
+      font-size: 16px;
+      animation: flow 1.5s ease-in-out infinite;
+    }}
+    @keyframes flow {{
+      0%, 100% {{ opacity: 0.5; }}
+      50% {{ opacity: 1; }}
+    }}
+    .reservoir-box {{
+      background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+      padding: 12px 24px;
+      border-radius: 8px;
+      text-align: center;
+      border: 2px solid rgba(255,255,255,0.3);
+    }}
+    .reservoir-label {{
+      font-size: 11px;
+      text-transform: uppercase;
+      opacity: 0.8;
+      margin-bottom: 4px;
+    }}
+    .reservoir-level {{
+      font-size: 18px;
+      font-weight: bold;
+    }}
+    .current-release-panel {{
+      background: rgba(0,0,0,0.3);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+    }}
+    .current-release-header {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }}
+    .current-release-title {{
+      font-size: 16px;
+      font-weight: bold;
+    }}
+    .current-release-time {{
+      font-size: 12px;
+      opacity: 0.7;
+    }}
+    .current-release-content {{
+      display: grid;
+      grid-template-columns: 1fr 200px;
+      gap: 24px;
+      align-items: center;
+    }}
+    .current-gauge {{
+      width: 100%;
+    }}
+    .gauge-track {{
+      height: 32px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 16px;
+      position: relative;
+      overflow: visible;
+    }}
+    .gauge-fill {{
+      height: 100%;
+      border-radius: 16px;
+      transition: width 0.5s ease;
+      box-shadow: 0 0 10px rgba(255,255,255,0.3);
+    }}
+    .gauge-threshold {{
+      position: absolute;
+      top: -8px;
+      bottom: -8px;
+      width: 4px;
+      border-radius: 2px;
+      transform: translateX(-50%);
+    }}
+    .gauge-threshold.spillway {{
+      background: #38bdf8;
+      box-shadow: 0 0 8px #38bdf8;
+    }}
+    .gauge-threshold.runnable {{
+      background: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
+    }}
+    .gauge-threshold-label {{
+      position: absolute;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-weight: bold;
+      white-space: nowrap;
+    }}
+    .gauge-threshold-label.spillway {{
+      bottom: -20px;
+      color: #38bdf8;
+    }}
+    .gauge-threshold-label.runnable {{
+      top: -24px;
+      color: #ef4444;
+    }}
+    .gauge-labels {{
+      display: flex;
+      justify-content: space-between;
+      margin-top: 24px;
+      font-size: 11px;
+      opacity: 0.6;
+    }}
+    .current-stats {{
+      text-align: center;
+    }}
+    .current-cfs {{
+      margin-bottom: 8px;
+    }}
+    .current-cfs-value {{
+      font-size: 48px;
+      font-weight: bold;
+      line-height: 1;
+    }}
+    .current-cfs-unit {{
+      font-size: 14px;
+      opacity: 0.7;
+    }}
+    .current-trend {{
+      margin-bottom: 12px;
+      font-size: 16px;
+    }}
+    .trend-arrow {{
+      font-size: 20px;
+      margin-right: 4px;
+    }}
+    .current-status-box {{
+      display: inline-block;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }}
+    .current-status-desc {{
+      font-size: 12px;
+      opacity: 0.8;
+    }}
+    @media (max-width: 600px) {{
+      .current-release-content {{
+        grid-template-columns: 1fr;
+      }}
+      .current-stats {{
+        order: -1;
+      }}
+    }}
+    .forecast-cards {{
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 20px 0;
+    }}
+    .forecast-card {{
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }}
+    .forecast-day {{
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 2px;
+    }}
+    .forecast-date {{
+      font-size: 12px;
+      opacity: 0.7;
+      margin-bottom: 12px;
+    }}
+    .forecast-bars {{
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }}
+    .bar-group {{
+      text-align: center;
+    }}
+    .bar-label {{
+      font-size: 10px;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 4px;
+    }}
+    .bar-container {{
+      width: 32px;
+      height: 80px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 4px;
+      position: relative;
+      overflow: hidden;
+    }}
+    .bar {{
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      border-radius: 4px 4px 0 0;
+      transition: height 0.5s ease;
+    }}
+    .bar-inflow {{
+      background: #60a5fa;
+    }}
+    .bar-outflow {{
+      background: #22c55e;
+    }}
+    .threshold-line {{
+      position: absolute;
+      left: -4px;
+      right: -4px;
+      height: 2px;
+      background: #ef4444;
+      box-shadow: 0 0 4px #ef4444;
+    }}
+    .bar-value {{
+      font-size: 11px;
+      margin-top: 4px;
+      font-weight: 500;
+    }}
+    .forecast-status {{
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }}
+    .forecast-pool {{
+      font-size: 12px;
+      opacity: 0.8;
+    }}
+    .forecast-legend {{
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+    }}
+    .legend-item {{
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      opacity: 0.9;
+    }}
+    .legend-line {{
+      width: 20px;
+      height: 3px;
+      border-radius: 2px;
+    }}
+    .legend-line.spillway {{
+      background: #38bdf8;
+      box-shadow: 0 0 4px #38bdf8;
+    }}
+    .legend-line.runnable {{
+      background: #ef4444;
+      box-shadow: 0 0 4px #ef4444;
+    }}
+    .legend-box {{
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+    }}
+    @media (max-width: 600px) {{
+      .forecast-cards {{
+        grid-template-columns: 1fr;
+      }}
+      .flow-diagram {{
+        flex-direction: column;
+      }}
+    }}
+    .story-section {{
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+    }}
+    .story-header {{
+      text-align: center;
+      margin-bottom: 16px;
+    }}
+    .story-title {{
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }}
+    .story-subtitle {{
+      font-size: 13px;
+      opacity: 0.7;
+    }}
+    .story-table-wrapper {{
+      overflow-x: auto;
+      margin: 16px 0;
+    }}
+    .story-table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }}
+    .story-table th {{
+      background: rgba(0,0,0,0.3);
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+    }}
+    .story-table td {{
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }}
+    .story-table tr:hover {{
+      background: rgba(255,255,255,0.05);
+    }}
+    .story-table tr.story-highlight {{
+      background: rgba(234,179,8,0.2);
+    }}
+    .story-table tr.story-highlight:hover {{
+      background: rgba(234,179,8,0.3);
+    }}
+    .story-time {{
+      font-weight: 600;
+      white-space: nowrap;
+    }}
+    .story-pool, .story-tailwater {{
+      font-family: monospace;
+      text-align: right;
+    }}
+    .story-discharge {{
+      font-family: monospace;
+      font-weight: bold;
+      text-align: right;
+    }}
+    .story-event {{
+      font-style: italic;
+    }}
+    .event-quiet {{
+      color: #9ca3af;
+    }}
+    .event-opening {{
+      color: #fbbf24;
+    }}
+    .event-filling {{
+      color: #60a5fa;
+    }}
+    .event-runnable {{
+      color: #4ade80;
+      font-weight: bold;
+    }}
+    .story-explainer {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      font-size: 12px;
+    }}
+    .explainer-item {{
+      opacity: 0.9;
+    }}
+    .explainer-item strong {{
+      color: #60a5fa;
+    }}
+    @media (max-width: 600px) {{
+      .story-table {{
+        font-size: 11px;
+      }}
+      .story-table th, .story-table td {{
+        padding: 8px 6px;
+      }}
+      .story-explainer {{
+        flex-direction: column;
+        gap: 8px;
+      }}
+    }}
+    </style>
+    '''
+
+    return html
+
+
 def main():
     """Test TVA fetch for all known sites."""
     print("TVA Dam Observations")
