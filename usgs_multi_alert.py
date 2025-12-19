@@ -79,7 +79,7 @@ except ImportError:
 
 # Import TVA dam data fetcher
 try:
-    from tva_fetch import get_latest_tva_observation, get_tva_trend
+    from tva_fetch import get_latest_tva_observation, get_tva_trend, get_tva_trend_data
     TVA_AVAILABLE = True
 except ImportError:
     TVA_AVAILABLE = False
@@ -1408,14 +1408,18 @@ def main():
                 # Get trend from TVA data
                 trend_label = get_tva_trend(tva_site_code, hours=4)
 
+                # Fetch 12-hour trend data for sparkline visualization
+                if args.dump_json or args.dump_html:
+                    trend_data = get_tva_trend_data(tva_site_code, hours=12)
+                else:
+                    trend_data = None
+
             except Exception as e:
                 tva_error = str(e)
                 if not args.quiet:
                     print(f"[ERROR] TVA fetch {tva_site_code} failed: {e}")
                 continue
 
-            # TVA doesn't provide USGS-style historical data, so no sparkline trend data
-            trend_data = None
             sparkline_threshold = th_cfs  # TVA sites use CFS threshold
 
             # Create a compatible data dict for alerts

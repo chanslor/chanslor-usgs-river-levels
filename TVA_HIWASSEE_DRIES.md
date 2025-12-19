@@ -123,13 +123,41 @@ All integration completed on 2025-12-18:
 
 | File | Action | Description |
 |------|--------|-------------|
-| `tva_fetch.py` | Created | TVA REST API client module |
+| `tva_fetch.py` | Created | TVA REST API client module with trend data support |
 | `gauges.conf.json` | Modified | Added Hiwassee Dries site config |
 | `gauges.conf.cloud.json` | Modified | Added Hiwassee Dries site config |
 | `pws_observations.py` | Modified | Added PWS stations and labels |
-| `usgs_multi_alert.py` | Modified | Added TVA source handling |
+| `usgs_multi_alert.py` | Modified | Added TVA source handling + 12hr trend sparklines |
 | `Containerfile.api.simple` | Modified | Added COPY for tva_fetch.py |
 | `GPS.txt` | Modified | Added Hiwassee Dries PWS stations |
+
+### TVA Trend Data Functions
+
+The `tva_fetch.py` module provides trend data in the same format as USGS data for sparkline visualization:
+
+```python
+# Get 12-hour trend data for sparklines
+from tva_fetch import get_tva_trend_data
+
+trend_data = get_tva_trend_data('HADT1', hours=12)
+# Returns:
+# {
+#     "values": [1479.0, 62.0, 30.0, 45.0, 1497.0, 2845.0, 2854.0, 2852.0],
+#     "direction": "rising"
+# }
+
+# Get text trend label
+from tva_fetch import get_tva_trend
+
+trend = get_tva_trend('HADT1', hours=4)  # Returns: "rising", "falling", or "steady"
+```
+
+**Sparkline Features:**
+- Red line when below threshold (3,000 CFS)
+- Green line when at/above threshold
+- Dashed horizontal threshold line
+- Dot at current value
+- Shows dam release patterns (spillway gates opening/closing)
 
 ### Site Configuration
 

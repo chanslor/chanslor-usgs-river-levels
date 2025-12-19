@@ -680,6 +680,7 @@ systemctl --user restart usgs-alert.service
   - API endpoint: `https://www.tva.com/RestApi/observed-data/HADT1.json`
   - Threshold: 3,000 CFS for runnable status
   - PWS weather stations: KNCMURPH4 (Murphy NC), KTNBENTO3 (Benton TN), KTNCLEVE20 (Cleveland TN)
+  - Added `get_tva_trend_data()` for 12-hour trend sparklines (same format as USGS)
   - See `TVA_HIWASSEE_DRIES.md` for full documentation
 - Added US Drought Monitor integration (`drought.py`) for Alabama rivers
 - Drought status displayed below weather with color-coded D0-D4 levels

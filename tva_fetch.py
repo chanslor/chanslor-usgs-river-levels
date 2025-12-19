@@ -206,6 +206,63 @@ def get_tva_trend(site_code: str, hours: int = 4) -> Optional[str]:
         return "falling"
 
 
+def get_tva_trend_data(site_code: str, hours: int = 12) -> Optional[Dict[str, Any]]:
+    """
+    Get trend data for sparkline visualization (compatible with USGS format).
+
+    Args:
+        site_code: TVA site code
+        hours: Number of hours of history to fetch
+
+    Returns:
+        Dict with:
+        - values: List of discharge values (floats) for sparkline
+        - direction: "rising", "falling", or "steady"
+
+        Returns None on error or insufficient data.
+    """
+    data = fetch_tva_observed(site_code)
+    if not data or len(data) < 2:
+        return None
+
+    # Get last N hours of data
+    recent = data[-min(hours, len(data)):]
+
+    # Extract discharge values
+    values = []
+    for obs in recent:
+        discharge = parse_tva_value(obs.get("AverageHourlyDischarge", "0"))
+        values.append(discharge)
+
+    if len(values) < 2:
+        return None
+
+    # Calculate direction
+    delta = values[-1] - values[0]
+    # Use 10% of first value as threshold, or 50 CFS minimum
+    threshold = max(values[0] * 0.1, 50) if values[0] > 0 else 50
+
+    if delta > threshold:
+        direction = "rising"
+    elif delta < -threshold:
+        direction = "falling"
+    else:
+        direction = "steady"
+
+    # Sample down to ~12 bars for display (take evenly spaced samples)
+    target_bars = 12
+    if len(values) > target_bars:
+        step = len(values) // target_bars
+        sampled = [values[i] for i in range(0, len(values), step)][:target_bars]
+    else:
+        sampled = values
+
+    return {
+        "values": sampled,
+        "direction": direction
+    }
+
+
 def main():
     """Test TVA fetch for all known sites."""
     print("TVA Dam Observations")

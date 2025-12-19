@@ -904,6 +904,11 @@ This keeps your workspace organized and makes the project portable across differ
 
 *Initial working version with basic features*
 
+### TVA Hiwassee Dries Integration (12-18-2025)
+![Dashboard with TVA Integration](./12-18-2025-update.png)
+
+*Added Hiwassee Dries (Apalachia Dam) via TVA REST API with 12-hour trend sparklines, PWS weather from Murphy NC*
+
 ### Enhanced Dashboard with Visual Indicators (11-01-2025)
 ![Enhanced Dashboard](./example.graph-11-01-2025.png)
 
