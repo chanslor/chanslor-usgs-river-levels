@@ -9,6 +9,7 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 - 🐳 **[CONTAINERFILES.md](CONTAINERFILES.md)** - Container build guide, comparison matrix
 - 🤖 **[CLAUDE.md](CLAUDE.md)** - Complete project reference, architecture
 - 📚 **[DOCS_INDEX.md](DOCS_INDEX.md)** - Master documentation index
+- 🏭 **[TVA_HIWASSEE_DRIES.md](TVA_HIWASSEE_DRIES.md)** - TVA dam integration, Apalachia spillway monitoring
 
 **🌐 Production Deployment:**
 - **Dashboard**: https://docker-blue-sound-1751.fly.dev/
