@@ -368,7 +368,7 @@ body {{
   <a href="/" class="back-link">← Back to All Rivers</a>
 
   <div class="header">
-    <h1>{h(site_name)}{' <a href="https://www.google.com/maps/place/35%C2%B010%2724.7%22N+84%C2%B023%2701.4%22W/@35.1713452,-84.38115,16.39z" target="_blank" class="location-link">📍 Put in</a> <a href="https://www.google.com/maps/place/35%C2%B010%2752.5%22N+84%C2%B026%2719.1%22W/@35.1816932,-84.4346579,16.39z" target="_blank" class="location-link">🏁 Take out</a>' if is_tva else (' <a href="https://www.google.com/maps/place/Eberhart+Point+Overlook/@34.3523913,-85.6782498,17z" target="_blank" class="location-link">📍 Eberhart Point</a> <a href="https://www.google.com/maps/dir/Little+River+Canyon+Kayak+Put+In//@34.3914776,-85.6250722,19z/data=!4m9!4m8!1m5!1m1!1s0x888a7fb5d77917ed:0x87cfeb1a488e4c59!2m2!1d-85.6248826!2d34.3915645!1m0!3e0!5m1!1e4?entry=ttu&g_ep=EgoyMDI1MTIwOS4wIKXMDSoASAFQAw%3D%3D" target="_blank" class="location-link">🚀 Suicide put in</a>' if site_id == '02399200' else '')}</h1>
+    <h1>{h(site_name)}{' <a href="https://www.google.com/maps/place/35%C2%B010%2724.7%22N+84%C2%B023%2701.4%22W/@35.1713452,-84.38115,16.39z" target="_blank" class="location-link">📍 Put in</a> <a href="https://www.google.com/maps/place/35%C2%B010%2752.5%22N+84%C2%B026%2719.1%22W/@35.1816932,-84.4346579,16.39z" target="_blank" class="location-link">🏁 Take out</a>' if is_tva else (' <a href="https://www.google.com/maps/dir/Little+River+Canyon+Kayak+Put+In//@34.3914776,-85.6250722,19z/data=!4m9!4m8!1m5!1m1!1s0x888a7fb5d77917ed:0x87cfeb1a488e4c59!2m2!1d-85.6248826!2d34.3915645!1m0!3e0!5m1!1e4?entry=ttu&g_ep=EgoyMDI1MTIwOS4wIKXMDSoASAFQAw%3D%3D" target="_blank" class="location-link">🚀 Suicide put in</a> <a href="https://maps.app.goo.gl/WuMrPD13zbDKwzwx6" target="_blank" class="location-link">📍 Eberhart Point</a> <a href="https://maps.app.goo.gl/Rt7pv8qZzzUsFFh37" target="_blank" class="location-link">🏁 Chair Lift Take Out</a>' if site_id == '02399200' else (' <a href="https://maps.app.goo.gl/VxoBRfDEiznaJEuR6" target="_blank" class="location-link">📍 Upper put in</a> <a href="https://maps.app.goo.gl/yW8uYJAUbpub1bQX8" target="_blank" class="location-link">📍 OLD Upper put in</a> <a href="https://maps.app.goo.gl/KsminZcRhyHsQi4s9" target="_blank" class="location-link">📍 Kings Bend put in</a> <a href="https://maps.app.goo.gl/8QTdmaYiyBWgdB7G6" target="_blank" class="location-link">🏁 Take out</a>' if site_id == '02455000' else ''))}</h1>
     {"" if is_tva else f'''<div class="status">{status_text}</div>
     <div class="meta">
       <span><strong>USGS Site:</strong> {h(site_id)}</span>
@@ -449,10 +449,10 @@ if (cfsLabels.length === 0 || cfsValues.length === 0) {{
       borderColor: '#1a73e8',
       backgroundColor: 'rgba(26, 115, 232, 0.1)',
       borderWidth: 2,
-      tension: 0.3,
+      tension: 0.4,
       fill: true,
-      pointRadius: 2,
-      pointHoverRadius: 5
+      pointRadius: 0,
+      pointHoverRadius: 4
     }}]
   }},
   options: {{
@@ -502,10 +502,10 @@ if (feetLabels.length === 0 || feetValues.length === 0) {{
       borderColor: '#1a73e8',
       backgroundColor: 'rgba(26, 115, 232, 0.1)',
       borderWidth: 2,
-      tension: 0.3,
+      tension: 0.4,
       fill: true,
-      pointRadius: 2,
-      pointHoverRadius: 5
+      pointRadius: 0,
+      pointHoverRadius: 4
     }}]
   }},
   options: {{
