@@ -18,6 +18,14 @@ except ImportError:
     cors_available = False
     print("Warning: flask-cors not installed. CORS will not be enabled.")
 
+# TVA History database (for long-term historical charts)
+try:
+    from tva_history import get_observations, get_stats, get_date_range, get_observation_count
+    tva_history_available = True
+except ImportError:
+    tva_history_available = False
+    print("Note: TVA history module not available. Historical charts will be disabled.")
+
 app = Flask(__name__)
 
 if cors_available:
@@ -272,28 +280,116 @@ def get_predictions():
     })
 
 
+@app.route('/api/tva-history/<site_code>', methods=['GET'])
+def get_tva_history(site_code):
+    """
+    Get historical TVA dam data for charting.
+
+    Query Parameters:
+        days: Number of days of history (default: 7, max: 365)
+
+    Example: /api/tva-history/HADT1?days=30
+
+    Returns time series data for:
+        - discharge_cfs (Release)
+        - pool_elevation_ft (Lake Level)
+        - tailwater_ft (Tailwater)
+    """
+    if not tva_history_available:
+        return jsonify({
+            "error": "TVA history not available",
+            "message": "Historical data storage is not configured"
+        }), 503
+
+    # Get query parameters
+    days = request.args.get('days', 7, type=int)
+    days = min(max(days, 1), 365)  # Clamp between 1 and 365
+
+    # Get observations
+    observations = get_observations(site_code.upper(), days=days)
+
+    if not observations:
+        return jsonify({
+            "site_code": site_code.upper(),
+            "days": days,
+            "observation_count": 0,
+            "message": "No historical data available yet. Data will accumulate over time.",
+            "observations": []
+        }), 200
+
+    # Get additional stats
+    stats = get_stats(site_code.upper(), days=days)
+    date_range = get_date_range(site_code.upper())
+
+    return jsonify({
+        "site_code": site_code.upper(),
+        "days_requested": days,
+        "observation_count": len(observations),
+        "date_range": date_range,
+        "stats": stats,
+        "observations": observations
+    })
+
+
+@app.route('/api/tva-history/<site_code>/stats', methods=['GET'])
+def get_tva_stats(site_code):
+    """
+    Get statistics for TVA dam data.
+
+    Query Parameters:
+        days: Number of days to analyze (default: 30)
+
+    Example: /api/tva-history/HADT1/stats?days=90
+    """
+    if not tva_history_available:
+        return jsonify({
+            "error": "TVA history not available"
+        }), 503
+
+    days = request.args.get('days', 30, type=int)
+    days = min(max(days, 1), 365)
+
+    stats = get_stats(site_code.upper(), days=days)
+    date_range = get_date_range(site_code.upper())
+    total_count = get_observation_count(site_code.upper())
+
+    return jsonify({
+        "site_code": site_code.upper(),
+        "days_analyzed": days,
+        "total_observations": total_count,
+        "date_range": date_range,
+        "stats": stats
+    })
+
+
 @app.route('/api')
 def api_info():
     """API documentation endpoint"""
     return jsonify({
         "name": "USGS River Levels API",
-        "version": "1.1",
+        "version": "1.2",
         "dashboard": "/",
         "endpoints": {
             "health": "/api/health",
             "all_rivers": "/api/river-levels",
             "by_site_id": "/api/river-levels/{site_id}",
             "by_name": "/api/river-levels/name/{name}",
-            "predictions": "/api/predictions"
+            "predictions": "/api/predictions",
+            "tva_history": "/api/tva-history/{site_code}?days=7",
+            "tva_stats": "/api/tva-history/{site_code}/stats?days=30"
         },
         "examples": {
             "little_river": "/api/river-levels/02399200",
             "little_river_by_name": "/api/river-levels/name/little",
             "locust_fork": "/api/river-levels/02455000",
-            "predictions": "/api/predictions"
+            "predictions": "/api/predictions",
+            "hiwassee_history_7d": "/api/tva-history/HADT1?days=7",
+            "hiwassee_history_30d": "/api/tva-history/HADT1?days=30",
+            "hiwassee_stats": "/api/tva-history/HADT1/stats?days=90"
         },
         "new_features": {
-            "predictions": "River predictions based on QPF forecast and 90-day historical response patterns"
+            "predictions": "River predictions based on QPF forecast and 90-day historical response patterns",
+            "tva_history": "Long-term historical data for TVA dam sites (Hiwassee Dries)"
         }
     })
 

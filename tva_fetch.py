@@ -639,6 +639,246 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
       </div>
     </div>
 
+    <div class="history-section">
+      <div class="history-header">
+        <div class="history-title">📊 Apalachia Historical Dam Operations</div>
+        <div class="history-subtitle">Long-term trends - data accumulates over time</div>
+      </div>
+      <div class="history-controls">
+        <button class="range-btn active" data-days="7">7 Days</button>
+        <button class="range-btn" data-days="30">30 Days</button>
+        <button class="range-btn" data-days="90">90 Days</button>
+        <button class="range-btn" data-days="365">1 Year</button>
+      </div>
+      <div class="history-stats" id="historyStats">
+        <div class="stat-card">
+          <div class="stat-label">Observations</div>
+          <div class="stat-value" id="statCount">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Max Release</div>
+          <div class="stat-value" id="statMaxCfs">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Release</div>
+          <div class="stat-value" id="statAvgCfs">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Data Range</div>
+          <div class="stat-value" id="statRange">--</div>
+        </div>
+      </div>
+      <div class="history-chart-container">
+        <canvas id="historyChart"></canvas>
+      </div>
+      <div class="history-legend">
+        <div class="legend-row">
+          <span class="legend-color" style="background: #ef4444;"></span>
+          <span>Release (CFS) - Left Axis</span>
+        </div>
+        <div class="legend-row">
+          <span class="legend-color" style="background: #3b82f6;"></span>
+          <span>Lake Level (ft) - Right Axis</span>
+        </div>
+        <div class="legend-row">
+          <span class="legend-color" style="background: #10b981;"></span>
+          <span>Tailwater (ft) - Right Axis</span>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+    (function() {{
+      const siteCode = '{site_code}';
+      let historyChart = null;
+
+      async function loadHistoryData(days) {{
+        try {{
+          const response = await fetch(`/api/tva-history/${{siteCode}}?days=${{days}}`);
+          const data = await response.json();
+          return data;
+        }} catch (err) {{
+          console.error('Failed to load history:', err);
+          return null;
+        }}
+      }}
+
+      function updateStats(data) {{
+        document.getElementById('statCount').textContent = data.observation_count || '--';
+
+        if (data.stats && data.stats.discharge_cfs) {{
+          document.getElementById('statMaxCfs').textContent =
+            data.stats.discharge_cfs.max ? data.stats.discharge_cfs.max.toLocaleString() + ' CFS' : '--';
+          document.getElementById('statAvgCfs').textContent =
+            data.stats.discharge_cfs.avg ? Math.round(data.stats.discharge_cfs.avg).toLocaleString() + ' CFS' : '--';
+        }}
+
+        if (data.date_range && data.date_range.earliest) {{
+          const earliest = new Date(data.date_range.earliest);
+          const latest = new Date(data.date_range.latest);
+          const diffDays = Math.round((latest - earliest) / (1000 * 60 * 60 * 24));
+          document.getElementById('statRange').textContent = diffDays + ' days';
+        }} else {{
+          document.getElementById('statRange').textContent = '--';
+        }}
+      }}
+
+      function renderChart(data) {{
+        const ctx = document.getElementById('historyChart').getContext('2d');
+
+        if (historyChart) {{
+          historyChart.destroy();
+        }}
+
+        if (!data.observations || data.observations.length === 0) {{
+          ctx.canvas.parentElement.innerHTML =
+            '<div style="padding:40px;text-align:center;color:#666;">' +
+            '<p style="font-size:18px;">📊 No historical data yet</p>' +
+            '<p>Data will accumulate as the system runs. Check back soon!</p></div>';
+          return;
+        }}
+
+        const labels = data.observations.map(o => {{
+          const d = new Date(o.timestamp);
+          return d.toLocaleDateString('en-US', {{ month: 'short', day: 'numeric', hour: 'numeric' }});
+        }});
+
+        const cfsData = data.observations.map(o => o.discharge_cfs);
+        const poolData = data.observations.map(o => o.pool_elevation_ft);
+        const tailwaterData = data.observations.map(o => o.tailwater_ft);
+
+        historyChart = new Chart(ctx, {{
+          type: 'line',
+          data: {{
+            labels: labels,
+            datasets: [
+              {{
+                label: 'Release (CFS)',
+                data: cfsData,
+                borderColor: '#ef4444',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+                yAxisID: 'y',
+                pointRadius: 1,
+                pointHoverRadius: 4
+              }},
+              {{
+                label: 'Lake Level (ft)',
+                data: poolData,
+                borderColor: '#3b82f6',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.3,
+                yAxisID: 'y1',
+                pointRadius: 0,
+                pointHoverRadius: 3
+              }},
+              {{
+                label: 'Tailwater (ft)',
+                data: tailwaterData,
+                borderColor: '#10b981',
+                borderWidth: 2,
+                fill: false,
+                tension: 0.3,
+                yAxisID: 'y1',
+                pointRadius: 0,
+                pointHoverRadius: 3
+              }}
+            ]
+          }},
+          options: {{
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {{
+              mode: 'index',
+              intersect: false
+            }},
+            plugins: {{
+              legend: {{ display: false }},
+              tooltip: {{
+                backgroundColor: 'rgba(0,0,0,0.8)',
+                titleFont: {{ size: 14 }},
+                bodyFont: {{ size: 13 }},
+                padding: 12,
+                callbacks: {{
+                  label: function(context) {{
+                    let label = context.dataset.label || '';
+                    if (context.parsed.y !== null) {{
+                      if (label.includes('CFS')) {{
+                        label += ': ' + context.parsed.y.toLocaleString() + ' CFS';
+                      }} else {{
+                        label += ': ' + context.parsed.y.toFixed(2) + ' ft';
+                      }}
+                    }}
+                    return label;
+                  }}
+                }}
+              }}
+            }},
+            scales: {{
+              x: {{
+                ticks: {{
+                  maxRotation: 45,
+                  minRotation: 45,
+                  autoSkip: true,
+                  maxTicksLimit: 12
+                }},
+                grid: {{ display: false }}
+              }},
+              y: {{
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: {{
+                  display: true,
+                  text: 'Release (CFS)',
+                  color: '#ef4444'
+                }},
+                ticks: {{ color: '#ef4444' }},
+                grid: {{ color: 'rgba(239, 68, 68, 0.1)' }}
+              }},
+              y1: {{
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: {{
+                  display: true,
+                  text: 'Elevation (ft)',
+                  color: '#3b82f6'
+                }},
+                ticks: {{ color: '#3b82f6' }},
+                grid: {{ drawOnChartArea: false }}
+              }}
+            }}
+          }}
+        }});
+      }}
+
+      async function updateChart(days) {{
+        const data = await loadHistoryData(days);
+        if (data) {{
+          updateStats(data);
+          renderChart(data);
+        }}
+      }}
+
+      // Set up button click handlers
+      document.querySelectorAll('.range-btn').forEach(btn => {{
+        btn.addEventListener('click', function() {{
+          document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+          updateChart(parseInt(this.dataset.days));
+        }});
+      }});
+
+      // Initial load
+      updateChart(7);
+    }})();
+    </script>
+
     <style>
     .forecast-panel {{
       background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
@@ -1060,6 +1300,112 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
       }}
       .story-explainer {{
         flex-direction: column;
+        gap: 8px;
+      }}
+    }}
+    /* Historical Chart Section */
+    .history-section {{
+      background: linear-gradient(135deg, #1a2f4a 0%, #243b55 100%);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 24px 0;
+      color: white;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }}
+    .history-header {{
+      text-align: center;
+      margin-bottom: 20px;
+    }}
+    .history-title {{
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }}
+    .history-subtitle {{
+      font-size: 13px;
+      opacity: 0.7;
+    }}
+    .history-controls {{
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }}
+    .range-btn {{
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s ease;
+    }}
+    .range-btn:hover {{
+      background: rgba(255,255,255,0.2);
+    }}
+    .range-btn.active {{
+      background: #3b82f6;
+      border-color: #3b82f6;
+      font-weight: bold;
+    }}
+    .history-stats {{
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }}
+    .stat-card {{
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }}
+    .stat-label {{
+      font-size: 11px;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 4px;
+    }}
+    .stat-value {{
+      font-size: 18px;
+      font-weight: bold;
+      color: #60a5fa;
+    }}
+    .history-chart-container {{
+      background: rgba(255,255,255,0.95);
+      border-radius: 8px;
+      padding: 16px;
+      height: 300px;
+      margin-bottom: 16px;
+    }}
+    .history-legend {{
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }}
+    .legend-row {{
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }}
+    .legend-color {{
+      width: 16px;
+      height: 4px;
+      border-radius: 2px;
+    }}
+    @media (max-width: 600px) {{
+      .history-stats {{
+        grid-template-columns: repeat(2, 1fr);
+      }}
+      .history-controls {{
+        flex-wrap: wrap;
+      }}
+      .history-legend {{
+        flex-direction: column;
+        align-items: center;
         gap: 8px;
       }}
     }}

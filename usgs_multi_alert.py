@@ -79,10 +79,17 @@ except ImportError:
 
 # Import TVA dam data fetcher
 try:
-    from tva_fetch import get_latest_tva_observation, get_tva_trend, get_tva_trend_data
+    from tva_fetch import get_latest_tva_observation, get_tva_trend, get_tva_trend_data, fetch_tva_observed, parse_tva_value, parse_tva_timestamp
     TVA_AVAILABLE = True
 except ImportError:
     TVA_AVAILABLE = False
+
+# Import TVA history storage
+try:
+    from tva_history import init_database as init_tva_history, save_observations_batch
+    TVA_HISTORY_AVAILABLE = True
+except ImportError:
+    TVA_HISTORY_AVAILABLE = False
 
 # Weather station mapping for each river site
 # PWS = Weather Underground Personal Weather Stations (primary, more local)
@@ -1286,6 +1293,15 @@ def main():
             if not args.quiet:
                 print(f"[WARN] Drought client initialization failed: {e}")
 
+    # Initialize TVA history database for long-term storage
+    if TVA_HISTORY_AVAILABLE:
+        tva_history_db = os.environ.get("TVA_HISTORY_DB", "/data/tva_history.sqlite")
+        try:
+            init_tva_history(tva_history_db)
+        except Exception as e:
+            if not args.quiet:
+                print(f"[WARN] TVA history database initialization failed: {e}")
+
     state_db = cfg.get("state_db"); state_file_legacy = cfg.get("state_file")
 
     now = time.time()
@@ -1415,6 +1431,27 @@ def main():
                     trend_data = get_tva_trend_data(tva_site_code, hours=12)
                 else:
                     trend_data = None
+
+                # Save all TVA observations to history database
+                if TVA_HISTORY_AVAILABLE:
+                    try:
+                        all_tva_obs = fetch_tva_observed(tva_site_code)
+                        if all_tva_obs:
+                            history_records = []
+                            for obs in all_tva_obs:
+                                ts = parse_tva_timestamp(obs.get("Day", ""), obs.get("Time", ""))
+                                if ts:
+                                    history_records.append({
+                                        'timestamp': ts.isoformat(),
+                                        'discharge_cfs': int(parse_tva_value(obs.get("AverageHourlyDischarge", "0"))),
+                                        'pool_elevation_ft': parse_tva_value(obs.get("ReservoirElevation", "0")),
+                                        'tailwater_ft': parse_tva_value(obs.get("TailwaterElevation", "0"))
+                                    })
+                            if history_records:
+                                save_observations_batch(tva_site_code, history_records)
+                    except Exception as hist_err:
+                        if not args.quiet:
+                            print(f"[TVA History] Error saving history: {hist_err}")
 
             except Exception as e:
                 tva_error = str(e)

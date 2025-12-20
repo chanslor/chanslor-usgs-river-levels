@@ -1,7 +1,7 @@
 # TVA Hiwassee Dries Integration
 
 **Created:** 2025-12-18
-**Updated:** 2025-12-18 (Evening - Added dual threshold gauges and tailwater documentation)
+**Updated:** 2025-12-19 (Added historical chart with indefinite data storage)
 **Status:** COMPLETE - Live in Production
 **Production URL:** https://docker-blue-sound-1751.fly.dev/
 **Detail Page:** https://docker-blue-sound-1751.fly.dev/details/HADT1.html
@@ -23,6 +23,49 @@
 - **3-Day Forecast Cards**: Predicted inflow/outflow for Today, Tomorrow, and Day 3
 - **Runnable Status**: Color-coded badges (Green=YES!, Yellow=MAYBE, Gray=NO)
 - **Today's Story Table**: Hourly observations showing dam operations with plain-English explanations
+- **Historical Chart**: Long-term trends with indefinite data storage (see below)
+
+### Historical Dam Operations Chart (NEW - 2025-12-19)
+
+The detail page now includes a **Historical Dam Operations** chart at the bottom, providing long-term trend visualization:
+
+- **Time Range Selector**: Buttons for 7 Days, 30 Days, 90 Days, and 1 Year views
+- **Dual-Axis Chart**:
+  - Left axis (red): Release (CFS)
+  - Right axis (blue/green): Lake Level and Tailwater (ft)
+- **Stats Cards**: Observation count, max release, avg release, data range
+- **Indefinite Storage**: Data is stored permanently in SQLite database
+
+**API Endpoints:**
+```bash
+# Get 7 days of historical data
+curl "https://docker-blue-sound-1751.fly.dev/api/tva-history/HADT1?days=7"
+
+# Get statistics for 30 days
+curl "https://docker-blue-sound-1751.fly.dev/api/tva-history/HADT1/stats?days=30"
+```
+
+**Response Format:**
+```json
+{
+  "site_code": "HADT1",
+  "days_requested": 7,
+  "observation_count": 168,
+  "date_range": {
+    "earliest": "2025-12-12T00:00:00",
+    "latest": "2025-12-19T14:00:00"
+  },
+  "stats": {
+    "discharge_cfs": {"min": 30, "max": 2853, "avg": 924.1},
+    "pool_elevation_ft": {"min": 1276.5, "max": 1278.5, "avg": 1277.4},
+    "tailwater_ft": {"min": 837.3, "max": 840.5, "avg": 838.9}
+  },
+  "observations": [
+    {"timestamp": "2025-12-19T07:00:00", "discharge_cfs": 1476, "pool_elevation_ft": 1277.51, "tailwater_ft": 839.5},
+    ...
+  ]
+}
+```
 
 ## Overview
 
@@ -209,13 +252,15 @@ All integration completed on 2025-12-18:
 
 | File | Action | Description |
 |------|--------|-------------|
-| `tva_fetch.py` | Created | TVA REST API client with trend data + 3-day forecast panel |
+| `tva_fetch.py` | Created | TVA REST API client with trend data + 3-day forecast panel + historical chart |
+| `tva_history.py` | Created | SQLite database module for indefinite historical storage |
 | `site_detail.py` | Modified | Integrated TVA forecast panel into detail pages |
+| `api_app.py` | Modified | Added `/api/tva-history` endpoints for historical data |
 | `gauges.conf.json` | Modified | Added Hiwassee Dries site config |
 | `gauges.conf.cloud.json` | Modified | Added Hiwassee Dries site config |
 | `pws_observations.py` | Modified | Added PWS stations and labels |
-| `usgs_multi_alert.py` | Modified | Added TVA source handling + 12hr trend sparklines |
-| `Containerfile.api.simple` | Modified | Added COPY for tva_fetch.py |
+| `usgs_multi_alert.py` | Modified | Added TVA source handling + 12hr trend sparklines + history storage |
+| `Containerfile.api.simple` | Modified | Added COPY for tva_fetch.py and tva_history.py |
 | `GPS.txt` | Modified | Added Hiwassee Dries PWS stations |
 
 ### TVA Data Functions
@@ -259,6 +304,30 @@ forecast = get_tva_forecast('HADT1', runnable_threshold=3000)
 
 # Generate complete HTML forecast panel for detail page
 html = generate_tva_forecast_html('HADT1', runnable_threshold=3000)
+```
+
+#### Historical Data (indefinite storage)
+
+```python
+from tva_history import init_database, save_observations_batch, get_observations, get_stats
+
+# Initialize database (call once at startup)
+init_database("/data/tva_history.sqlite")
+
+# Save observations (automatically deduplicated by timestamp)
+observations = [
+    {'timestamp': '2025-12-19T14:00:00', 'discharge_cfs': 1476, 'pool_elevation_ft': 1277.5, 'tailwater_ft': 839.5},
+    {'timestamp': '2025-12-19T15:00:00', 'discharge_cfs': 1500, 'pool_elevation_ft': 1277.4, 'tailwater_ft': 839.6}
+]
+saved_count = save_observations_batch('HADT1', observations)  # Returns number of NEW observations saved
+
+# Get historical data
+data = get_observations('HADT1', days=7)  # Last 7 days
+# Returns: [{'timestamp': '...', 'discharge_cfs': 1476, 'pool_elevation_ft': 1277.5, 'tailwater_ft': 839.5}, ...]
+
+# Get statistics
+stats = get_stats('HADT1', days=30)
+# Returns: {'discharge_cfs': {'min': 30, 'max': 2853, 'avg': 924.1}, ...}
 ```
 
 **Sparkline Features:**

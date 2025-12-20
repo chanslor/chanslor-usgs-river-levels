@@ -194,15 +194,24 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Returns discharge (CFS), pool elevation, tailwater elevation
    - No authentication required
    - Supports trend calculation from recent observations
+   - Generates 3-day forecast panel and historical chart for detail pages
    - Site code: HADT1 (Hiwassee Above Dam Tennessee 1)
 
-6. **site_detail.py** — Site detail page generator
+6. **tva_history.py** — TVA Historical Data Storage (NEW - 2025-12-19)
+   - SQLite database module for indefinite storage of TVA dam observations
+   - Stores discharge (CFS), pool elevation, and tailwater elevation
+   - Auto-deduplication using unique constraint on site_code + timestamp
+   - Functions: `init_database()`, `save_observations_batch()`, `get_observations()`, `get_stats()`, `get_date_range()`
+   - Database location: `/data/tva_history.sqlite`
+   - Data is preserved across deployments and accumulates over time
+
+7. **site_detail.py** — Site detail page generator
    - Creates individual detail pages for each gauge
    - Generates 7-day historical charts using Chart.js
    - Provides detailed historical data and trend analysis
    - Linked from main dashboard for deep-dive analysis
 
-7. **drought.py** — US Drought Monitor integration
+8. **drought.py** — US Drought Monitor integration
    - Fetches county-level drought status from USDM REST API
    - API endpoint: `https://usdmdataservices.unl.edu/api/CountyStatistics/GetDroughtSeverityStatisticsByArea`
    - Uses FIPS county codes (configured per river in gauges.conf.json)
@@ -219,7 +228,7 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Cache is stored at `/data/drought_cache.sqlite`
    - To force refresh: delete cache file and restart container
 
-8. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
+9. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
    - Runs initial gauge check immediately on startup
    - Launches background loop to refresh data every `RUN_INTERVAL_SEC` (default 60s)
    - Starts Flask API server on port 8080
@@ -230,14 +239,14 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - No API endpoints, dashboard only
    - Use entrypoint-api.sh for production deployments
 
-9. **gauges.conf.json** — Configuration file
+10. **gauges.conf.json** — Configuration file
    - SMTP settings for email alerts (server, port, credentials)
    - Site definitions with USGS site IDs and custom thresholds
    - FIPS county codes for drought monitoring (Alabama rivers only)
    - Alert behavior: `notify.mode` ("rising" or "any"), cooldown periods
    - State persistence path (`state_db`)
 
-10. **test_visual_indicators.py** — Test suite generator
+11. **test_visual_indicators.py** — Test suite generator
    - Generates comprehensive test HTML for all visual indicators
    - Tests all 6 Little River Canyon color zones with 22 test cases
    - Validates temperature alerts (10 cases: 35-85°F)
@@ -245,7 +254,7 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Creates standalone HTML test file with color legend
    - Run with: `python3 test_visual_indicators.py`
 
-11. **predictions.py** — River Predictions Module (NEW - 2025-11-30)
+12. **predictions.py** — River Predictions Module (NEW - 2025-11-30)
    - Calculates likelihood of rivers reaching runnable levels
    - Uses QPF (rainfall forecast) + historical response patterns
    - Based on 90-day analysis of USGS gauge data
@@ -304,6 +313,7 @@ The dashboard includes a **River Predictions** panel that forecasts which rivers
 │  - Runs every 60 seconds                                   │
 │  - Fetches + processes data                                │
 │  - Updates SQLite state DB                                 │
+│  - Saves TVA observations to tva_history.sqlite            │
 │  - Sends email alerts (on threshold changes)               │
 │  - Generates output files:                                 │
 │    • gauges.json (API data source)                         │
@@ -320,6 +330,7 @@ The dashboard includes a **River Predictions** panel that forecasts which rivers
 │  - GET /api/river-levels/{site_id} → single river          │
 │  - GET /api/river-levels/name/{name} → search by name      │
 │  - GET /api/predictions → river predictions JSON           │
+│  - GET /api/tva-history/{site} → TVA historical data       │
 │  - GET /gauges.json → raw data feed                        │
 │  - GET /details/{site}.html → detail pages                 │
 └────────────────────────────────────────────────────────────┘
@@ -368,6 +379,13 @@ The Flask API provides the following endpoints:
 - **`GET /api/river-levels/{site_id}`** - Single river by USGS site ID (e.g., 02399200)
 - **`GET /api/river-levels/name/{name}`** - Single river by name search (case-insensitive)
 - **`GET /api/predictions`** - River predictions based on QPF and historical patterns
+
+### TVA Historical Data Endpoints (NEW - 2025-12-19)
+- **`GET /api/tva-history/{site_code}?days=7`** - Get historical TVA observations
+  - Query param `days`: Number of days of history (1-365, default: 7)
+  - Returns: observations array, stats, date range
+- **`GET /api/tva-history/{site_code}/stats?days=30`** - Get statistics only
+  - Returns: min/max/avg for discharge, pool, tailwater
 
 ### ESP32 Response Format
 
@@ -427,6 +445,7 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
   - `pws_observations.py` - PWS weather observations (primary)
   - `drought.py` - US Drought Monitor integration
   - `tva_fetch.py` - TVA dam data fetcher (Hiwassee Dries)
+  - `tva_history.py` - TVA historical data storage module
   - `site_detail.py` - Detail page generator
   - `predictions.py` - River predictions module
   - `api_app.py` - Flask REST API server
@@ -436,6 +455,7 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
   - `state.sqlite` - Alert state database
   - `qpf_cache.sqlite` - QPF cache database
   - `drought_cache.sqlite` - Drought monitor cache database
+  - `tva_history.sqlite` - TVA historical observations (indefinite storage)
 - `/site/`: Generated output (bind mount required)
   - `index.html` - Main dashboard
   - `gauges.json` - JSON data feed
@@ -607,6 +627,7 @@ The system uses SQLite caching for external API data to reduce load and improve 
 | `qpf_cache.sqlite` | Rainfall forecasts | 3 hours | NWS API |
 | `drought_cache.sqlite` | Drought status | 12 hours | USDM API |
 | `state.sqlite` | Alert state | Permanent | Internal |
+| `tva_history.sqlite` | TVA dam observations | Permanent | TVA API |
 
 ### Deploying Code Changes That Affect Cached Data
 
@@ -664,16 +685,25 @@ systemctl --user restart usgs-alert.service
 
 ## Git Repository State
 
-**Current Production Status**: Working as of 12-18-2025
+**Current Production Status**: Working as of 12-19-2025
 
 **Production Deployment:**
 - URL: https://docker-blue-sound-1751.fly.dev/
 - Containerfile: `Containerfile.api.simple`
 - Entrypoint: `entrypoint-api.sh`
-- Features: Flask API + Dashboard + ESP32 endpoints + TVA integration
+- Features: Flask API + Dashboard + ESP32 endpoints + TVA integration + Historical Charts
 - **Total Sites Monitored**: 8 rivers
 
 **Recent Updates:**
+- **2025-12-19: Added TVA Historical Chart Feature**
+  - New `tva_history.py` module for indefinite storage of TVA dam observations
+  - SQLite database stores discharge, pool elevation, tailwater for all time
+  - API endpoints: `/api/tva-history/{site_code}` and `/api/tva-history/{site_code}/stats`
+  - Interactive Chart.js visualization with 7d/30d/90d/1yr time range selector
+  - Dual-axis chart: CFS on left, elevation on right
+  - Stats cards showing observation count, max/avg release, data range
+  - See updated `TVA_HIWASSEE_DRIES.md` for full documentation
+
 - **2025-12-18: Added TVA Hiwassee Dries Integration**
   - New `tva_fetch.py` module for TVA REST API
   - Monitors Apalachia Dam spillway releases via `HADT1` site code

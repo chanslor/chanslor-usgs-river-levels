@@ -339,6 +339,23 @@ body {{
 }}
 .back-link:hover {{ text-decoration: underline; }}
 
+.location-link {{
+  font-size: 16px;
+  font-weight: normal;
+  color: #1a73e8;
+  text-decoration: none;
+  margin-left: 16px;
+  padding: 4px 12px;
+  background: #e8f0fe;
+  border-radius: 16px;
+  transition: all 0.2s ease;
+}}
+.location-link:hover {{
+  background: #1a73e8;
+  color: white;
+  text-decoration: none;
+}}
+
 @media (max-width: 768px) {{
   .header h1 {{ font-size: 22px; }}
   .chart-value {{ font-size: 24px; }}
@@ -348,16 +365,16 @@ body {{
 </head>
 <body>
 <div class="container">
-  <a href="../index.html" class="back-link">← Back to All Rivers</a>
+  <a href="/" class="back-link">← Back to All Rivers</a>
 
   <div class="header">
-    <h1>{h(site_name)}</h1>
-    <div class="status">{status_text}</div>
+    <h1>{h(site_name)}{' <a href="https://www.google.com/maps/place/35%C2%B010%2724.7%22N+84%C2%B023%2701.4%22W/@35.1713452,-84.38115,16.39z" target="_blank" class="location-link">📍 Put in</a> <a href="https://www.google.com/maps/place/35%C2%B010%2752.5%22N+84%C2%B026%2719.1%22W/@35.1816932,-84.4346579,16.39z" target="_blank" class="location-link">🏁 Take out</a>' if is_tva else (' <a href="https://www.google.com/maps/place/Eberhart+Point+Overlook/@34.3523913,-85.6782498,17z" target="_blank" class="location-link">📍 Eberhart Point</a> <a href="https://www.google.com/maps/dir/Little+River+Canyon+Kayak+Put+In//@34.3914776,-85.6250722,19z/data=!4m9!4m8!1m5!1m1!1s0x888a7fb5d77917ed:0x87cfeb1a488e4c59!2m2!1d-85.6248826!2d34.3915645!1m0!3e0!5m1!1e4?entry=ttu&g_ep=EgoyMDI1MTIwOS4wIKXMDSoASAFQAw%3D%3D" target="_blank" class="location-link">🚀 Suicide put in</a>' if site_id == '02399200' else '')}</h1>
+    {"" if is_tva else f'''<div class="status">{status_text}</div>
     <div class="meta">
-      <span><strong>{"TVA Site" if is_tva else "USGS Site"}:</strong> {h(site_id)}</span>
+      <span><strong>USGS Site:</strong> {h(site_id)}</span>
       <span><strong>Threshold:</strong> {h(threshold_str)}</span>
       <span><strong>Last Runnable:</strong> {h(last_runnable)}</span>
-    </div>
+    </div>'''}
   </div>
 
   {tva_forecast_html}
@@ -419,14 +436,14 @@ const cfsCtx = document.getElementById('cfsChart').getContext('2d');
 const cfsLabels = {json.dumps(cfs_labels)};
 const cfsValues = {json.dumps(cfs_values)};
 
-if (cfsLabels.length === 0 || cfsValues.length === 0) {{{{
+if (cfsLabels.length === 0 || cfsValues.length === 0) {{
   cfsCtx.canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">No CFS data available for this site</div>';
-}}}} else {{{{
-  new Chart(cfsCtx, {{{{
+}} else {{
+  new Chart(cfsCtx, {{
     type: 'line',
-    data: {{{{
+    data: {{
       labels: cfsLabels,
-      datasets: [{{{{
+      datasets: [{{
         label: 'CFS',
         data: cfsValues,
       borderColor: '#1a73e8',
@@ -436,50 +453,50 @@ if (cfsLabels.length === 0 || cfsValues.length === 0) {{{{
       fill: true,
       pointRadius: 2,
       pointHoverRadius: 5
-    }}}}]
-  }}}},
-  options: {{{{
+    }}]
+  }},
+  options: {{
     responsive: true,
     maintainAspectRatio: false,
-    plugins: {{{{
-      legend: {{{{ display: false }}}},
-      tooltip: {{{{
+    plugins: {{
+      legend: {{ display: false }},
+      tooltip: {{
         mode: 'index',
         intersect: false,
-      }}}}
-    }}}},
-    scales: {{{{
-      x: {{{{
-        ticks: {{{{
+      }}
+    }},
+    scales: {{
+      x: {{
+        ticks: {{
           maxRotation: 45,
           minRotation: 45,
           autoSkip: true,
           maxTicksLimit: 10
-        }}}},
-        grid: {{{{ display: false }}}}
-      }}}},
-      y: {{{{
+        }},
+        grid: {{ display: false }}
+      }},
+      y: {{
         beginAtZero: false,
-        grid: {{{{ color: 'rgba(0,0,0,0.05)' }}}}
-      }}}}
-    }}}}
-  }}}}
-  }}}});
-}}}}
+        grid: {{ color: 'rgba(0,0,0,0.05)' }}
+      }}
+    }}
+  }}
+  }});
+}}
 
 // Feet Chart
 const feetCtx = document.getElementById('feetChart').getContext('2d');
 const feetLabels = {json.dumps(feet_labels)};
 const feetValues = {json.dumps(feet_values)};
 
-if (feetLabels.length === 0 || feetValues.length === 0) {{{{
+if (feetLabels.length === 0 || feetValues.length === 0) {{
   feetCtx.canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">No gage height data available for this site</div>';
-}}}} else {{{{
-  new Chart(feetCtx, {{{{
+}} else {{
+  new Chart(feetCtx, {{
     type: 'line',
-    data: {{{{
+    data: {{
       labels: feetLabels,
-      datasets: [{{{{
+      datasets: [{{
         label: 'Feet',
         data: feetValues,
       borderColor: '#1a73e8',
@@ -489,36 +506,36 @@ if (feetLabels.length === 0 || feetValues.length === 0) {{{{
       fill: true,
       pointRadius: 2,
       pointHoverRadius: 5
-    }}}}]
-  }}}},
-  options: {{{{
+    }}]
+  }},
+  options: {{
     responsive: true,
     maintainAspectRatio: false,
-    plugins: {{{{
-      legend: {{{{ display: false }}}},
-      tooltip: {{{{
+    plugins: {{
+      legend: {{ display: false }},
+      tooltip: {{
         mode: 'index',
         intersect: false,
-      }}}}
-    }}}},
-    scales: {{{{
-      x: {{{{
-        ticks: {{{{
+      }}
+    }},
+    scales: {{
+      x: {{
+        ticks: {{
           maxRotation: 45,
           minRotation: 45,
           autoSkip: true,
           maxTicksLimit: 10
-        }}}},
-        grid: {{{{ display: false }}}}
-      }}}},
-      y: {{{{
+        }},
+        grid: {{ display: false }}
+      }},
+      y: {{
         beginAtZero: false,
-        grid: {{{{ color: 'rgba(0,0,0,0.05)' }}}}
-      }}}}
-    }}}}
-  }}}}
-  }}}});
-}}}}
+        grid: {{ color: 'rgba(0,0,0,0.05)' }}
+      }}
+    }}
+  }}
+  }});
+}}
 </script>'''}
 
 </body>
