@@ -122,6 +122,14 @@ def get_location_links(site_id, tva_site_code):
                 '<a href="https://maps.app.goo.gl/8QTdmaYiyBWgdB7G6" '
                 'target="_blank" class="location-link">🏁 Take out</a>')
 
+    if site_id == "02341460":  # Rush South (Columbus GA)
+        return (' <a href="https://rushsouth.com/" '
+                'target="_blank" class="location-link">🌊 RushSouth Whitewater Park</a> '
+                '<a href="https://lakes.southernco.com/" '
+                'target="_blank" class="location-link">📊 GA Power Lake Levels</a> '
+                '<a href="https://www.google.com/maps/place/RushSouth+Whitewater+Park/@32.4697,-84.9935,16z" '
+                'target="_blank" class="location-link">📍 Map</a>')
+
     return ""
 
 

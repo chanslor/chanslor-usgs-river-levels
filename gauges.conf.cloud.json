@@ -96,6 +96,18 @@
       "fips": "01095"
     },
     {
+      "site": "02341460",
+      "name": "Rush South",
+      "include_discharge": true,
+      "min_ft": null,
+      "min_cfs": 4000,
+      "good_ft": null,
+      "good_cfs": 8000,
+      "lat": 32.4728,
+      "lon": -84.9967,
+      "fips": "13215"
+    },
+    {
       "source": "tva",
       "tva_site_code": "HADT1",
       "name": "Hiwassee Dries",
@@ -230,6 +242,14 @@
         "rain_needed_inches": 0.65,
         "responsiveness": "fast",
         "notes": "Small creek, first to rise, first to drop"
+      },
+      "02341460": {
+        "name": "Rush South",
+        "avg_response_hours": 0,
+        "response_range": [0, 0],
+        "rain_needed_inches": 0,
+        "responsiveness": "dam-controlled",
+        "notes": "Georgia Power North Highland Dam releases. 2 units = ~4,500 CFS (runnable). Check lakes.southernco.com for schedule."
       },
       "hiwassee_dries": {
         "name": "Hiwassee Dries",

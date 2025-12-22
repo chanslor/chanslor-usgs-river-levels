@@ -457,7 +457,43 @@ def get_latest_discharge(site_code: str) -> dict:
         'timestamp': timestamp,
         'is_spilling': discharge >= 500  # Threshold for "running"
     }
+
+def get_tva_tailwater_trend(site_code: str, hours: int = 4, threshold_ft: float = 0.5) -> dict:
+    """
+    Calculate tailwater trend from recent observations.
+
+    Tailwater rising indicates water is pouring over the dam spillway,
+    which is a key indicator for kayakers that the river is runnable.
+
+    Args:
+        site_code: TVA site code (e.g., 'OCAT1' for Ocoee #1)
+        hours: Number of hours to consider for trend
+        threshold_ft: Minimum change in feet to consider rising/falling
+
+    Returns:
+        Dict with:
+        - trend: "rising", "falling", or "steady"
+        - current_ft: Current tailwater elevation
+        - change_ft: Change in tailwater over the period
+        - is_spilling: True if tailwater is rising (water over dam)
+    """
+    data = fetch_tva_observed(site_code)
+    recent = data[-min(hours, len(data)):]
+
+    tailwaters = [float(obs['TailwaterElevation'].replace(',', '')) for obs in recent]
+
+    current_ft = tailwaters[-1]
+    change_ft = current_ft - tailwaters[0]
+
+    if change_ft >= threshold_ft:
+        return {"trend": "rising", "current_ft": current_ft, "change_ft": change_ft, "is_spilling": True}
+    elif change_ft <= -threshold_ft:
+        return {"trend": "falling", "current_ft": current_ft, "change_ft": change_ft, "is_spilling": False}
+    else:
+        return {"trend": "steady", "current_ft": current_ft, "change_ft": change_ft, "is_spilling": False}
 ```
+
+**NEW (2025-12-22):** The `get_tva_tailwater_trend()` function detects when water is pouring over the dam spillway. At Ocoee #1 (Parksville Dam), when discharge exceeds ~1,300 CFS, tailwater rises ~1 ft. This is displayed on the dashboard as "💧 tailwater ↗ +X.Xft".
 
 ### Phase 2: Add to Configuration
 

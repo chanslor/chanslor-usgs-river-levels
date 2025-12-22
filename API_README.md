@@ -155,7 +155,7 @@ curl https://docker-blue-sound-1751.fly.dev/api/river-levels
 ```json
 {
   "generated_at": "2025-11-17T13:45:00-0500",
-  "site_count": 11,
+  "site_count": 12,
   "sites": [
     {
       "site_id": "02399200",
@@ -419,6 +419,7 @@ void fetchRiverData() {
 | OCCT1 | Ocoee #3 (Upper) | Flow (cfs) | 1,000 cfs | 1,250 cfs | TVA |
 | OCBT1 | Ocoee #2 (Middle) | Flow (cfs) | 1,000 cfs | 1,250 cfs | TVA |
 | OCAT1 | Ocoee #1 (Lower) | Flow (cfs) | 800 cfs | 1,000 cfs | TVA |
+| 02341460 | Rush South | Flow (cfs) | 4,000 cfs | 8,000 cfs | USGS |
 
 ## Thresholds Explained
 
@@ -447,6 +448,44 @@ Each river has configurable thresholds that determine its status:
 | 800-1,500 | Good medium | Light Green |
 | 1,500-2,500 | Good high (BEST!) | Green |
 | 2,500+ | Too high | Red |
+
+## TVA Tailwater Trend (Dam Sites Only)
+
+TVA dam sites (Hiwassee Dries, Ocoee #1/#2/#3) include a `tailwater_trend` field in the JSON response that indicates when water is pouring over the dam spillway:
+
+**Example Response (TVA site with tailwater trend):**
+```json
+{
+  "site": "OCAT1",
+  "name": "Ocoee #1 (Lower)",
+  "cfs": 1325,
+  "stage_ft": 827.92,
+  "in_range": true,
+  "trend_8h": "rising",
+  "tailwater_trend": {
+    "trend": "rising",
+    "current_ft": 715.87,
+    "change_ft": 0.99,
+    "is_spilling": true
+  }
+}
+```
+
+**Tailwater Trend Fields:**
+| Field | Description |
+|-------|-------------|
+| `trend` | Direction: `rising`, `falling`, or `steady` |
+| `current_ft` | Current tailwater elevation (feet MSL) |
+| `change_ft` | Change over past 4 hours (positive = rising) |
+| `is_spilling` | `true` if tailwater is rising (water over dam) |
+
+**Dashboard Display:**
+- Rising: `💧 tailwater ↗ +X.Xft` (bright blue)
+- Falling: `💧 tailwater ↘ -X.Xft` (gray)
+- Steady: (not displayed)
+
+**Why This Matters:**
+Rising tailwater indicates water pouring over the dam spillway - the key indicator for kayakers that the river section below is running. At Ocoee #1 (Parksville Dam), when discharge exceeds ~1,300 CFS, tailwater rises ~1 ft.
 
 ## Data Update Frequency
 
@@ -479,10 +518,11 @@ PWS Station Mapping (from `pws_observations.py`):
 | Ocoee #3 (Upper) | KTNBENTO3, KNCMURPH4, KTNCLEVE20 |
 | Ocoee #2 (Middle) | KTNBENTO3, KNCMURPH4, KTNCLEVE20 |
 | Ocoee #1 (Lower) | KTNBENTO3, KTNCLEVE20, KNCMURPH4 |
+| Rush South | KGACOLUM39, KGACOLUM96, KGAPHENI5, KGACOLUM50 |
 
 ## Drought Data
 
-The dashboard displays US Drought Monitor status for Alabama rivers (Tellico River in TN is excluded). Drought data is fetched by county FIPS code and cached for 12 hours.
+The dashboard displays US Drought Monitor status for rivers with configured FIPS codes (Tellico River in TN is excluded). Drought data is fetched by county FIPS code and cached for 12 hours.
 
 **Data Source:** [US Drought Monitor](https://droughtmonitor.unl.edu/)
 
@@ -492,6 +532,7 @@ The dashboard displays US Drought Monitor status for Alabama rivers (Tellico Riv
 | Blount County, AL | 01009 | Mulberry Fork, Locust Fork |
 | DeKalb County, AL | 01049 | Town Creek, Little River Canyon |
 | Marshall County, AL | 01095 | South Sauty, Short Creek |
+| Muscogee County, GA | 13215 | Rush South |
 
 **Drought Level Colors (on dashboard):**
 | Level | Description | Color |

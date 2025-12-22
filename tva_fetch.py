@@ -268,6 +268,63 @@ def get_tva_trend(site_code: str, hours: int = 4) -> Optional[str]:
         return "falling"
 
 
+def get_tva_tailwater_trend(site_code: str, hours: int = 4, threshold_ft: float = 0.5) -> Optional[Dict[str, Any]]:
+    """
+    Calculate tailwater trend from recent observations.
+
+    Tailwater rising indicates water is pouring over the dam spillway,
+    which is a key indicator for kayakers that the river is runnable.
+
+    Args:
+        site_code: TVA site code
+        hours: Number of hours to consider for trend
+        threshold_ft: Minimum change in feet to consider rising/falling (default 0.5 ft)
+
+    Returns:
+        Dict with:
+        - trend: "rising", "falling", or "steady"
+        - current_ft: Current tailwater elevation
+        - change_ft: Change in tailwater over the period
+        - is_spilling: True if tailwater is rising (water over dam)
+
+        Returns None on error or insufficient data.
+    """
+    data = fetch_tva_observed(site_code)
+    if not data or len(data) < 2:
+        return None
+
+    # Get last N hours of data
+    recent = data[-min(hours, len(data)):]
+
+    # Extract tailwater values
+    tailwaters = [parse_tva_value(obs.get("TailwaterElevation", "0")) for obs in recent]
+
+    if len(tailwaters) < 2:
+        return None
+
+    current_ft = tailwaters[-1]
+    first_ft = tailwaters[0]
+    change_ft = current_ft - first_ft
+
+    # Determine trend based on threshold
+    if change_ft >= threshold_ft:
+        trend = "rising"
+        is_spilling = True
+    elif change_ft <= -threshold_ft:
+        trend = "falling"
+        is_spilling = False
+    else:
+        trend = "steady"
+        is_spilling = False
+
+    return {
+        "trend": trend,
+        "current_ft": current_ft,
+        "change_ft": round(change_ft, 2),
+        "is_spilling": is_spilling,
+    }
+
+
 def get_tva_trend_data(site_code: str, hours: int = 12) -> Optional[Dict[str, Any]]:
     """
     Get trend data for sparkline visualization (compatible with USGS format).

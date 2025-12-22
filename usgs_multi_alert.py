@@ -79,7 +79,7 @@ except ImportError:
 
 # Import TVA dam data fetcher
 try:
-    from tva_fetch import get_latest_tva_observation, get_tva_trend, get_tva_trend_data, fetch_tva_observed, parse_tva_value, parse_tva_timestamp
+    from tva_fetch import get_latest_tva_observation, get_tva_trend, get_tva_trend_data, get_tva_tailwater_trend, fetch_tva_observed, parse_tva_value, parse_tva_timestamp
     TVA_AVAILABLE = True
 except ImportError:
     TVA_AVAILABLE = False
@@ -776,6 +776,18 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
                 sub_parts.append(f'<span class="trend-falling">{trend_icon} {trend}</span>')
             else:
                 sub_parts.append(f"{trend_icon} {trend}")
+
+        # Add tailwater trend indicator for TVA dam sites
+        tailwater = r.get("tailwater_trend")
+        if tailwater:
+            tw_trend = tailwater.get("trend", "steady")
+            tw_change = tailwater.get("change_ft", 0)
+            if tw_trend == "rising":
+                sub_parts.append(f'<span class="tailwater-rising">💧 tailwater ↗ +{tw_change:.1f}ft</span>')
+            elif tw_trend == "falling":
+                sub_parts.append(f'<span class="tailwater-falling">💧 tailwater ↘ {tw_change:.1f}ft</span>')
+            # Don't show "steady" to keep display clean
+
         sub = " • ".join(sub_parts)
 
         # Multi-level classification for specific sites
@@ -1065,6 +1077,8 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   .drought-level {{ font-family: 'Fira Code', monospace; font-weight:500; }}
   .trend-rising {{ color:#4ade80; font-weight:600; }}
   .trend-falling {{ color:#f87171; font-weight:600; }}
+  .tailwater-rising {{ color:#38bdf8; font-weight:600; }}  /* Bright blue - water over dam! */
+  .tailwater-falling {{ color:#94a3b8; font-weight:500; }}  /* Muted gray */
 
   /* Predictions Panel */
   .predictions-panel {{
@@ -1391,6 +1405,7 @@ def main():
             trend_data = None
             sparkline_threshold = th_ft  # StreamBeam uses ft threshold
             river_url = None  # Use default USGS-style URL
+            tailwater_trend = None  # Only TVA sites have tailwater data
 
         elif source == "tva":
             # TVA dam source - uses TVA REST API
@@ -1431,6 +1446,14 @@ def main():
                     trend_data = get_tva_trend_data(tva_site_code, hours=12)
                 else:
                     trend_data = None
+
+                # Fetch tailwater trend (key indicator for dam spillover)
+                tailwater_trend = get_tva_tailwater_trend(tva_site_code, hours=4)
+                if tailwater_trend and not args.quiet:
+                    tw_trend = tailwater_trend.get("trend", "steady")
+                    tw_change = tailwater_trend.get("change_ft", 0)
+                    if tw_trend == "rising":
+                        print(f"[TVA] {name}: Tailwater RISING (+{tw_change:.2f} ft) - water over dam!")
 
                 # Save all TVA observations to history database
                 if TVA_HISTORY_AVAILABLE:
@@ -1513,6 +1536,7 @@ def main():
                 sparkline_threshold = None
 
             river_url = None  # Use default USGS URL
+            tailwater_trend = None  # Only TVA sites have tailwater data
 
         # Common processing for all sources
         in_range = is_in(stage, discharge, th_ft, th_cfs)
@@ -1646,7 +1670,8 @@ def main():
             "obs": obs_data,
             "obs_secondary": obs_secondary,
             "river_url": river_url,
-            "waterdata_url": f"https://waterdata.usgs.gov/monitoring-location/{site}/#parameterCode=00065&period=P7D"
+            "waterdata_url": f"https://waterdata.usgs.gov/monitoring-location/{site}/#parameterCode=00065&period=P7D",
+            "tailwater_trend": tailwater_trend
         })
 
         # Alerts
@@ -1664,12 +1689,29 @@ def main():
         def do_in_alert():
             waterdata_url = f"https://waterdata.usgs.gov/monitoring-location/{site}/#parameterCode=00065&period=P7D"
             subj_cfs = f" - {discharge:.0f} cfs" if discharge is not None else ""
-            subject = f"{name} is IN ({stage:.2f} ft{subj_cfs})"
+
+            # Add tailwater info for TVA dam sites
+            tailwater_info = ""
+            if tailwater_trend:
+                tw_trend = tailwater_trend.get("trend", "steady")
+                tw_change = tailwater_trend.get("change_ft", 0)
+                if tw_trend == "rising":
+                    tailwater_info = f" (tailwater rising +{tw_change:.1f}ft - water over dam!)"
+
+            subject = f"{name} is IN ({stage:.2f} ft{subj_cfs}){tailwater_info}"
             lines = [
                 f"{name} is {stage:.2f} ft{subj_cfs} @ {ts_iso} (meets {format_thresh(th_ft, th_cfs)}).",
+            ]
+            # Add tailwater detail for TVA sites
+            if tailwater_trend:
+                tw_trend = tailwater_trend.get("trend", "steady")
+                tw_change = tailwater_trend.get("change_ft", 0)
+                tw_ft = tailwater_trend.get("current_ft", 0)
+                lines.append(f"Tailwater: {tw_ft:.2f} ft ({tw_trend}, {tw_change:+.2f} ft change)")
+            lines.extend([
                 f"USGS chart: {waterdata_url}",
                 f"API: {data['url']}"
-            ]
+            ])
             body = "\n".join(lines)
             send_email(smtp, subject, body)
             site_state["last_alert_epoch"] = now
@@ -1691,15 +1733,32 @@ def main():
             waterdata_url = f"https://waterdata.usgs.gov/monitoring-location/{site}/#parameterCode=00065&period=P7D"
             subj_cfs = f" - {discharge:.0f} cfs" if discharge is not None else ""
             last_ft = site_state.get("last_stage_ft")
-            subject = f"{name} {direction.upper()} {abs(pct_change):.1f}% ({stage:.2f} ft{subj_cfs})"
+
+            # Add tailwater info for TVA dam sites
+            tailwater_info = ""
+            if tailwater_trend:
+                tw_trend = tailwater_trend.get("trend", "steady")
+                tw_change = tailwater_trend.get("change_ft", 0)
+                if tw_trend == "rising":
+                    tailwater_info = f" - tailwater rising!"
+
+            subject = f"{name} {direction.upper()} {abs(pct_change):.1f}% ({stage:.2f} ft{subj_cfs}){tailwater_info}"
             lines = [
                 f"{name} has {direction} by {abs(pct_change):.1f}%",
                 f"Previous: {last_ft:.2f} ft",
                 f"Current:  {stage:.2f} ft{subj_cfs}",
                 f"Time: {ts_iso}",
+            ]
+            # Add tailwater detail for TVA sites
+            if tailwater_trend:
+                tw_trend = tailwater_trend.get("trend", "steady")
+                tw_change = tailwater_trend.get("change_ft", 0)
+                tw_ft = tailwater_trend.get("current_ft", 0)
+                lines.append(f"Tailwater: {tw_ft:.2f} ft ({tw_trend}, {tw_change:+.2f} ft change)")
+            lines.extend([
                 f"USGS chart: {waterdata_url}",
                 f"API: {data['url']}"
-            ]
+            ])
             body = "\n".join(lines)
             send_email(smtp, subject, body)
             site_state["last_pct_change_epoch"] = now

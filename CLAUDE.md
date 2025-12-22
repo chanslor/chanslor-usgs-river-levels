@@ -189,8 +189,9 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
      - Ocoee #3 (Upper): KTNBENTO3, KNCMURPH4, KTNCLEVE20
      - Ocoee #2 (Middle): KTNBENTO3, KNCMURPH4, KTNCLEVE20
      - Ocoee #1 (Lower): KTNBENTO3, KTNCLEVE20, KNCMURPH4
+     - Rush South: KGACOLUM39, KGACOLUM96, KGAPHENI5, KGACOLUM50
 
-5. **tva_fetch.py** — TVA Dam Data Fetcher (NEW - 2025-12-18)
+5. **tva_fetch.py** — TVA Dam Data Fetcher (NEW - 2025-12-18, Updated 2025-12-22)
    - Fetches observed data from TVA REST API for dam monitoring
    - Used for sites like Apalachia Dam (Hiwassee Dries) that don't have USGS gauges
    - API endpoint: `https://www.tva.com/RestApi/observed-data/{SITE_CODE}.json`
@@ -198,7 +199,13 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - No authentication required
    - Supports trend calculation from recent observations
    - Generates 3-day forecast panel and historical chart for detail pages
-   - Site code: HADT1 (Hiwassee Above Dam Tennessee 1)
+   - **Tailwater Trend Detection** (NEW - 2025-12-22):
+     - `get_tva_tailwater_trend()` calculates if tailwater is rising/falling/steady
+     - Rising tailwater indicates water pouring over dam spillway
+     - Key indicator for kayakers that river is running
+     - Displays as "💧 tailwater ↗ +X.Xft" on dashboard
+     - Included in email alerts when tailwater is rising
+   - Site codes: HADT1, OCAT1, OCBT1, OCCT1
 
 6. **tva_history.py** — TVA Historical Data Storage (NEW - 2025-12-19)
    - SQLite database module for indefinite storage of TVA dam observations
@@ -492,6 +499,7 @@ Per-site configuration supports:
 | South Sauty | Marshall County, AL | 01095 |
 | Little River Canyon | DeKalb County, AL | 01049 |
 | Short Creek | Marshall County, AL | 01095 |
+| Rush South | Muscogee County, GA | 13215 |
 | Tellico River | Monroe County, TN | (not configured - TN excluded) |
 
 ### Dashboard Color Coding
@@ -515,6 +523,22 @@ Rivers are color-coded based on their thresholds:
 | 1,500-2,500 | Good high (BEST!) | Green |
 | 2,500+ | Too high | Red |
 
+### Tailwater Trend Indicators (TVA Dam Sites Only)
+
+TVA dam sites display tailwater trend when water is pouring over the dam spillway:
+
+| Indicator | Meaning | Color | Hex |
+|-----------|---------|-------|-----|
+| 💧 tailwater ↗ +X.Xft | Tailwater rising (water over dam!) | Bright Blue | `#38bdf8` |
+| 💧 tailwater ↘ -X.Xft | Tailwater falling | Muted Gray | `#94a3b8` |
+| (not shown) | Tailwater steady | - | - |
+
+**Why This Matters for Kayakers:**
+- Rising tailwater = water pouring over the dam spillway
+- This is the key indicator that the river section below the dam is running
+- Example: At Ocoee #1 (Parksville Dam), when release exceeds ~1,300 CFS, tailwater rises ~1 ft as water spills over
+- The tailwater indicator appears on the main dashboard next to the discharge trend
+
 ### Current River Thresholds
 
 | River | min | good | Data Source |
@@ -526,6 +550,7 @@ Rivers are color-coded based on their thresholds:
 | Tellico River | 1.70 ft | 2.0 ft | USGS |
 | Little River Canyon | 300 cfs | 500 cfs (uses special 6-level) | USGS |
 | Short Creek | 0.5 ft | 1.0 ft | StreamBeam |
+| Rush South | 4,000 cfs (2 units) | 8,000 cfs (3 units) | USGS |
 | Hiwassee Dries | 3,000 cfs | 5,000 cfs | TVA |
 | Ocoee #3 (Upper) | 1,000 cfs | 1,250 cfs | TVA |
 | Ocoee #2 (Middle) | 1,000 cfs | 1,250 cfs | TVA |
@@ -698,7 +723,7 @@ systemctl --user restart usgs-alert.service
 - Containerfile: `Containerfile.api.simple`
 - Entrypoint: `entrypoint-api.sh`
 - Features: Flask API + Dashboard + ESP32 endpoints + TVA integration + Historical Charts
-- **Total Sites Monitored**: 11 rivers
+- **Total Sites Monitored**: 12 rivers
 
 **Recent Updates:**
 - **2025-12-19: Added TVA Historical Chart Feature**

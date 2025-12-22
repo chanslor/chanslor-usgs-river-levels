@@ -32,6 +32,7 @@ PWS_STATIONS = {
     "Ocoee #3 (Upper)": ["KTNBENTO3", "KNCMURPH4", "KTNCLEVE20"],  # Same area as Hiwassee
     "Ocoee #2 (Middle)": ["KTNBENTO3", "KNCMURPH4", "KTNCLEVE20"],  # Same area as Hiwassee
     "Ocoee #1 (Lower)": ["KTNBENTO3", "KTNCLEVE20", "KNCMURPH4"],  # Near Parksville
+    "Rush South": ["KGACOLUM39", "KGACOLUM96", "KGAPHENI5", "KGACOLUM50"],  # Columbus GA area
 }
 
 # Friendly labels for display
@@ -61,6 +62,10 @@ PWS_LABELS = {
     "KNCMURPH4": "MURPHY",    # Murphy NC (Tarheel)
     "KTNBENTO3": "BENTON",    # Benton TN
     "KTNCLEVE20": "CLEVE",    # Cleveland TN (Prospect)
+    "KGACOLUM39": "COLMBS",   # Columbus GA
+    "KGACOLUM96": "COLMBS",   # Columbus GA
+    "KGAPHENI5": "PHNXCY",    # Phenix City AL
+    "KGACOLUM50": "COLMBS",   # Columbus GA
 }
 
 # Browser-style User-Agent
