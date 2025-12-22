@@ -10,6 +10,7 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 - 🤖 **[CLAUDE.md](CLAUDE.md)** - Complete project reference, architecture
 - 📚 **[DOCS_INDEX.md](DOCS_INDEX.md)** - Master documentation index
 - 🏭 **[TVA_HIWASSEE_DRIES.md](TVA_HIWASSEE_DRIES.md)** - TVA dam integration, Apalachia spillway monitoring
+- 🌊 **[OCOEE_RESEARCH.md](OCOEE_RESEARCH.md)** - Ocoee River TVA API research & integration
 
 **🌐 Production Deployment:**
 - **Dashboard**: https://docker-blue-sound-1751.fly.dev/
@@ -40,7 +41,7 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 - 💨 **Wind alerts** (> 15 mph highlighted in yellow)
 - 📈 **Color-coded trend indicators** (rising = green, falling = light red)
 - 🧪 **Comprehensive test suite** for visual indicator verification
-- 🏭 **TVA Dam monitoring** - Hiwassee Dries (Apalachia Dam spillway releases)
+- 🏭 **TVA Dam monitoring** - Hiwassee Dries & Ocoee #1/#2/#3 (scheduled releases)
 
 ---
 
@@ -103,12 +104,16 @@ Each river has unique characteristics that affect how it responds to rain:
 | South Sauty | 33 hours | 2.00" | 🐢 Slow |
 | Mulberry Fork | 33 hours | 2.25" | 🐢 Slow |
 | Hiwassee Dries | N/A | N/A | 🏭 Dam-controlled |
+| Ocoee #3 (Upper) | N/A | N/A | 🏭 Dam-controlled |
+| Ocoee #2 (Middle) | N/A | N/A | 🏭 Dam-controlled |
+| Ocoee #1 (Lower) | N/A | N/A | 🏭 Dam-controlled |
 
 **Tips:**
 - Short Creek is the "canary in the coal mine" - if it's not running, nothing else will be
 - Mulberry Fork needs sustained heavy rain events to reach runnable levels
 - Peak timing shows the window when the river is expected to reach its highest level
 - **Hiwassee Dries** runs only when TVA opens the Apalachia Dam spillway gates - not rain responsive
+- **Ocoee dams** are TVA scheduled releases for whitewater recreation - check TVA release calendar
 
 ### API Endpoint
 
@@ -160,6 +165,9 @@ Thresholds are configured in `gauges.conf.json` and exposed via the API:
 | Little River Canyon | 300 cfs | (uses special 6-level above) | USGS |
 | Short Creek | 0.5 ft | 1.0 ft | StreamBeam |
 | Hiwassee Dries | 3,000 cfs | 5,000 cfs | TVA |
+| Ocoee #3 (Upper) | 1,000 cfs | 1,250 cfs | TVA |
+| Ocoee #2 (Middle) | 1,000 cfs | 1,250 cfs | TVA |
+| Ocoee #1 (Lower) | 800 cfs | 1,000 cfs | TVA |
 
 ### Weather Alerts
 

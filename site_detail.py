@@ -65,6 +65,66 @@ def calculate_wind_chill(temp_f, wind_mph):
 
     return wind_chill, emoji, desc
 
+def get_location_links(site_id, tva_site_code):
+    """
+    Get location links HTML for a river site.
+
+    Args:
+        site_id: USGS site ID or empty string
+        tva_site_code: TVA site code (e.g., 'HADT1', 'OCBT1') or None
+
+    Returns:
+        HTML string with location links
+    """
+    # TVA sites
+    if tva_site_code == "HADT1":
+        return (' <a href="https://www.google.com/maps/place/35%C2%B010%2724.7%22N+84%C2%B023%2701.4%22W/@35.1713452,-84.38115,16.39z" '
+                'target="_blank" class="location-link">📍 Put in</a> '
+                '<a href="https://www.google.com/maps/place/35%C2%B010%2752.5%22N+84%C2%B026%2719.1%22W/@35.1816932,-84.4346579,16.39z" '
+                'target="_blank" class="location-link">🏁 Take out</a>')
+
+    if tva_site_code == "OCCT1":
+        return (' <a href="https://www.google.com/maps/place/Ocoee+Whitewater+Center/@35.0619844,-84.4296477,17z" '
+                'target="_blank" class="location-link">📍 Upper Ocoee Put-in (Olympic)</a> '
+                '<a href="https://www.tva.com/environment/lake-levels/ocoee-3" '
+                'target="_blank" class="location-link">📅 Upper Ocoee Info</a>')
+
+    if tva_site_code == "OCBT1":
+        return (' <a href="https://maps.app.goo.gl/5cD9XmDBaiu6kZVy9" '
+                'target="_blank" class="location-link">📍 Middle Ocoee Put-in</a> '
+                '<a href="https://maps.app.goo.gl/nzEjdqdPwLac6nMp8" '
+                'target="_blank" class="location-link">🏁 Take-out</a> '
+                '<a href="https://www.tva.com/environment/lake-levels/ocoee-2/recreation-release-calendar" '
+                'target="_blank" class="location-link">📅 Middle Ocoee Release Schedule</a>')
+
+    if tva_site_code == "OCAT1":
+        return (' <a href="https://www.google.com/maps/place/Parksville+Lake/@35.0950,-84.6470,15z" '
+                'target="_blank" class="location-link">📍 Parksville Dam</a> '
+                '<a href="https://www.tva.com/environment/lake-levels/ocoee-1" '
+                'target="_blank" class="location-link">📅 Lower Ocoee Info</a>')
+
+    # USGS sites
+    if site_id == "02399200":  # Little River Canyon
+        return (' <a href="https://www.google.com/maps/dir/Little+River+Canyon+Kayak+Put+In//@34.3914776,-85.6250722,19z" '
+                'target="_blank" class="location-link">🚀 Suicide put in</a> '
+                '<a href="https://maps.app.goo.gl/WuMrPD13zbDKwzwx6" '
+                'target="_blank" class="location-link">📍 Eberhart Point</a> '
+                '<a href="https://maps.app.goo.gl/Rt7pv8qZzzUsFFh37" '
+                'target="_blank" class="location-link">🏁 Chair Lift Take Out</a>')
+
+    if site_id == "02455000":  # Locust Fork
+        return (' <a href="https://maps.app.goo.gl/VxoBRfDEiznaJEuR6" '
+                'target="_blank" class="location-link">📍 Upper put in</a> '
+                '<a href="https://maps.app.goo.gl/yW8uYJAUbpub1bQX8" '
+                'target="_blank" class="location-link">📍 OLD Upper put in</a> '
+                '<a href="https://maps.app.goo.gl/KsminZcRhyHsQi4s9" '
+                'target="_blank" class="location-link">📍 Kings Bend put in</a> '
+                '<a href="https://maps.app.goo.gl/8QTdmaYiyBWgdB7G6" '
+                'target="_blank" class="location-link">🏁 Take out</a>')
+
+    return ""
+
+
 def fetch_usgs_7day_data(site_id, parameter_code):
     """
     Fetch 7 days of historical data from USGS IV service.
@@ -368,7 +428,7 @@ body {{
   <a href="/" class="back-link">← Back to All Rivers</a>
 
   <div class="header">
-    <h1>{h(site_name)}{' <a href="https://www.google.com/maps/place/35%C2%B010%2724.7%22N+84%C2%B023%2701.4%22W/@35.1713452,-84.38115,16.39z" target="_blank" class="location-link">📍 Put in</a> <a href="https://www.google.com/maps/place/35%C2%B010%2752.5%22N+84%C2%B026%2719.1%22W/@35.1816932,-84.4346579,16.39z" target="_blank" class="location-link">🏁 Take out</a>' if is_tva else (' <a href="https://www.google.com/maps/dir/Little+River+Canyon+Kayak+Put+In//@34.3914776,-85.6250722,19z/data=!4m9!4m8!1m5!1m1!1s0x888a7fb5d77917ed:0x87cfeb1a488e4c59!2m2!1d-85.6248826!2d34.3915645!1m0!3e0!5m1!1e4?entry=ttu&g_ep=EgoyMDI1MTIwOS4wIKXMDSoASAFQAw%3D%3D" target="_blank" class="location-link">🚀 Suicide put in</a> <a href="https://maps.app.goo.gl/WuMrPD13zbDKwzwx6" target="_blank" class="location-link">📍 Eberhart Point</a> <a href="https://maps.app.goo.gl/Rt7pv8qZzzUsFFh37" target="_blank" class="location-link">🏁 Chair Lift Take Out</a>' if site_id == '02399200' else (' <a href="https://maps.app.goo.gl/VxoBRfDEiznaJEuR6" target="_blank" class="location-link">📍 Upper put in</a> <a href="https://maps.app.goo.gl/yW8uYJAUbpub1bQX8" target="_blank" class="location-link">📍 OLD Upper put in</a> <a href="https://maps.app.goo.gl/KsminZcRhyHsQi4s9" target="_blank" class="location-link">📍 Kings Bend put in</a> <a href="https://maps.app.goo.gl/8QTdmaYiyBWgdB7G6" target="_blank" class="location-link">🏁 Take out</a>' if site_id == '02455000' else ''))}</h1>
+    <h1>{h(site_name)}{get_location_links(site_id, tva_site_code)}</h1>
     {"" if is_tva else f'''<div class="status">{status_text}</div>
     <div class="meta">
       <span><strong>USGS Site:</strong> {h(site_id)}</span>

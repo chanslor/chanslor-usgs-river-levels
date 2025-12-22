@@ -168,9 +168,14 @@ curl -s "https://www.tva.com/RestApi/observed-data/HADT1.json" \
 
 | Endpoint | Description | Status |
 |----------|-------------|--------|
-| `/RestApi/observed-data/HADT1.json` | Hourly observations | **WORKING** |
-| `/RestApi/predicted-data/HADT1.json` | 3-day forecast | **WORKING** |
+| `/RestApi/observed-data/HADT1.json` | Hiwassee Dries observations | **WORKING** |
+| `/RestApi/predicted-data/HADT1.json` | Hiwassee 3-day forecast | **WORKING** |
+| `/RestApi/observed-data/OCCT1.json` | Ocoee #3 (Upper) observations | **WORKING** |
+| `/RestApi/observed-data/OCBT1.json` | Ocoee #2 (Middle) observations | **WORKING** |
+| `/RestApi/observed-data/OCAT1.json` | Ocoee #1 (Lower) observations | **WORKING** |
 | `/RestApi/predicted-data/DUGT1.json` | Douglas Dam predictions | Working |
+
+**Note:** Ocoee rivers were added on 2025-12-21. See [OCOEE_RESEARCH.md](OCOEE_RESEARCH.md) for details.
 
 ### Predicted Data API (3-Day Forecast)
 

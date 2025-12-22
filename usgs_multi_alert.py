@@ -1461,8 +1461,14 @@ def main():
 
             sparkline_threshold = th_cfs  # TVA sites use CFS threshold
 
-            # TVA-specific URL for the river name link
-            river_url = "https://www.tva.com/environment/lake-levels/apalachia"
+            # TVA-specific URL for the river name link (site-dependent)
+            tva_urls = {
+                "HADT1": "https://www.tva.com/environment/lake-levels/apalachia",
+                "OCBT1": "https://www.tva.com/environment/lake-levels/ocoee-2",
+                "OCCT1": "https://www.tva.com/environment/lake-levels/ocoee-3",
+                "OCAT1": "https://www.tva.com/environment/lake-levels/ocoee-1",
+            }
+            river_url = tva_urls.get(tva_site_code, f"https://www.tva.com/environment/lake-levels")
 
             # Create a compatible data dict for alerts
             data = {

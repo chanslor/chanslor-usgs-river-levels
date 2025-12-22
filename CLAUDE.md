@@ -186,6 +186,9 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
      - Little River Canyon: KALCEDAR14, KALGAYLE19, KALGAYLE16, KALGAYLE7
      - Mulberry Fork: KALHAYDE19, KALHAYDE21, KALHAYDE13, KALWARRI54
      - Hiwassee Dries: KNCMURPH4, KTNBENTO3, KTNCLEVE20
+     - Ocoee #3 (Upper): KTNBENTO3, KNCMURPH4, KTNCLEVE20
+     - Ocoee #2 (Middle): KTNBENTO3, KNCMURPH4, KTNCLEVE20
+     - Ocoee #1 (Lower): KTNBENTO3, KTNCLEVE20, KNCMURPH4
 
 5. **tva_fetch.py** — TVA Dam Data Fetcher (NEW - 2025-12-18)
    - Fetches observed data from TVA REST API for dam monitoring
@@ -524,6 +527,9 @@ Rivers are color-coded based on their thresholds:
 | Little River Canyon | 300 cfs | 500 cfs (uses special 6-level) | USGS |
 | Short Creek | 0.5 ft | 1.0 ft | StreamBeam |
 | Hiwassee Dries | 3,000 cfs | 5,000 cfs | TVA |
+| Ocoee #3 (Upper) | 1,000 cfs | 1,250 cfs | TVA |
+| Ocoee #2 (Middle) | 1,000 cfs | 1,250 cfs | TVA |
+| Ocoee #1 (Lower) | 800 cfs | 1,000 cfs | TVA |
 
 ## Systemd Integration
 
@@ -692,7 +698,7 @@ systemctl --user restart usgs-alert.service
 - Containerfile: `Containerfile.api.simple`
 - Entrypoint: `entrypoint-api.sh`
 - Features: Flask API + Dashboard + ESP32 endpoints + TVA integration + Historical Charts
-- **Total Sites Monitored**: 8 rivers
+- **Total Sites Monitored**: 11 rivers
 
 **Recent Updates:**
 - **2025-12-19: Added TVA Historical Chart Feature**

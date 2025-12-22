@@ -155,7 +155,7 @@ curl https://docker-blue-sound-1751.fly.dev/api/river-levels
 ```json
 {
   "generated_at": "2025-11-17T13:45:00-0500",
-  "site_count": 6,
+  "site_count": 11,
   "sites": [
     {
       "site_id": "02399200",
@@ -416,6 +416,9 @@ void fetchRiverData() {
 | 02399200 | Little River Canyon | Flow (cfs) | 300 cfs | 500 cfs | USGS |
 | streambeam:1 | Short Creek | Stage (ft) | 0.5 ft | 1.0 ft | StreamBeam |
 | HADT1 | Hiwassee Dries | Flow (cfs) | 3,000 cfs | 5,000 cfs | TVA |
+| OCCT1 | Ocoee #3 (Upper) | Flow (cfs) | 1,000 cfs | 1,250 cfs | TVA |
+| OCBT1 | Ocoee #2 (Middle) | Flow (cfs) | 1,000 cfs | 1,250 cfs | TVA |
+| OCAT1 | Ocoee #1 (Lower) | Flow (cfs) | 800 cfs | 1,000 cfs | TVA |
 
 ## Thresholds Explained
 
@@ -473,6 +476,9 @@ PWS Station Mapping (from `pws_observations.py`):
 | Little River Canyon | KALCEDAR14, KALGAYLE19, KALGAYLE16, KALGAYLE7 |
 | Mulberry Fork | KALHAYDE19, KALHAYDE21, KALHAYDE13, KALWARRI54 |
 | Hiwassee Dries | KNCMURPH4, KTNBENTO3, KTNCLEVE20 |
+| Ocoee #3 (Upper) | KTNBENTO3, KNCMURPH4, KTNCLEVE20 |
+| Ocoee #2 (Middle) | KTNBENTO3, KNCMURPH4, KTNCLEVE20 |
+| Ocoee #1 (Lower) | KTNBENTO3, KTNCLEVE20, KNCMURPH4 |
 
 ## Drought Data
 

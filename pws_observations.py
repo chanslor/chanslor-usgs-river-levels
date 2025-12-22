@@ -29,6 +29,9 @@ PWS_STATIONS = {
     "Little River": ["KALCEDAR14", "KALGAYLE19", "KALGAYLE16", "KALGAYLE7"],  # alias
     "Mulberry Fork": ["KALHAYDE19", "KALHAYDE21", "KALHAYDE13", "KALWARRI54"],
     "Hiwassee Dries": ["KNCMURPH4", "KTNBENTO3", "KTNCLEVE20"],
+    "Ocoee #3 (Upper)": ["KTNBENTO3", "KNCMURPH4", "KTNCLEVE20"],  # Same area as Hiwassee
+    "Ocoee #2 (Middle)": ["KTNBENTO3", "KNCMURPH4", "KTNCLEVE20"],  # Same area as Hiwassee
+    "Ocoee #1 (Lower)": ["KTNBENTO3", "KTNCLEVE20", "KNCMURPH4"],  # Near Parksville
 }
 
 # Friendly labels for display

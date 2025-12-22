@@ -30,11 +30,73 @@ TVA_SITES = {
         "lat": 35.168,
         "lon": -84.298,
     },
+    "OCBT1": {
+        "name": "Ocoee #2 (Middle Dam)",
+        "description": "Ocoee Dam #2 - main whitewater put-in for Middle Ocoee",
+        "lat": 35.093,
+        "lon": -84.510,
+    },
+    "OCCT1": {
+        "name": "Ocoee #3 (Upper Dam)",
+        "description": "Ocoee Dam #3 - Upper Ocoee section",
+        "lat": 35.040,
+        "lon": -84.467,
+    },
+    "OCAT1": {
+        "name": "Ocoee #1 (Parksville Dam)",
+        "description": "Ocoee Dam #1 / Parksville - Lower Ocoee section",
+        "lat": 35.095,
+        "lon": -84.647,
+    },
     "DUGT1": {
         "name": "Douglas Dam",
         "description": "Douglas Dam on French Broad River",
         "lat": 36.0,
         "lon": -83.5,
+    },
+}
+
+# Site-specific display text for the forecast panel
+TVA_DISPLAY_CONFIG = {
+    "HADT1": {
+        "title": "APALACHIA OPERATIONS FORECAST",
+        "subtitle": "Apalachia Dam → Hiwassee Dries",
+        "history_title": "Apalachia Historical Dam Operations",
+        "running_msg": "The Dries are running!",
+        "quiet_msg": "Dam quiet, Dries dry",
+        "filling_msg": "Dries filling up",
+        "spillway_label": "Water starts flowing into Dries",
+        "runnable_msg": "Dries will run",
+    },
+    "OCBT1": {
+        "title": "OCOEE #2 OPERATIONS FORECAST",
+        "subtitle": "Ocoee Dam #2 → Middle Ocoee",
+        "history_title": "Ocoee #2 Historical Dam Operations",
+        "running_msg": "Middle Ocoee is running!",
+        "quiet_msg": "Dam quiet, no release",
+        "filling_msg": "Release building up",
+        "spillway_label": "Release starting",
+        "runnable_msg": "Middle Ocoee will run",
+    },
+    "OCCT1": {
+        "title": "OCOEE #3 OPERATIONS FORECAST",
+        "subtitle": "Ocoee Dam #3 → Upper Ocoee",
+        "history_title": "Ocoee #3 Historical Dam Operations",
+        "running_msg": "Upper Ocoee is running!",
+        "quiet_msg": "Dam quiet, no release",
+        "filling_msg": "Release building up",
+        "spillway_label": "Release starting",
+        "runnable_msg": "Upper Ocoee will run",
+    },
+    "OCAT1": {
+        "title": "OCOEE #1 OPERATIONS FORECAST",
+        "subtitle": "Parksville Dam → Lower Ocoee",
+        "history_title": "Ocoee #1 Historical Dam Operations",
+        "running_msg": "Lower Ocoee is running!",
+        "quiet_msg": "Dam quiet, no release",
+        "filling_msg": "Release building up",
+        "spillway_label": "Release starting",
+        "runnable_msg": "Lower Ocoee will run",
     },
 }
 
@@ -392,6 +454,19 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
     if not forecasts:
         return ""
 
+    # Get site-specific display configuration (with defaults)
+    default_config = {
+        "title": f"{site_code} OPERATIONS FORECAST",
+        "subtitle": f"Dam → River",
+        "history_title": f"{site_code} Historical Dam Operations",
+        "running_msg": "River is running!",
+        "quiet_msg": "Dam quiet, no release",
+        "filling_msg": "Release building up",
+        "spillway_label": "Release starting",
+        "runnable_msg": "River will run",
+    }
+    display = TVA_DISPLAY_CONFIG.get(site_code, default_config)
+
     # Get current observation for the header
     current = get_latest_tva_observation(site_code)
     current_outflow = current['discharge_cfs'] if current else 0
@@ -408,7 +483,7 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
 
     # Calculate current release gauge values
     max_gauge_cfs = 6000  # Max for visualization
-    spillway_opens_cfs = 500  # CFS when water starts spilling into the Dries
+    spillway_opens_cfs = 500  # CFS when release is noticeable
     current_pct = min(100, (current_outflow / max_gauge_cfs) * 100)
     threshold_pct_gauge = min(100, (runnable_threshold / max_gauge_cfs) * 100)
     spillway_pct_gauge = min(100, (spillway_opens_cfs / max_gauge_cfs) * 100)
@@ -417,7 +492,7 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
     if current_outflow >= runnable_threshold:
         current_status = "RUNNABLE!"
         current_color = "#22c55e"  # Green
-        status_desc = "The Dries are running!"
+        status_desc = display["running_msg"]
     elif current_outflow >= runnable_threshold * 0.5:
         current_status = "GETTING CLOSE"
         current_color = "#eab308"  # Yellow
@@ -438,18 +513,18 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
                 pool = parse_tva_value(obs.get("ReservoirElevation", "0"))
                 tailwater = parse_tva_value(obs.get("TailwaterElevation", "0"))
 
-                # Determine what's happening
+                # Determine what's happening (site-specific text)
                 if discharge < 100:
-                    event = "Dam quiet, Dries dry"
+                    event = display["quiet_msg"]
                     event_class = "event-quiet"
                 elif discharge < 500:
                     event = "Minimal release"
                     event_class = "event-quiet"
                 elif discharge < 1500:
-                    event = "Spillway opening!"
+                    event = "Release opening!"
                     event_class = "event-opening"
                 elif discharge < runnable_threshold:
-                    event = "Dries filling up"
+                    event = display["filling_msg"]
                     event_class = "event-filling"
                 else:
                     event = "Full release - RUNNABLE!"
@@ -516,8 +591,8 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
     html = f'''
     <div class="forecast-panel">
       <div class="forecast-header">
-        <div class="forecast-title">🌊 3-DAY APALACHIA OPERATIONS FORECAST</div>
-        <div class="forecast-subtitle">Apalachia Dam → Hiwassee Dries</div>
+        <div class="forecast-title">🌊 3-DAY {display["title"]}</div>
+        <div class="forecast-subtitle">{display["subtitle"]}</div>
       </div>
 
       <div class="flow-diagram">
@@ -584,7 +659,7 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
       <div class="forecast-legend">
         <div class="legend-item">
           <div class="legend-line spillway"></div>
-          <span>💧 Spillway Opens: {spillway_opens_cfs:,} CFS - Water starts flowing into Dries</span>
+          <span>💧 Release: {spillway_opens_cfs:,} CFS - {display["spillway_label"]}</span>
         </div>
         <div class="legend-item">
           <div class="legend-line runnable"></div>
@@ -592,7 +667,7 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
         </div>
         <div class="legend-item">
           <div class="legend-box" style="background: #22c55e;"></div>
-          <span>YES! - Dries will run</span>
+          <span>YES! - {display["runnable_msg"]}</span>
         </div>
         <div class="legend-item">
           <div class="legend-box" style="background: #eab308;"></div>
@@ -630,7 +705,7 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
             <strong>Lake Level</strong> = Water elevation in the reservoir (behind the dam)
           </div>
           <div class="explainer-item">
-            <strong>Tailwater</strong> = Water level below the dam (start of the Dries)
+            <strong>Tailwater</strong> = Water level below the dam (start of whitewater section)
           </div>
           <div class="explainer-item">
             <strong>Release</strong> = How much water is flowing through the spillway
@@ -641,7 +716,7 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
 
     <div class="history-section">
       <div class="history-header">
-        <div class="history-title">📊 Apalachia Historical Dam Operations</div>
+        <div class="history-title">📊 {display["history_title"]}</div>
         <div class="history-subtitle">Long-term trends - data accumulates over time</div>
       </div>
       <div class="history-controls">
@@ -1233,6 +1308,12 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
       font-size: 11px;
       letter-spacing: 0.5px;
     }}
+    .story-table th:nth-child(2),
+    .story-table th:nth-child(3),
+    .story-table th:nth-child(4) {{
+      text-align: center;
+      width: 120px;
+    }}
     .story-table td {{
       padding: 10px 12px;
       border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -1249,15 +1330,18 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
     .story-time {{
       font-weight: 600;
       white-space: nowrap;
+      width: 80px;
     }}
     .story-pool, .story-tailwater {{
       font-family: monospace;
-      text-align: right;
+      text-align: center;
+      width: 120px;
     }}
     .story-discharge {{
       font-family: monospace;
       font-weight: bold;
-      text-align: right;
+      text-align: center;
+      width: 120px;
     }}
     .story-event {{
       font-style: italic;

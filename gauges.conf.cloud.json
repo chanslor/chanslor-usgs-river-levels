@@ -106,6 +106,42 @@
       "good_cfs": 5000,
       "lat": 35.168,
       "lon": -84.298
+    },
+    {
+      "source": "tva",
+      "tva_site_code": "OCCT1",
+      "name": "Ocoee #3 (Upper)",
+      "include_discharge": true,
+      "min_ft": null,
+      "min_cfs": 1000,
+      "good_ft": null,
+      "good_cfs": 1250,
+      "lat": 35.040,
+      "lon": -84.467
+    },
+    {
+      "source": "tva",
+      "tva_site_code": "OCBT1",
+      "name": "Ocoee #2 (Middle)",
+      "include_discharge": true,
+      "min_ft": null,
+      "min_cfs": 1000,
+      "good_ft": null,
+      "good_cfs": 1250,
+      "lat": 35.093,
+      "lon": -84.510
+    },
+    {
+      "source": "tva",
+      "tva_site_code": "OCAT1",
+      "name": "Ocoee #1 (Lower)",
+      "include_discharge": true,
+      "min_ft": null,
+      "min_cfs": 800,
+      "good_ft": null,
+      "good_cfs": 1000,
+      "lat": 35.095,
+      "lon": -84.647
     }
   ],
 
@@ -202,6 +238,30 @@
         "rain_needed_inches": 0,
         "responsiveness": "dam-controlled",
         "notes": "TVA dam release - not rain responsive. Runs when Apalachia Dam spillway opens."
+      },
+      "ocoee_3": {
+        "name": "Ocoee #3 (Upper)",
+        "avg_response_hours": 0,
+        "response_range": [0, 0],
+        "rain_needed_inches": 0,
+        "responsiveness": "dam-controlled",
+        "notes": "TVA scheduled releases for Upper Ocoee whitewater. Check TVA release calendar."
+      },
+      "ocoee_2": {
+        "name": "Ocoee #2 (Middle)",
+        "avg_response_hours": 0,
+        "response_range": [0, 0],
+        "rain_needed_inches": 0,
+        "responsiveness": "dam-controlled",
+        "notes": "TVA scheduled releases for Middle Ocoee whitewater. Check TVA release calendar."
+      },
+      "ocoee_1": {
+        "name": "Ocoee #1 (Lower)",
+        "avg_response_hours": 0,
+        "response_range": [0, 0],
+        "rain_needed_inches": 0,
+        "responsiveness": "dam-controlled",
+        "notes": "TVA Parksville Dam releases for Lower Ocoee."
       }
     }
   },
