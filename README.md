@@ -107,6 +107,7 @@ Each river has unique characteristics that affect how it responds to rain:
 | Ocoee #3 (Upper) | N/A | N/A | 🏭 Dam-controlled |
 | Ocoee #2 (Middle) | N/A | N/A | 🏭 Dam-controlled |
 | Ocoee #1 (Lower) | N/A | N/A | 🏭 Dam-controlled |
+| Rush South | N/A | N/A | 🏭 Dam-controlled |
 
 **Tips:**
 - Short Creek is the "canary in the coal mine" - if it's not running, nothing else will be
@@ -114,6 +115,7 @@ Each river has unique characteristics that affect how it responds to rain:
 - Peak timing shows the window when the river is expected to reach its highest level
 - **Hiwassee Dries** runs only when TVA opens the Apalachia Dam spillway gates - not rain responsive
 - **Ocoee dams** are TVA scheduled releases for whitewater recreation - check TVA release calendar
+- **Rush South** (Chattahoochee at Columbus GA) runs on Georgia Power North Highland Dam releases - 2 units ≈ 4,500 CFS (runnable). Check [lakes.southernco.com](https://lakes.southernco.com) for schedule
 
 ### API Endpoint
 
@@ -168,6 +170,7 @@ Thresholds are configured in `gauges.conf.json` and exposed via the API:
 | Ocoee #3 (Upper) | 1,000 cfs | 1,250 cfs | TVA |
 | Ocoee #2 (Middle) | 1,000 cfs | 1,250 cfs | TVA |
 | Ocoee #1 (Lower) | 800 cfs | 1,000 cfs | TVA |
+| Rush South | 4,000 cfs | 8,000 cfs | USGS |
 
 ### Weather Alerts
 
