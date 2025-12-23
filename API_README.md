@@ -94,7 +94,7 @@ curl https://docker-blue-sound-1751.fly.dev/api
 ```json
 {
   "name": "USGS River Levels API",
-  "version": "1.3",
+  "version": "1.4",
   "dashboard": "/",
   "endpoints": {
     "health": "/api/health",
@@ -104,7 +104,8 @@ curl https://docker-blue-sound-1751.fly.dev/api
     "predictions": "/api/predictions",
     "usgs_history": "/api/usgs-history/{site_id}?days=7",
     "tva_history": "/api/tva-history/{site_code}?days=7",
-    "tva_stats": "/api/tva-history/{site_code}/stats?days=30"
+    "tva_stats": "/api/tva-history/{site_code}/stats?days=30",
+    "ocoee_combined": "/api/tva-history/ocoee/combined?days=7"
   },
   "examples": {
     "little_river": "/api/river-levels/02399200",
@@ -114,12 +115,14 @@ curl https://docker-blue-sound-1751.fly.dev/api
     "rush_south_history_7d": "/api/usgs-history/02341460?days=7",
     "rush_south_history_30d": "/api/usgs-history/02341460?days=30",
     "hiwassee_history_7d": "/api/tva-history/HADT1?days=7",
-    "hiwassee_history_30d": "/api/tva-history/HADT1?days=30"
+    "hiwassee_history_30d": "/api/tva-history/HADT1?days=30",
+    "ocoee_cascade_7d": "/api/tva-history/ocoee/combined?days=7"
   },
   "new_features": {
     "predictions": "River predictions based on QPF forecast and 90-day historical response patterns",
     "usgs_history": "Historical USGS data with 7d/30d/90d/1yr time range options",
-    "tva_history": "Long-term historical data for TVA dam sites"
+    "tva_history": "Long-term historical data for TVA dam sites",
+    "ocoee_cascade": "Combined data for all 3 Ocoee dams to visualize water flow downstream"
   }
 }
 ```
@@ -482,6 +485,74 @@ Returns statistics only for TVA dam data (no observation array).
 ```bash
 curl https://docker-blue-sound-1751.fly.dev/api/tva-history/HADT1/stats?days=90
 ```
+
+---
+
+### Get Ocoee Combined Historical Data
+```bash
+GET /api/tva-history/ocoee/combined?days={days}
+```
+
+Returns combined historical data for all 3 Ocoee dams in a single request. Used by the **Ocoee Cascade Correlation Page** to visualize how water flows downstream from Upper (#3) → Middle (#2) → Lower (#1) dams.
+
+**Parameters:**
+| Parameter | Description | Default | Max |
+|-----------|-------------|---------|-----|
+| `days` | Number of days of history | 7 | 365 |
+
+**Example:**
+```bash
+curl https://docker-blue-sound-1751.fly.dev/api/tva-history/ocoee/combined?days=7
+```
+
+**Response:**
+```json
+{
+  "days_requested": 7,
+  "generated_at": "2025-12-23T10:30:00",
+  "sites": {
+    "OCCT1": {
+      "name": "Ocoee #3 (Upper)",
+      "position": 1,
+      "color": "#ef4444",
+      "observation_count": 168,
+      "date_range": {
+        "earliest": "2025-12-16T00:00:00",
+        "latest": "2025-12-23T10:00:00"
+      },
+      "stats": {
+        "discharge_cfs": {"min": 0, "max": 1200, "avg": 450},
+        "pool_elevation_ft": {"min": 1431.5, "max": 1432.5, "avg": 1432.0},
+        "tailwater_ft": {"min": 1117.5, "max": 1119.0, "avg": 1118.2}
+      },
+      "observations": [
+        {"timestamp": "2025-12-23T10:00:00", "discharge_cfs": 1081, "pool_elevation_ft": 1432.1, "tailwater_ft": 1118.5}
+      ]
+    },
+    "OCBT1": {
+      "name": "Ocoee #2 (Middle)",
+      "position": 2,
+      "color": "#eab308",
+      "observation_count": 168,
+      "...": "..."
+    },
+    "OCAT1": {
+      "name": "Ocoee #3 (Lower)",
+      "position": 3,
+      "color": "#22c55e",
+      "observation_count": 168,
+      "...": "..."
+    }
+  }
+}
+```
+
+**Use Case:** The Ocoee Cascade Correlation page uses this endpoint to:
+- Show overlapping time-series charts of all 3 dams
+- Visualize release delays as water flows downstream
+- Compare discharge, pool elevation, and tailwater across all dams
+
+**Cascade Correlation Page:** https://docker-blue-sound-1751.fly.dev/details/ocoee-cascade.html
 
 ---
 

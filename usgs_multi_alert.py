@@ -91,6 +91,13 @@ try:
 except ImportError:
     TVA_HISTORY_AVAILABLE = False
 
+# Import Ocoee cascade correlation page generator
+try:
+    from ocoee_correlation import generate_ocoee_cascade_html
+    OCOEE_CORRELATION_AVAILABLE = True
+except ImportError:
+    OCOEE_CORRELATION_AVAILABLE = False
+
 # Weather station mapping for each river site
 # PWS = Weather Underground Personal Weather Stations (primary, more local)
 # NWS = National Weather Service official stations (fallback)
@@ -1406,6 +1413,8 @@ def main():
             sparkline_threshold = th_ft  # StreamBeam uses ft threshold
             river_url = None  # Use default USGS-style URL
             tailwater_trend = None  # Only TVA sites have tailwater data
+            pool_elevation_ft = None  # Only TVA sites have pool elevation
+            tailwater_ft = None  # Only TVA sites have tailwater elevation
 
         elif source == "tva":
             # TVA dam source - uses TVA REST API
@@ -1437,6 +1446,10 @@ def main():
                 discharge = tva_data["discharge_cfs"]
                 stage = tva_data.get("pool_elevation_ft")  # Pool elevation (not gauge height)
                 ts_iso = tva_data["timestamp"].isoformat() if tva_data["timestamp"] else None
+
+                # Capture pool and tailwater for cascade correlation page
+                pool_elevation_ft = tva_data.get("pool_elevation_ft")
+                tailwater_ft = tva_data.get("tailwater_ft")
 
                 # Get trend from TVA data
                 trend_label = get_tva_trend(tva_site_code, hours=4)
@@ -1537,6 +1550,8 @@ def main():
 
             river_url = None  # Use default USGS URL
             tailwater_trend = None  # Only TVA sites have tailwater data
+            pool_elevation_ft = None  # Only TVA sites have pool elevation
+            tailwater_ft = None  # Only TVA sites have tailwater elevation
 
         # Common processing for all sources
         in_range = is_in(stage, discharge, th_ft, th_cfs)
@@ -1671,7 +1686,9 @@ def main():
             "obs_secondary": obs_secondary,
             "river_url": river_url,
             "waterdata_url": f"https://waterdata.usgs.gov/monitoring-location/{site}/#parameterCode=00065&period=P7D",
-            "tailwater_trend": tailwater_trend
+            "tailwater_trend": tailwater_trend,
+            "pool_elevation_ft": pool_elevation_ft,
+            "tailwater_ft": tailwater_ft
         })
 
         # Alerts
@@ -1913,6 +1930,35 @@ def main():
                 except Exception as e:
                     if not args.quiet:
                         print(f"[WARN] Failed to generate detail page for {site_id}: {e}")
+
+            # Generate Ocoee cascade correlation page
+            if OCOEE_CORRELATION_AVAILABLE:
+                try:
+                    # Gather current data for all 3 Ocoee sites
+                    ocoee_current = {}
+                    for row in feed_rows:
+                        site = row.get("site")
+                        if site in ["OCCT1", "OCBT1", "OCAT1"]:
+                            ocoee_current[site] = {
+                                "discharge_cfs": row.get("cfs"),
+                                "pool_elevation_ft": row.get("pool_elevation_ft"),
+                                "tailwater_ft": row.get("tailwater_ft")
+                            }
+
+                    # Only generate if we have data for all 3 Ocoee sites
+                    if len(ocoee_current) == 3:
+                        cascade_html = generate_ocoee_cascade_html(ocoee_current)
+                        cascade_path = os.path.join(details_dir, "ocoee-cascade.html")
+                        with open(cascade_path, "w", encoding="utf-8") as f:
+                            f.write(cascade_html)
+                        if not args.quiet:
+                            print(f"[CASCADE] wrote {cascade_path}")
+                    elif not args.quiet:
+                        print(f"[CASCADE] Skipped - only found {len(ocoee_current)}/3 Ocoee sites")
+
+                except Exception as e:
+                    if not args.quiet:
+                        print(f"[WARN] Failed to generate Ocoee cascade page: {e}")
 
     # close DB
     if state_db and 'conn' in locals() and conn:

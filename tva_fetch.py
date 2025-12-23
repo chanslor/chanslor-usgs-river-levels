@@ -1553,6 +1553,22 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
     </style>
     '''
 
+    # Add link to Ocoee cascade correlation page for Ocoee sites
+    if site_code in ["OCCT1", "OCBT1", "OCAT1"]:
+        cascade_link = '''
+    <div class="cascade-link-section" style="text-align: center; margin: 24px 0; padding: 20px; background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+      <a href="ocoee-cascade.html" style="display: inline-flex; align-items: center; gap: 12px; color: white; font-size: 18px; font-weight: 600; text-decoration: none; padding: 16px 32px; background: rgba(255,255,255,0.1); border-radius: 30px; transition: all 0.3s; border: 2px solid rgba(255,255,255,0.2);">
+        <span style="font-size: 24px;">&#128202;</span>
+        <span>View All 3 Ocoee Dams Together</span>
+        <span style="font-size: 20px;">&rarr;</span>
+      </a>
+      <div style="color: rgba(255,255,255,0.8); font-size: 14px; margin-top: 12px;">
+        See the cascade correlation between Upper, Middle, and Lower Ocoee
+      </div>
+    </div>
+        '''
+        html += cascade_link
+
     return html
 
 

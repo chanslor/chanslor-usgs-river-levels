@@ -177,6 +177,8 @@ curl -s "https://www.tva.com/RestApi/observed-data/HADT1.json" \
 
 **Note:** Ocoee rivers were added on 2025-12-21. See [OCOEE_RESEARCH.md](OCOEE_RESEARCH.md) for details.
 
+**NEW (2025-12-23):** Ocoee Cascade Correlation page added - visualizes water flow across all 3 dams. See the [Cascade Page](https://docker-blue-sound-1751.fly.dev/details/ocoee-cascade.html) and combined API endpoint `/api/tva-history/ocoee/combined`.
+
 ### Predicted Data API (3-Day Forecast)
 
 ```

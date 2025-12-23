@@ -468,12 +468,83 @@ def get_tva_stats(site_code):
     })
 
 
+@app.route('/api/tva-history/ocoee/combined', methods=['GET'])
+def get_ocoee_combined_history():
+    """
+    Get combined historical data for all 3 Ocoee dams for cascade correlation charting.
+
+    Query Parameters:
+        days: Number of days of history (default: 7, max: 365)
+
+    Example: /api/tva-history/ocoee/combined?days=30
+
+    Returns combined time series for:
+        - OCCT1 (Ocoee #3 - Upper) - top of mountain
+        - OCBT1 (Ocoee #2 - Middle)
+        - OCAT1 (Ocoee #1 - Lower/Parksville) - bottom
+
+    Water cascades: Upper (#3) -> Middle (#2) -> Lower (#1)
+    """
+    if not tva_history_available:
+        return jsonify({
+            "error": "TVA history not available",
+            "message": "Historical data storage is not configured"
+        }), 503
+
+    days = request.args.get('days', 7, type=int)
+    days = min(max(days, 1), 365)
+
+    # Ocoee sites configuration
+    ocoee_sites = {
+        "OCCT1": {"name": "Ocoee #3 (Upper)", "position": 1, "color": "#ef4444"},
+        "OCBT1": {"name": "Ocoee #2 (Middle)", "position": 2, "color": "#eab308"},
+        "OCAT1": {"name": "Ocoee #1 (Lower)", "position": 3, "color": "#22c55e"}
+    }
+
+    combined_data = {}
+    overall_earliest = None
+    overall_latest = None
+
+    for site_code, config in ocoee_sites.items():
+        observations = get_observations(site_code, days=days)
+        stats = get_stats(site_code, days=days)
+        date_range = get_date_range(site_code)
+
+        combined_data[site_code] = {
+            "name": config["name"],
+            "position": config["position"],
+            "color": config["color"],
+            "observation_count": len(observations),
+            "observations": observations,
+            "stats": stats,
+            "date_range": date_range
+        }
+
+        # Track overall date range
+        if date_range.get("earliest"):
+            if overall_earliest is None or date_range["earliest"] < overall_earliest:
+                overall_earliest = date_range["earliest"]
+        if date_range.get("latest"):
+            if overall_latest is None or date_range["latest"] > overall_latest:
+                overall_latest = date_range["latest"]
+
+    return jsonify({
+        "days_requested": days,
+        "description": "All 3 Ocoee dams - Water flows: Upper (#3) -> Middle (#2) -> Lower (#1)",
+        "date_range": {
+            "earliest": overall_earliest,
+            "latest": overall_latest
+        },
+        "sites": combined_data
+    })
+
+
 @app.route('/api')
 def api_info():
     """API documentation endpoint"""
     return jsonify({
         "name": "USGS River Levels API",
-        "version": "1.3",
+        "version": "1.4",
         "dashboard": "/",
         "endpoints": {
             "health": "/api/health",
@@ -483,7 +554,8 @@ def api_info():
             "predictions": "/api/predictions",
             "usgs_history": "/api/usgs-history/{site_id}?days=7",
             "tva_history": "/api/tva-history/{site_code}?days=7",
-            "tva_stats": "/api/tva-history/{site_code}/stats?days=30"
+            "tva_stats": "/api/tva-history/{site_code}/stats?days=30",
+            "ocoee_combined": "/api/tva-history/ocoee/combined?days=7"
         },
         "examples": {
             "little_river": "/api/river-levels/02399200",
@@ -494,12 +566,15 @@ def api_info():
             "rush_south_history_30d": "/api/usgs-history/02341460?days=30",
             "hiwassee_history_7d": "/api/tva-history/HADT1?days=7",
             "hiwassee_history_30d": "/api/tva-history/HADT1?days=30",
-            "hiwassee_stats": "/api/tva-history/HADT1/stats?days=90"
+            "hiwassee_stats": "/api/tva-history/HADT1/stats?days=90",
+            "ocoee_combined_7d": "/api/tva-history/ocoee/combined?days=7",
+            "ocoee_combined_30d": "/api/tva-history/ocoee/combined?days=30"
         },
         "new_features": {
             "predictions": "River predictions based on QPF forecast and 90-day historical response patterns",
             "usgs_history": "Historical USGS data with 7d/30d/90d/1yr time range options",
-            "tva_history": "Long-term historical data for TVA dam sites (Hiwassee Dries)"
+            "tva_history": "Long-term historical data for TVA dam sites (Hiwassee Dries)",
+            "ocoee_combined": "Combined Ocoee dam cascade data showing all 3 dams for correlation analysis"
         }
     })
 

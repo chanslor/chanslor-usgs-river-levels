@@ -210,3 +210,61 @@ For supplementary data:
 - Full detail pages with 3-day forecast panels
 - Historical data stored indefinitely in SQLite
 - PWS weather from Benton/Murphy/Cleveland stations
+- **NEW: Cascade Correlation Page** - See all 3 dams together
+
+---
+
+## Ocoee Cascade Correlation Page (NEW - 2025-12-23)
+
+A dedicated visualization page showing the relationship between all 3 Ocoee dams, visualizing how water cascades downstream during heavy rain or scheduled releases.
+
+**Live Page:** [ocoee-cascade.html](https://docker-blue-sound-1751.fly.dev/details/ocoee-cascade.html)
+
+### Water Flow Direction
+```
+OCCT1 (Ocoee #3 - Upper)   [Red]
+    ↓ water flows downstream
+OCBT1 (Ocoee #2 - Middle)  [Yellow]  ← YOUR PUT-IN
+    ↓
+OCAT1 (Ocoee #1 - Lower)   [Green]
+```
+
+### Visualization Views
+
+The cascade page includes **THREE** visualization modes accessible via tab navigation:
+
+| View | Description |
+|------|-------------|
+| **Overlapping Lines** | All 3 dams' data as separate colored lines on one chart - easy to see when one dam spikes and how it affects downstream |
+| **Multi-Panel Synced** | 3 stacked rows (one per dam) with synchronized time axis - cleaner separation, easier to read individual dams |
+| **Full Metrics** | Discharge + Pool elevation + Tailwater on dual axes - complete picture of dam operations |
+
+### Data Displayed
+
+All three metrics available from TVA:
+- **Discharge (CFS)** - Water release rate
+- **Pool Elevation (ft)** - Lake level behind dam
+- **Tailwater (ft)** - Water level below dam (rises when spillway runs)
+
+### API Endpoint
+
+```bash
+# Get combined data for all 3 Ocoee dams
+curl "https://docker-blue-sound-1751.fly.dev/api/tva-history/ocoee/combined?days=7"
+```
+
+Returns combined observations, stats, and date range for all 3 sites in a single request.
+
+### Implementation Files
+
+| File | Description |
+|------|-------------|
+| `ocoee_correlation.py` | Page generator module (~700 lines) |
+| `api_app.py` | Combined endpoint `/api/tva-history/ocoee/combined` |
+| `tva_fetch.py` | Added link to cascade page from individual dam pages |
+| `usgs_multi_alert.py` | Generates cascade page and passes pool/tailwater data |
+
+### Navigation
+
+Each Ocoee detail page (OCCT1, OCBT1, OCAT1) has a link at the bottom:
+> 📊 **View All 3 Ocoee Dams Together** → See the cascade correlation between Upper, Middle, and Lower Ocoee

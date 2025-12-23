@@ -31,6 +31,7 @@ COPY predictions.py     /app/predictions.py
 COPY drought.py         /app/drought.py
 COPY tva_fetch.py       /app/tva_fetch.py
 COPY tva_history.py     /app/tva_history.py
+COPY ocoee_correlation.py /app/ocoee_correlation.py
 COPY streambeam_multi_scrape.py /app/streambeam_multi_scrape.py
 COPY api_app.py         /app/api_app.py
 COPY entrypoint-api.sh  /app/entrypoint-api.sh

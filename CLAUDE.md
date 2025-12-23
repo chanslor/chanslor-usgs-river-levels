@@ -215,7 +215,19 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Database location: `/data/tva_history.sqlite`
    - Data is preserved across deployments and accumulates over time
 
-7. **site_detail.py** — Site detail page generator
+7. **ocoee_correlation.py** — Ocoee Dam Cascade Correlation Page (NEW - 2025-12-23)
+   - Generates correlation page showing all 3 Ocoee dams on overlapping charts
+   - Visualizes water cascade: Upper (#3) → Middle (#2) → Lower (#1)
+   - Three visualization views with tab navigation:
+     - **Overlapping Lines**: All 3 dams on single chart (discharge)
+     - **Multi-Panel Synced**: 3 stacked charts with synchronized time axis
+     - **Full Metrics**: CFS + Pool elevation + Tailwater on dual y-axes
+   - Time range selector: 7d/30d/90d/1yr
+   - Current status cards showing CFS, pool elevation, tailwater for each dam
+   - Links to individual dam detail pages
+   - Output: `/site/details/ocoee-cascade.html`
+
+8. **site_detail.py** — Site detail page generator
    - Creates individual detail pages for each gauge
    - Historical section with 7d/30d/90d/1yr time range selector
    - Dual-axis Chart.js charts (CFS left, gage height right)
@@ -223,7 +235,7 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Fetches data dynamically from `/api/usgs-history/{site_id}`
    - Linked from main dashboard for deep-dive analysis
 
-8. **drought.py** — US Drought Monitor integration
+9. **drought.py** — US Drought Monitor integration
    - Fetches county-level drought status from USDM REST API
    - API endpoint: `https://usdmdataservices.unl.edu/api/CountyStatistics/GetDroughtSeverityStatisticsByArea`
    - Uses FIPS county codes (configured per river in gauges.conf.json)
@@ -240,7 +252,7 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Cache is stored at `/data/drought_cache.sqlite`
    - To force refresh: delete cache file and restart container
 
-9. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
+10. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
    - Runs initial gauge check immediately on startup
    - Launches background loop to refresh data every `RUN_INTERVAL_SEC` (default 60s)
    - Starts Flask API server on port 8080
@@ -251,14 +263,14 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - No API endpoints, dashboard only
    - Use entrypoint-api.sh for production deployments
 
-10. **gauges.conf.json** — Configuration file
+11. **gauges.conf.json** — Configuration file
    - SMTP settings for email alerts (server, port, credentials)
    - Site definitions with USGS site IDs and custom thresholds
    - FIPS county codes for drought monitoring (Alabama rivers only)
    - Alert behavior: `notify.mode` ("rising" or "any"), cooldown periods
    - State persistence path (`state_db`)
 
-11. **test_visual_indicators.py** — Test suite generator
+12. **test_visual_indicators.py** — Test suite generator
    - Generates comprehensive test HTML for all visual indicators
    - Tests all 6 Little River Canyon color zones with 22 test cases
    - Validates temperature alerts (10 cases: 35-85°F)
@@ -266,7 +278,7 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Creates standalone HTML test file with color legend
    - Run with: `python3 test_visual_indicators.py`
 
-12. **predictions.py** — River Predictions Module (NEW - 2025-11-30)
+13. **predictions.py** — River Predictions Module (NEW - 2025-11-30)
    - Calculates likelihood of rivers reaching runnable levels
    - Uses QPF (rainfall forecast) + historical response patterns
    - Based on 90-day analysis of USGS gauge data
@@ -406,6 +418,13 @@ The Flask API provides the following endpoints:
 - **`GET /api/tva-history/{site_code}/stats?days=30`** - Get statistics only
   - Returns: min/max/avg for discharge, pool, tailwater
 
+### Ocoee Cascade Correlation Endpoint (NEW - 2025-12-23)
+- **`GET /api/tva-history/ocoee/combined?days=7`** - Get combined data for all 3 Ocoee dams
+  - Query param `days`: Number of days of history (1-365, default: 7)
+  - Returns combined time series for OCCT1, OCBT1, OCAT1
+  - Each site includes: observations, stats, date_range
+  - Used by the Ocoee cascade correlation page for overlapping charts
+
 ### ESP32 Response Format
 
 Each river data endpoint returns a `display_lines` array optimized for ESP32 OLED displays (5 lines):
@@ -463,8 +482,9 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
   - `observations.py` - NWS weather observations (fallback)
   - `pws_observations.py` - PWS weather observations (primary)
   - `drought.py` - US Drought Monitor integration
-  - `tva_fetch.py` - TVA dam data fetcher (Hiwassee Dries)
+  - `tva_fetch.py` - TVA dam data fetcher (Hiwassee Dries, Ocoee)
   - `tva_history.py` - TVA historical data storage module
+  - `ocoee_correlation.py` - Ocoee cascade correlation page generator
   - `site_detail.py` - Detail page generator
   - `predictions.py` - River predictions module
   - `api_app.py` - Flask REST API server
@@ -479,7 +499,8 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
   - `index.html` - Main dashboard
   - `gauges.json` - JSON data feed
   - `test_visual_indicators.html` - Test suite
-  - `site_*.html` - Individual gauge detail pages
+  - `details/{site_id}.html` - Individual gauge detail pages
+  - `details/ocoee-cascade.html` - Ocoee dam cascade correlation page
 
 ## Configuration Notes
 
@@ -735,6 +756,19 @@ systemctl --user restart usgs-alert.service
 - **Total Sites Monitored**: 12 rivers
 
 **Recent Updates:**
+- **2025-12-23: Added Ocoee Dam Cascade Correlation Feature**
+  - New `ocoee_correlation.py` module for generating cascade visualization page
+  - New `/api/tva-history/ocoee/combined` endpoint for combined Ocoee data
+  - Shows relationship between all 3 Ocoee dams: Upper (#3) → Middle (#2) → Lower (#1)
+  - Three visualization views with tab navigation:
+    - Overlapping Lines: All 3 dams on single chart
+    - Multi-Panel Synced: 3 stacked charts with synchronized time axis
+    - Full Metrics: CFS + Pool elevation + Tailwater on dual y-axes
+  - Time range selector: 7d/30d/90d/1yr
+  - Status cards showing current CFS, pool elevation, tailwater for each dam
+  - Link added to each Ocoee detail page for easy navigation
+  - URL: https://docker-blue-sound-1751.fly.dev/details/ocoee-cascade.html
+
 - **2025-12-23: Added USGS Historical Chart Feature**
   - New `/api/usgs-history/{site_id}?days=N` endpoint for fetching historical USGS data
   - All USGS detail pages now have 7d/30d/90d/1yr time range selector
