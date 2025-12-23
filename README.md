@@ -35,7 +35,7 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 - 🔮 **River Predictions** - AI-powered forecasts of which rivers will run based on QPF + historical patterns
 - 🌡️ **Weather Underground PWS** (Personal Weather Stations) for hyperlocal weather data
 - 🛡️ NWS airport stations as weather fallback
-- 📱 Mobile-responsive dashboard with 7-day historical charts
+- 📱 Mobile-responsive dashboard with historical charts (7d/30d/90d/1yr time range selector)
 - 🎨 **Multi-level color coding for river conditions**
 - 🌡️ **Temperature alerts** (< 45°F with ❄️ snowflake in dark blue, < 55°F in light blue)
 - 💨 **Wind alerts** (> 15 mph highlighted in yellow)

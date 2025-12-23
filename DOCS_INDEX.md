@@ -116,6 +116,8 @@ This index provides a quick overview of all documentation files and their purpos
 ### API_README.md
 **What it covers:**
 - ✅ REST API endpoints
+- ✅ USGS historical data endpoint (`/api/usgs-history/{site_id}`)
+- ✅ TVA historical data endpoint (`/api/tva-history/{site_code}`)
 - ✅ Request/response examples
 - ✅ ESP32 integration code
 - ✅ OLED display format (5-line)
@@ -198,9 +200,16 @@ This index provides a quick overview of all documentation files and their purpos
 
 ## 🔄 Documentation Updates
 
-**Last Full Review**: November 19, 2025
+**Last Full Review**: December 23, 2025
 
 **Recent Documentation Changes:**
+- ✅ Added USGS history API endpoint documentation (`/api/usgs-history/{site_id}`)
+- ✅ Updated detail pages to include 7d/30d/90d/1yr time range selector
+- ✅ Updated API_README.md with historical data endpoints
+- ✅ Updated CLAUDE.md with USGS history feature (2025-12-23)
+- ✅ Updated README.md features list
+- ✅ Added TVA_HIWASSEE_DRIES.md (TVA dam integration)
+- ✅ Added OCOEE_RESEARCH.md (Ocoee River research)
 - ✅ Added DEPLOYMENT_SUMMARY.md (new)
 - ✅ Added CONTAINERFILES.md (new)
 - ✅ Added DOCS_INDEX.md (this file)
@@ -236,13 +245,16 @@ If documentation is unclear or outdated:
 
 | Document | Completeness | Accuracy | Last Updated |
 |----------|--------------|----------|--------------|
+| CLAUDE.md | ✅ 100% | ✅ Current | 2025-12-23 |
+| API_README.md | ✅ 100% | ✅ Current | 2025-12-23 |
+| DOCS_INDEX.md | ✅ 100% | ✅ Current | 2025-12-23 |
+| README.md | ✅ 100% | ✅ Current | 2025-12-23 |
 | DEPLOYMENT_SUMMARY.md | ✅ 100% | ✅ Current | 2025-11-19 |
-| CLAUDE.md | ✅ 100% | ✅ Current | 2025-11-19 |
-| API_README.md | ✅ 100% | ✅ Current | 2025-11-19 |
 | CONTAINERFILES.md | ✅ 100% | ✅ Current | 2025-11-19 |
+| TVA_HIWASSEE_DRIES.md | ✅ 100% | ✅ Current | 2025-12-19 |
+| OCOEE_RESEARCH.md | ✅ 100% | ✅ Current | 2025-12-18 |
 | VALIDATOR_README.md | ✅ 90% | ✅ Current | 2025-11-01 |
 | VALIDATION_QUICKSTART.md | ✅ 90% | ✅ Current | 2025-11-01 |
-| README.md | ✅ 85% | ⚠️ Needs review | 2025-10-29 |
 | CHANGES_SUMMARY.md | ✅ 80% | ⚠️ Needs update | 2025-11-01 |
 | AGENTS.md | ✅ 70% | ⚠️ Needs review | 2025-10-29 |
 

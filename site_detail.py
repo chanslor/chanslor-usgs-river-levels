@@ -429,6 +429,113 @@ body {{
   .chart-value {{ font-size: 24px; }}
   .stat-box .value {{ font-size: 20px; }}
 }}
+
+/* Historical Chart Section */
+.history-section {{
+  background: linear-gradient(135deg, #1a2f4a 0%, #243b55 100%);
+  border-radius: 12px;
+  padding: 24px;
+  margin: 24px 0;
+  color: white;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}}
+.history-header {{
+  text-align: center;
+  margin-bottom: 20px;
+}}
+.history-title {{
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}}
+.history-subtitle {{
+  font-size: 13px;
+  opacity: 0.7;
+}}
+.history-controls {{
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}}
+.range-btn {{
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}}
+.range-btn:hover {{
+  background: rgba(255,255,255,0.2);
+}}
+.range-btn.active {{
+  background: #3b82f6;
+  border-color: #3b82f6;
+  font-weight: bold;
+}}
+.history-stats {{
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}}
+.stat-card {{
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}}
+.stat-card .stat-label {{
+  font-size: 11px;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 4px;
+}}
+.stat-card .stat-value {{
+  font-size: 18px;
+  font-weight: bold;
+  color: #60a5fa;
+}}
+.history-chart-container {{
+  background: rgba(255,255,255,0.95);
+  border-radius: 8px;
+  padding: 16px;
+  height: 300px;
+  margin-bottom: 16px;
+}}
+.history-legend {{
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}}
+.legend-row {{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}}
+.legend-color {{
+  width: 16px;
+  height: 4px;
+  border-radius: 2px;
+}}
+@media (max-width: 600px) {{
+  .history-stats {{
+    grid-template-columns: repeat(2, 1fr);
+  }}
+  .history-controls {{
+    flex-wrap: wrap;
+  }}
+  .history-legend {{
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }}
+}}
 </style>
 </head>
 <body>
@@ -488,7 +595,52 @@ body {{
       <div class="value">{f"{wind_chill_temp:.1f}°F" if wind_chill_temp is not None else "N/A"}</div>
       <div class="range">{wind_chill_desc if wind_chill_desc else "No wind chill" if current_temp is not None and current_wind_mph is not None else "Data unavailable"}</div>
     </div>
-  </div>'''}
+  </div>
+
+  <div class="history-section">
+    <div class="history-header">
+      <div class="history-title">Historical Data</div>
+      <div class="history-subtitle">Select time range to view historical trends</div>
+    </div>
+    <div class="history-controls">
+      <button class="range-btn active" data-days="7">7 Days</button>
+      <button class="range-btn" data-days="30">30 Days</button>
+      <button class="range-btn" data-days="90">90 Days</button>
+      <button class="range-btn" data-days="365">1 Year</button>
+    </div>
+    <div class="history-stats" id="historyStats">
+      <div class="stat-card">
+        <div class="stat-label">Data Points</div>
+        <div class="stat-value" id="statCount">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Max CFS</div>
+        <div class="stat-value" id="statMaxCfs">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg CFS</div>
+        <div class="stat-value" id="statAvgCfs">--</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Max Height</div>
+        <div class="stat-value" id="statMaxFeet">--</div>
+      </div>
+    </div>
+    <div class="history-chart-container">
+      <canvas id="historyChart"></canvas>
+    </div>
+    <div class="history-legend">
+      <div class="legend-row">
+        <span class="legend-color" style="background: #ef4444;"></span>
+        <span>Discharge (CFS) - Left Axis</span>
+      </div>
+      <div class="legend-row">
+        <span class="legend-color" style="background: #3b82f6;"></span>
+        <span>Gage Height (ft) - Right Axis</span>
+      </div>
+    </div>
+  </div>
+'''}
 
 </div>
 
@@ -604,6 +756,184 @@ if (feetLabels.length === 0 || feetValues.length === 0) {{
   }}
   }});
 }}
+
+// History Chart with Time Range Selection
+(function() {{
+  const siteId = '{site_id}';
+  let historyChart = null;
+
+  async function loadHistoryData(days) {{
+    try {{
+      const response = await fetch(`/api/usgs-history/${{siteId}}?days=${{days}}`);
+      const data = await response.json();
+      return data;
+    }} catch (err) {{
+      console.error('Failed to load history:', err);
+      return null;
+    }}
+  }}
+
+  function updateStats(data) {{
+    document.getElementById('statCount').textContent = (data.cfs_count || 0).toLocaleString();
+
+    if (data.stats && data.stats.cfs) {{
+      document.getElementById('statMaxCfs').textContent =
+        data.stats.cfs.max ? Math.round(data.stats.cfs.max).toLocaleString() + ' CFS' : '--';
+      document.getElementById('statAvgCfs').textContent =
+        data.stats.cfs.avg ? Math.round(data.stats.cfs.avg).toLocaleString() + ' CFS' : '--';
+    }}
+
+    if (data.stats && data.stats.feet) {{
+      document.getElementById('statMaxFeet').textContent =
+        data.stats.feet.max ? data.stats.feet.max.toFixed(2) + ' ft' : '--';
+    }}
+  }}
+
+  function renderChart(data) {{
+    const ctx = document.getElementById('historyChart').getContext('2d');
+
+    if (historyChart) {{
+      historyChart.destroy();
+    }}
+
+    if (!data.cfs || data.cfs.length === 0) {{
+      ctx.canvas.parentElement.innerHTML =
+        '<div style="padding:40px;text-align:center;color:#666;">' +
+        '<p style="font-size:18px;">No historical data available</p></div>';
+      return;
+    }}
+
+    const labels = data.cfs.map(o => {{
+      const d = new Date(o.timestamp);
+      return d.toLocaleDateString('en-US', {{ month: 'short', day: 'numeric', hour: 'numeric' }});
+    }});
+
+    const cfsData = data.cfs.map(o => o.value);
+    const feetData = data.feet ? data.feet.map(o => o.value) : [];
+
+    const datasets = [
+      {{
+        label: 'Discharge (CFS)',
+        data: cfsData,
+        borderColor: '#ef4444',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3,
+        yAxisID: 'y',
+        pointRadius: 1,
+        pointHoverRadius: 4
+      }}
+    ];
+
+    if (feetData.length > 0) {{
+      datasets.push({{
+        label: 'Gage Height (ft)',
+        data: feetData,
+        borderColor: '#3b82f6',
+        borderWidth: 2,
+        fill: false,
+        tension: 0.3,
+        yAxisID: 'y1',
+        pointRadius: 0,
+        pointHoverRadius: 3
+      }});
+    }}
+
+    historyChart = new Chart(ctx, {{
+      type: 'line',
+      data: {{
+        labels: labels,
+        datasets: datasets
+      }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {{
+          mode: 'index',
+          intersect: false
+        }},
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            titleFont: {{ size: 14 }},
+            bodyFont: {{ size: 13 }},
+            padding: 12,
+            callbacks: {{
+              label: function(context) {{
+                let label = context.dataset.label || '';
+                if (context.parsed.y !== null) {{
+                  if (label.includes('CFS')) {{
+                    label += ': ' + context.parsed.y.toLocaleString() + ' CFS';
+                  }} else {{
+                    label += ': ' + context.parsed.y.toFixed(2) + ' ft';
+                  }}
+                }}
+                return label;
+              }}
+            }}
+          }}
+        }},
+        scales: {{
+          x: {{
+            ticks: {{
+              maxRotation: 45,
+              minRotation: 45,
+              autoSkip: true,
+              maxTicksLimit: 12
+            }},
+            grid: {{ display: false }}
+          }},
+          y: {{
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {{
+              display: true,
+              text: 'Discharge (CFS)',
+              color: '#ef4444'
+            }},
+            ticks: {{ color: '#ef4444' }},
+            grid: {{ color: 'rgba(239, 68, 68, 0.1)' }}
+          }},
+          y1: {{
+            type: 'linear',
+            display: feetData.length > 0,
+            position: 'right',
+            title: {{
+              display: true,
+              text: 'Gage Height (ft)',
+              color: '#3b82f6'
+            }},
+            ticks: {{ color: '#3b82f6' }},
+            grid: {{ drawOnChartArea: false }}
+          }}
+        }}
+      }}
+    }});
+  }}
+
+  async function updateChart(days) {{
+    const data = await loadHistoryData(days);
+    if (data) {{
+      updateStats(data);
+      renderChart(data);
+    }}
+  }}
+
+  // Set up button click handlers
+  document.querySelectorAll('.range-btn').forEach(btn => {{
+    btn.addEventListener('click', function() {{
+      document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      updateChart(parseInt(this.dataset.days));
+    }});
+  }});
+
+  // Initial load
+  updateChart(7);
+}})();
 </script>'''}
 
 </body>

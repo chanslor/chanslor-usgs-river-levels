@@ -217,8 +217,10 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
 
 7. **site_detail.py** — Site detail page generator
    - Creates individual detail pages for each gauge
-   - Generates 7-day historical charts using Chart.js
-   - Provides detailed historical data and trend analysis
+   - Historical section with 7d/30d/90d/1yr time range selector
+   - Dual-axis Chart.js charts (CFS left, gage height right)
+   - Stats cards showing data points, max/avg CFS, max height
+   - Fetches data dynamically from `/api/usgs-history/{site_id}`
    - Linked from main dashboard for deep-dive analysis
 
 8. **drought.py** — US Drought Monitor integration
@@ -377,7 +379,7 @@ The Flask API provides the following endpoints:
 
 ### Web Interface
 - **`GET /`** - Main HTML dashboard with sparkles, color-coded rivers, charts
-- **`GET /details/{site_id}.html`** - Individual river detail page with 7-day history
+- **`GET /details/{site_id}.html`** - Individual river detail page with 7d/30d/90d/1yr historical charts
 - **`GET /gauges.json`** - Raw JSON data feed
 
 ### API Documentation
@@ -389,6 +391,13 @@ The Flask API provides the following endpoints:
 - **`GET /api/river-levels/{site_id}`** - Single river by USGS site ID (e.g., 02399200)
 - **`GET /api/river-levels/name/{name}`** - Single river by name search (case-insensitive)
 - **`GET /api/predictions`** - River predictions based on QPF and historical patterns
+
+### USGS Historical Data Endpoints (NEW - 2025-12-23)
+- **`GET /api/usgs-history/{site_id}?days=7`** - Get historical USGS data for charting
+  - Query param `days`: Number of days of history (1-365, default: 7)
+  - Returns: CFS and gage height time series, stats (min/max/avg)
+  - Data is downsampled to ~200 points for smooth charting
+  - Powers the 7d/30d/90d/1yr time range selector on detail pages
 
 ### TVA Historical Data Endpoints (NEW - 2025-12-19)
 - **`GET /api/tva-history/{site_code}?days=7`** - Get historical TVA observations
@@ -716,7 +725,7 @@ systemctl --user restart usgs-alert.service
 
 ## Git Repository State
 
-**Current Production Status**: Working as of 12-19-2025
+**Current Production Status**: Working as of 12-23-2025
 
 **Production Deployment:**
 - URL: https://docker-blue-sound-1751.fly.dev/
@@ -726,6 +735,14 @@ systemctl --user restart usgs-alert.service
 - **Total Sites Monitored**: 12 rivers
 
 **Recent Updates:**
+- **2025-12-23: Added USGS Historical Chart Feature**
+  - New `/api/usgs-history/{site_id}?days=N` endpoint for fetching historical USGS data
+  - All USGS detail pages now have 7d/30d/90d/1yr time range selector
+  - Interactive Chart.js visualization with dual-axis (CFS left, feet right)
+  - Stats cards showing data points, max CFS, avg CFS, max height
+  - Data is fetched directly from USGS IV service and downsampled for smooth charting
+  - Matches the TVA historical chart feature added on 2025-12-19
+
 - **2025-12-19: Added TVA Historical Chart Feature**
   - New `tva_history.py` module for indefinite storage of TVA dam observations
   - SQLite database stores discharge, pool elevation, tailwater for all time

@@ -94,23 +94,32 @@ curl https://docker-blue-sound-1751.fly.dev/api
 ```json
 {
   "name": "USGS River Levels API",
-  "version": "1.1",
+  "version": "1.3",
   "dashboard": "/",
   "endpoints": {
     "health": "/api/health",
     "all_rivers": "/api/river-levels",
     "by_site_id": "/api/river-levels/{site_id}",
     "by_name": "/api/river-levels/name/{name}",
-    "predictions": "/api/predictions"
+    "predictions": "/api/predictions",
+    "usgs_history": "/api/usgs-history/{site_id}?days=7",
+    "tva_history": "/api/tva-history/{site_code}?days=7",
+    "tva_stats": "/api/tva-history/{site_code}/stats?days=30"
   },
   "examples": {
     "little_river": "/api/river-levels/02399200",
     "little_river_by_name": "/api/river-levels/name/little",
     "locust_fork": "/api/river-levels/02455000",
-    "predictions": "/api/predictions"
+    "predictions": "/api/predictions",
+    "rush_south_history_7d": "/api/usgs-history/02341460?days=7",
+    "rush_south_history_30d": "/api/usgs-history/02341460?days=30",
+    "hiwassee_history_7d": "/api/tva-history/HADT1?days=7",
+    "hiwassee_history_30d": "/api/tva-history/HADT1?days=30"
   },
   "new_features": {
-    "predictions": "River predictions based on QPF forecast and 90-day historical response patterns"
+    "predictions": "River predictions based on QPF forecast and 90-day historical response patterns",
+    "usgs_history": "Historical USGS data with 7d/30d/90d/1yr time range options",
+    "tva_history": "Long-term historical data for TVA dam sites"
   }
 }
 ```
@@ -357,6 +366,122 @@ Predictions are calculated using:
 - 40-69% if QPF ≥ 75% of rain_needed
 - 15-39% if QPF ≥ 50% of rain_needed
 - <15% if QPF < 50% of rain_needed
+
+---
+
+### Get USGS Historical Data
+```bash
+GET /api/usgs-history/{site_id}?days={days}
+```
+
+Returns historical USGS data for charting with selectable time ranges. Used by detail pages for the 7d/30d/90d/1yr time range selector.
+
+**Parameters:**
+| Parameter | Description | Default | Max |
+|-----------|-------------|---------|-----|
+| `site_id` | USGS site ID (e.g., 02341460) | required | - |
+| `days` | Number of days of history | 7 | 365 |
+
+**Example:**
+```bash
+curl https://docker-blue-sound-1751.fly.dev/api/usgs-history/02341460?days=30
+```
+
+**Response:**
+```json
+{
+  "site_id": "02341460",
+  "days_requested": 30,
+  "cfs_count": 2000,
+  "feet_count": 2000,
+  "stats": {
+    "cfs": {
+      "min": 4430.0,
+      "max": 12500.0,
+      "avg": 6234.5
+    },
+    "feet": {
+      "min": 19.05,
+      "max": 21.45,
+      "avg": 19.87
+    }
+  },
+  "cfs": [
+    {"timestamp": "2025-11-23T07:45:00.000-05:00", "value": 4430.0},
+    {"timestamp": "2025-11-23T08:15:00.000-05:00", "value": 4640.0}
+  ],
+  "feet": [
+    {"timestamp": "2025-11-23T07:45:00.000-05:00", "value": 19.05},
+    {"timestamp": "2025-11-23T08:15:00.000-05:00", "value": 19.12}
+  ]
+}
+```
+
+**Notes:**
+- Data is fetched directly from USGS Instantaneous Values service
+- Large datasets are automatically downsampled to ~200 points for smooth charting
+- Both CFS (discharge) and gage height (feet) are returned when available
+- Stats include min, max, and average values for the requested period
+
+---
+
+### Get TVA Historical Data
+```bash
+GET /api/tva-history/{site_code}?days={days}
+```
+
+Returns historical TVA dam data for charting. Data accumulates over time in a local SQLite database.
+
+**Parameters:**
+| Parameter | Description | Default | Max |
+|-----------|-------------|---------|-----|
+| `site_code` | TVA site code (HADT1, OCAT1, OCBT1, OCCT1) | required | - |
+| `days` | Number of days of history | 7 | 365 |
+
+**Example:**
+```bash
+curl https://docker-blue-sound-1751.fly.dev/api/tva-history/HADT1?days=30
+```
+
+**Response:**
+```json
+{
+  "site_code": "HADT1",
+  "days_requested": 30,
+  "observation_count": 720,
+  "date_range": {
+    "earliest": "2025-12-19T10:00:00",
+    "latest": "2025-12-23T12:00:00"
+  },
+  "stats": {
+    "discharge_cfs": {"min": 0, "max": 3500, "avg": 1200},
+    "pool_elevation_ft": {"min": 1277.5, "max": 1278.2, "avg": 1277.8},
+    "tailwater_ft": {"min": 1248.1, "max": 1249.5, "avg": 1248.6}
+  },
+  "observations": [
+    {
+      "timestamp": "2025-12-19T10:00:00",
+      "discharge_cfs": 1500,
+      "pool_elevation_ft": 1277.81,
+      "tailwater_ft": 1248.34
+    }
+  ]
+}
+```
+
+---
+
+### Get TVA Statistics
+```bash
+GET /api/tva-history/{site_code}/stats?days={days}
+```
+
+Returns statistics only for TVA dam data (no observation array).
+
+**Example:**
+```bash
+curl https://docker-blue-sound-1751.fly.dev/api/tva-history/HADT1/stats?days=90
+```
 
 ---
 

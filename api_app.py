@@ -280,6 +280,112 @@ def get_predictions():
     })
 
 
+@app.route('/api/usgs-history/<site_id>', methods=['GET'])
+def get_usgs_history(site_id):
+    """
+    Get historical USGS data for charting.
+
+    Query Parameters:
+        days: Number of days of history (default: 7, max: 365)
+
+    Example: /api/usgs-history/02341460?days=30
+
+    Returns time series data for:
+        - cfs (discharge)
+        - feet (gage height)
+    """
+    import urllib.request
+    import urllib.parse
+    from datetime import timezone, timedelta
+
+    days = request.args.get('days', 7, type=int)
+    days = min(max(days, 1), 365)  # Clamp between 1 and 365
+
+    end_date = datetime.now(timezone.utc)
+    start_date = end_date - timedelta(days=days)
+
+    # Build USGS API request
+    params = {
+        "sites": site_id,
+        "parameterCd": "00060,00065",  # CFS and gage height
+        "startDT": start_date.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "endDT": end_date.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        "siteStatus": "all",
+        "format": "json"
+    }
+
+    url = f"https://waterservices.usgs.gov/nwis/iv/?{urllib.parse.urlencode(params)}"
+
+    try:
+        with urllib.request.urlopen(url, timeout=60) as response:
+            data = json.loads(response.read())
+
+        time_series = data.get("value", {}).get("timeSeries", [])
+
+        # Parse CFS and feet data
+        cfs_data = []
+        feet_data = []
+
+        for ts in time_series:
+            var_code = ts.get("variable", {}).get("variableCode", [{}])[0].get("value", "")
+            values = ts.get("values", [{}])[0].get("value", [])
+
+            for item in values:
+                dt_str = item.get("dateTime")
+                val_str = item.get("value")
+
+                if dt_str and val_str:
+                    try:
+                        val = float(val_str)
+                        if var_code == "00060":  # CFS
+                            cfs_data.append({"timestamp": dt_str, "value": val})
+                        elif var_code == "00065":  # Feet
+                            feet_data.append({"timestamp": dt_str, "value": val})
+                    except (ValueError, TypeError):
+                        continue
+
+        # Calculate stats
+        cfs_values = [d["value"] for d in cfs_data]
+        feet_values = [d["value"] for d in feet_data]
+
+        stats = {}
+        if cfs_values:
+            stats["cfs"] = {
+                "min": min(cfs_values),
+                "max": max(cfs_values),
+                "avg": sum(cfs_values) / len(cfs_values)
+            }
+        if feet_values:
+            stats["feet"] = {
+                "min": min(feet_values),
+                "max": max(feet_values),
+                "avg": sum(feet_values) / len(feet_values)
+            }
+
+        # Downsample for large date ranges
+        def downsample(data_list, target_points=200):
+            if len(data_list) <= target_points:
+                return data_list
+            step = len(data_list) // target_points
+            return [data_list[i] for i in range(0, len(data_list), step)][:target_points]
+
+        return jsonify({
+            "site_id": site_id,
+            "days_requested": days,
+            "cfs_count": len(cfs_data),
+            "feet_count": len(feet_data),
+            "stats": stats,
+            "cfs": downsample(cfs_data),
+            "feet": downsample(feet_data)
+        })
+
+    except Exception as e:
+        return jsonify({
+            "error": "Failed to fetch USGS data",
+            "message": str(e)
+        }), 503
+
+
 @app.route('/api/tva-history/<site_code>', methods=['GET'])
 def get_tva_history(site_code):
     """
@@ -367,7 +473,7 @@ def api_info():
     """API documentation endpoint"""
     return jsonify({
         "name": "USGS River Levels API",
-        "version": "1.2",
+        "version": "1.3",
         "dashboard": "/",
         "endpoints": {
             "health": "/api/health",
@@ -375,6 +481,7 @@ def api_info():
             "by_site_id": "/api/river-levels/{site_id}",
             "by_name": "/api/river-levels/name/{name}",
             "predictions": "/api/predictions",
+            "usgs_history": "/api/usgs-history/{site_id}?days=7",
             "tva_history": "/api/tva-history/{site_code}?days=7",
             "tva_stats": "/api/tva-history/{site_code}/stats?days=30"
         },
@@ -383,12 +490,15 @@ def api_info():
             "little_river_by_name": "/api/river-levels/name/little",
             "locust_fork": "/api/river-levels/02455000",
             "predictions": "/api/predictions",
+            "rush_south_history_7d": "/api/usgs-history/02341460?days=7",
+            "rush_south_history_30d": "/api/usgs-history/02341460?days=30",
             "hiwassee_history_7d": "/api/tva-history/HADT1?days=7",
             "hiwassee_history_30d": "/api/tva-history/HADT1?days=30",
             "hiwassee_stats": "/api/tva-history/HADT1/stats?days=90"
         },
         "new_features": {
             "predictions": "River predictions based on QPF forecast and 90-day historical response patterns",
+            "usgs_history": "Historical USGS data with 7d/30d/90d/1yr time range options",
             "tva_history": "Long-term historical data for TVA dam sites (Hiwassee Dries)"
         }
     })
