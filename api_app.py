@@ -135,7 +135,7 @@ def format_for_display(site_data):
             f"{flow_status} {trend_arrow} {trend}",
             f"QPF Today: {qpf_today:.2f}\"",
             f"Tom:{qpf_tomorrow:.2f}\" Day3:{qpf_day3:.2f}\"",
-            f"Max:{temp_f:.0f}F Wind:{wind_mph:.1f} {wind_dir}" if temp_f else "Weather: N/A"
+            f"Max:{temp_f:.0f}F Wind:{wind_mph:.1f} {wind_dir}" if (temp_f is not None and wind_mph is not None and wind_dir) else "Weather: N/A"
         ]
     }
 
