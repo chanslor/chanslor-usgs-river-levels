@@ -130,6 +130,12 @@ def get_location_links(site_id, tva_site_code):
                 '<a href="https://www.google.com/maps/place/RushSouth+Whitewater+Park/@32.4697,-84.9935,16z" '
                 'target="_blank" class="location-link">📍 Map</a>')
 
+    if site_id == "1":  # Short Creek (StreamBeam)
+        return (' <a href="https://maps.app.goo.gl/S7sgCqGY2Hg43J5H9" '
+                'target="_blank" class="location-link">📍 Put in</a> '
+                '<a href="https://maps.app.goo.gl/D2QKT4HobnhpRnnVA" '
+                'target="_blank" class="location-link">🏁 Take out</a>')
+
     return ""
 
 
