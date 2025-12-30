@@ -20,19 +20,29 @@ USGS Multi-Site River Gauge Alert System — Monitors USGS river gauges and send
 - **API Info**: https://docker-blue-sound-1751.fly.dev/api (API documentation)
 - **ESP32 API**: https://docker-blue-sound-1751.fly.dev/api/river-levels/{site_id}
 
-## Short Creek StreamBeam Calibration Status (2025-11-26)
+## Short Creek StreamBeam Calibration Status (2025-12-30)
 
-**Current Status**: Calibrated with offset `22.39`
+**Current Status**: Using raw StreamBeam readings (offset `0.0`)
 
 ### Configuration:
-- **Offset Setting**: `streambeam_zero_offset: 22.39`
-- **Floor Setting**: `streambeam_floor_at_zero: false` (allows negative values for debugging)
+- **Offset Setting**: `streambeam_zero_offset: 0.0` (StreamBeam now returns calibrated values)
+- **Floor Setting**: `streambeam_floor_at_zero: false` (allows negative values)
+- **Validation Range**: `[-5.0, 15.0]` ft
 - **StreamBeam Site ID**: 1
 - **Gauge Location**: Short Creek near Hustleville Road
 
 ### Reference Links:
 - StreamBeam Gauge: https://www.streambeam.net/Home/Gauge?siteID=1
 - Production API: https://docker-blue-sound-1751.fly.dev/api/river-levels/name/short
+
+### History (2025-12-30)
+StreamBeam's datum changed, causing the previous offset of `22.39` to produce invalid readings (`-22.86 ft`). Reset offset to `0.0` since StreamBeam now returns pre-calibrated values near actual creek level.
+
+### StreamBeam History Storage (NEW - 2025-12-30)
+StreamBeam readings are now stored in `streambeam_history` table in `/data/state.sqlite` for sparkline/trend data:
+- Each unique reading (by timestamp) is stored
+- `_get_streambeam_trend_data()` fetches recent readings for sparklines
+- Sparklines populate over time as StreamBeam provides new readings (~15 min intervals)
 
 ### To Recalibrate (if needed):
 1. **Go on-site** with staff gauge or known reference point
@@ -756,6 +766,14 @@ systemctl --user restart usgs-alert.service
 - **Total Sites Monitored**: 12 rivers
 
 **Recent Updates:**
+- **2025-12-30: Fixed Short Creek StreamBeam Integration & Added History Storage**
+  - Fixed offset issue: Changed `streambeam_zero_offset` from `22.39` to `0.0`
+  - StreamBeam's datum changed, causing readings to fail validation (-22.86 ft outside [-5.0, 15.0])
+  - Added `streambeam_history` table in `/data/state.sqlite` for sparkline support
+  - New functions: `_init_streambeam_history_table()`, `_save_streambeam_history()`, `_get_streambeam_trend_data()`
+  - StreamBeam readings now stored with each fetch for trend data visualization
+  - Sparklines populate over time as StreamBeam provides new readings (~15 min intervals)
+
 - **2025-12-23: Added Ocoee Dam Cascade Correlation Feature**
   - New `ocoee_correlation.py` module for generating cascade visualization page
   - New `/api/tva-history/ocoee/combined` endpoint for combined Ocoee data

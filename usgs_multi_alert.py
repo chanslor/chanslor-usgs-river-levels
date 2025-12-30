@@ -15,7 +15,7 @@ if '/app' not in sys.path:
     sys.path.insert(0, '/app')
 
 import argparse, json, time, smtplib, ssl, sqlite3, re
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
@@ -447,6 +447,84 @@ def _save_streambeam_last_good(site_name: str, value_ft: float):
             conn.commit()
     except Exception:
         pass  # Don't fail the whole fetch if DB write fails
+
+def _init_streambeam_history_table(db_path: str):
+    """Create the streambeam_history table for trend data/sparklines."""
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS streambeam_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    site_name TEXT NOT NULL,
+                    stage_ft REAL NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(site_name, timestamp)
+                )
+            """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_streambeam_history_site_time
+                ON streambeam_history(site_name, timestamp DESC)
+            """)
+            conn.commit()
+    except Exception:
+        pass
+
+def _save_streambeam_history(site_name: str, stage_ft: float, timestamp: str):
+    """Save a StreamBeam reading to history for trend data."""
+    global _streambeam_db_path
+    if _streambeam_db_path is None:
+        return
+    try:
+        with sqlite3.connect(_streambeam_db_path) as conn:
+            conn.execute("""
+                INSERT OR IGNORE INTO streambeam_history (site_name, stage_ft, timestamp, created_at)
+                VALUES (?, ?, ?, ?)
+            """, (site_name, stage_ft, timestamp, datetime.now().isoformat()))
+            conn.commit()
+    except Exception:
+        pass
+
+def _get_streambeam_trend_data(site_name: str, hours: int = 12):
+    """
+    Fetch recent StreamBeam readings for trend data/sparklines.
+    Returns dict with 'values' list and 'direction' string, or None.
+    """
+    global _streambeam_db_path
+    if _streambeam_db_path is None:
+        return None
+    try:
+        with sqlite3.connect(_streambeam_db_path) as conn:
+            # Get readings from the last N hours, limit to ~12 points for sparkline
+            cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
+            rows = conn.execute("""
+                SELECT stage_ft, timestamp FROM streambeam_history
+                WHERE site_name = ? AND timestamp >= ?
+                ORDER BY timestamp ASC
+            """, (site_name, cutoff)).fetchall()
+
+            if len(rows) < 2:
+                return None
+
+            values = [row[0] for row in rows]
+
+            # Determine direction from first vs last value
+            if len(values) >= 2:
+                first_avg = sum(values[:3]) / min(3, len(values))
+                last_avg = sum(values[-3:]) / min(3, len(values))
+                diff = last_avg - first_avg
+                if diff > 0.05:
+                    direction = "rising"
+                elif diff < -0.05:
+                    direction = "falling"
+                else:
+                    direction = "steady"
+            else:
+                direction = "steady"
+
+            return {"values": values, "direction": direction}
+    except Exception:
+        return None
 
 def convert_streambeam_timestamp_to_iso(timestamp_str: str) -> str:
     """
@@ -1336,6 +1414,7 @@ def main():
             migrate_json_to_db(state_file_legacy, conn)
         # Initialize StreamBeam last-good tracking in same database
         _init_streambeam_table(state_db)
+        _init_streambeam_history_table(state_db)
         _load_streambeam_last_good(state_db)
 
     def get_site_state(site):
@@ -1389,6 +1468,9 @@ def main():
             try:
                 data = fetch_streambeam_latest(entry)
                 stage = data["stage_ft"]; ts_iso = data["ts_iso"]; discharge = data["discharge_cfs"]
+                # Save to history for trend data / sparklines
+                if ts_iso:
+                    _save_streambeam_history(name, stage, ts_iso)
             except (RuntimeError, ValueError) as e:
                 streambeam_error = str(e)
                 if not args.quiet:
@@ -1407,9 +1489,14 @@ def main():
                         print(f"[WARN] No last known good value for {name}, skipping")
                     continue
 
-            # StreamBeam doesn't provide historical data, so no trend data
-            trend_label = "⚠ stale" if streambeam_error else None
-            trend_data = None
+            # Fetch trend data from local history (stored on each fetch)
+            trend_data = _get_streambeam_trend_data(name, hours=12) if (args.dump_json or args.dump_html) else None
+            if streambeam_error:
+                trend_label = "⚠ stale"
+            elif trend_data and trend_data.get("direction"):
+                trend_label = trend_data["direction"]
+            else:
+                trend_label = None
             sparkline_threshold = th_ft  # StreamBeam uses ft threshold
             river_url = None  # Use default USGS-style URL
             tailwater_trend = None  # Only TVA sites have tailwater data

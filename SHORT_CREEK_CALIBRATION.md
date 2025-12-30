@@ -2,8 +2,8 @@
 
 ## Quick Reference
 
-**Current Status**: UNCALIBRATED - Showing raw StreamBeam readings
-**Last Updated**: 2025-11-25 11:00 AM CST
+**Current Status**: WORKING - Using raw StreamBeam readings (offset 0.0)
+**Last Updated**: 2025-12-30
 **StreamBeam Site**: https://www.streambeam.net/Home/Gauge?siteID=1
 
 ---
@@ -17,11 +17,16 @@
   "streambeam_site_id": "1",
   "streambeam_zero_offset": 0.0,
   "streambeam_floor_at_zero": false,
+  "streambeam_min_valid_ft": -5.0,
+  "streambeam_max_valid_ft": 15.0,
+  "streambeam_max_change_ft": 5.0,
   "name": "Short Creek",
   "min_ft": 0.5,
+  "good_ft": 1.0,
   "min_cfs": null,
   "lat": 34.3580,
-  "lon": -86.2950
+  "lon": -86.2950,
+  "fips": "01095"
 }
 ```
 
@@ -32,13 +37,43 @@
   "streambeam_site_id": "1",
   "streambeam_zero_offset": 0.0,
   "streambeam_floor_at_zero": false,
+  "streambeam_min_valid_ft": -5.0,
+  "streambeam_max_valid_ft": 15.0,
+  "streambeam_max_change_ft": 5.0,
   "name": "Short Creek",
   "min_ft": 0.5,
+  "good_ft": 1.0,
   "min_cfs": null,
   "lat": 34.3580,
-  "lon": -86.2950
+  "lon": -86.2950,
+  "fips": "01095"
 }
 ```
+
+---
+
+## What Happened on 2025-12-30
+
+### Issue
+Short Creek was completely missing from the dashboard/API. Logs showed:
+```
+[ERROR] StreamBeam reading -22.86 ft is outside valid range [-5.0, 15.0] - rejecting as bad data
+[WARN] No last known good value for Short Creek, skipping
+```
+
+### Root Cause
+The `streambeam_zero_offset` was set to `22.39`, but StreamBeam's datum had changed. Raw readings were near `0` (e.g., `-0.47 ft`), and subtracting `22.39` produced `-22.86 ft` which failed validation.
+
+### Fix Applied
+1. Changed `streambeam_zero_offset` from `22.39` to `0.0` in both config files
+2. Added StreamBeam history storage for sparkline/trend data support
+
+### New Feature: StreamBeam History Storage
+StreamBeam readings are now stored in SQLite for sparkline visualization:
+- Table: `streambeam_history` in `/data/state.sqlite`
+- Each unique reading (by timestamp) is stored
+- `_get_streambeam_trend_data()` fetches recent readings for sparklines
+- Sparklines populate over time as StreamBeam provides new readings (~15 min intervals)
 
 ---
 

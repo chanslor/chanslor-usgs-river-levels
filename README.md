@@ -907,6 +907,9 @@ This keeps your workspace organized and makes the project portable across differ
 
 ## Screenshots
 
+### Short Creek StreamBeam Fix (12-30-2025)
+Fixed Short Creek StreamBeam integration after datum change. Now using offset `0.0` (StreamBeam returns pre-calibrated values). Added history storage for sparkline support - sparklines populate over time as StreamBeam provides new readings.
+
 ### Dashboard with River Predictions (11-30-2025)
 ![River Predictions Dashboard](./new-predictive.png)
 
