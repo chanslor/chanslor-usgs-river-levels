@@ -81,10 +81,10 @@
     {
       "source": "streambeam",
       "streambeam_site_id": "1",
-      "streambeam_zero_offset": 0.0,
+      "streambeam_zero_offset": 22.39,
       "streambeam_floor_at_zero": false,
       "streambeam_min_valid_ft": -5.0,
-      "streambeam_max_valid_ft": 15.0,
+      "streambeam_max_valid_ft": 30.0,
       "streambeam_max_change_ft": 5.0,
       "name": "Short Creek",
       "min_ft": 0.5,

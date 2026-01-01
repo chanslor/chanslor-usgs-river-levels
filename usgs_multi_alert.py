@@ -98,6 +98,13 @@ try:
 except ImportError:
     OCOEE_CORRELATION_AVAILABLE = False
 
+# Import air quality module (Open-Meteo)
+try:
+    from air_quality import AirQualityClient
+    AQI_AVAILABLE = True
+except ImportError:
+    AQI_AVAILABLE = False
+
 # Weather station mapping for each river site
 # PWS = Weather Underground Personal Weather Stations (primary, more local)
 # NWS = National Weather Service official stations (fallback)
@@ -451,7 +458,8 @@ def _save_streambeam_last_good(site_name: str, value_ft: float):
 def _init_streambeam_history_table(db_path: str):
     """Create the streambeam_history table for trend data/sparklines."""
     try:
-        with sqlite3.connect(db_path) as conn:
+        with sqlite3.connect(db_path, timeout=30) as conn:
+            conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS streambeam_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -467,62 +475,65 @@ def _init_streambeam_history_table(db_path: str):
                 ON streambeam_history(site_name, timestamp DESC)
             """)
             conn.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[HISTORY] Error creating table: {e}")
+
+_streambeam_conn = None  # Shared connection for StreamBeam history
 
 def _save_streambeam_history(site_name: str, stage_ft: float, timestamp: str):
     """Save a StreamBeam reading to history for trend data."""
-    global _streambeam_db_path
-    if _streambeam_db_path is None:
+    global _streambeam_conn
+    if _streambeam_conn is None:
+        print(f"[HISTORY] No connection available, cannot save {site_name}")
         return
     try:
-        with sqlite3.connect(_streambeam_db_path) as conn:
-            conn.execute("""
-                INSERT OR IGNORE INTO streambeam_history (site_name, stage_ft, timestamp, created_at)
-                VALUES (?, ?, ?, ?)
-            """, (site_name, stage_ft, timestamp, datetime.now().isoformat()))
-            conn.commit()
-    except Exception:
-        pass
+        cursor = _streambeam_conn.execute("""
+            INSERT OR IGNORE INTO streambeam_history (site_name, stage_ft, timestamp, created_at)
+            VALUES (?, ?, ?, ?)
+        """, (site_name, stage_ft, timestamp, datetime.now().isoformat()))
+        _streambeam_conn.commit()
+        if cursor.rowcount > 0:
+            print(f"[HISTORY] Saved {site_name}: {stage_ft} ft @ {timestamp}")
+    except Exception as e:
+        print(f"[HISTORY] Error saving {site_name}: {e}")
 
 def _get_streambeam_trend_data(site_name: str, hours: int = 12):
     """
     Fetch recent StreamBeam readings for trend data/sparklines.
     Returns dict with 'values' list and 'direction' string, or None.
     """
-    global _streambeam_db_path
-    if _streambeam_db_path is None:
+    global _streambeam_conn
+    if _streambeam_conn is None:
         return None
     try:
-        with sqlite3.connect(_streambeam_db_path) as conn:
-            # Get readings from the last N hours, limit to ~12 points for sparkline
-            cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
-            rows = conn.execute("""
-                SELECT stage_ft, timestamp FROM streambeam_history
-                WHERE site_name = ? AND timestamp >= ?
-                ORDER BY timestamp ASC
-            """, (site_name, cutoff)).fetchall()
+        # Get readings from the last N hours, limit to ~12 points for sparkline
+        cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
+        rows = _streambeam_conn.execute("""
+            SELECT stage_ft, timestamp FROM streambeam_history
+            WHERE site_name = ? AND timestamp >= ?
+            ORDER BY timestamp ASC
+        """, (site_name, cutoff)).fetchall()
 
-            if len(rows) < 2:
-                return None
+        if len(rows) < 2:
+            return None
 
-            values = [row[0] for row in rows]
+        values = [row[0] for row in rows]
 
-            # Determine direction from first vs last value
-            if len(values) >= 2:
-                first_avg = sum(values[:3]) / min(3, len(values))
-                last_avg = sum(values[-3:]) / min(3, len(values))
-                diff = last_avg - first_avg
-                if diff > 0.05:
-                    direction = "rising"
-                elif diff < -0.05:
-                    direction = "falling"
-                else:
-                    direction = "steady"
+        # Determine direction from first vs last value
+        if len(values) >= 2:
+            first_avg = sum(values[:3]) / min(3, len(values))
+            last_avg = sum(values[-3:]) / min(3, len(values))
+            diff = last_avg - first_avg
+            if diff > 0.05:
+                direction = "rising"
+            elif diff < -0.05:
+                direction = "falling"
             else:
                 direction = "steady"
+        else:
+            direction = "steady"
 
-            return {"values": values, "direction": direction}
+        return {"values": values, "direction": direction}
     except Exception:
         return None
 
@@ -1044,6 +1055,16 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
             color = drought.get("color", "#888")
             drought_line = f'<div class="sub drought-info">{emoji} <span class="drought-level" style="color:{color}">{name_d} {desc}</span></div>'
 
+        # Format AQI status if available
+        aqi_line = ""
+        aqi = r.get("aqi")
+        if aqi:
+            aqi_val = aqi.get("aqi", 0)
+            aqi_cat = aqi.get("category", "")
+            aqi_color = aqi.get("color", "#888")
+            pm25 = aqi.get("pm2_5", 0)
+            aqi_line = f'<div class="sub aqi-info">🌬️ AQI: <span class="aqi-level" style="color:{aqi_color}">{aqi_val} {aqi_cat}</span> · PM2.5: {pm25:.1f}</div>'
+
         # Build USGS site URL
         site_id = r.get('site', '')
 
@@ -1072,6 +1093,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
             {obs_line}
             {obs_secondary_line}
             {drought_line}
+            {aqi_line}
           </td>
           <td class="sparkline-cell">{sparkline_html}</td>
           <td class="center">{pct_html}</td>
@@ -1160,6 +1182,8 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   .wind-chill {{ color:#87ceeb; font-weight:600; }}
   .drought-info {{ font-size:12px; }}
   .drought-level {{ font-family: 'Fira Code', monospace; font-weight:500; }}
+  .aqi-info {{ font-size:12px; }}
+  .aqi-level {{ font-family: 'Fira Code', monospace; font-weight:500; }}
   .trend-rising {{ color:#4ade80; font-weight:600; }}
   .trend-falling {{ color:#f87171; font-weight:600; }}
   .tailwater-rising {{ color:#38bdf8; font-weight:600; }}  /* Bright blue - water over dam! */
@@ -1306,6 +1330,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   <div class="foot" style="margin-top:8px;"><a href="http://flowpage.alabamawhitewater.com/" target="_blank" rel="noopener">Alabama Flow Page</a></div>
   <div class="foot" style="margin-top:8px;"><a href="https://syotr.org/" target="_blank" rel="noopener">See You On The River</a></div>
   <div class="foot" style="margin-top:8px;"><a href="https://rainpursuit.org/map/?supporter=true" target="_blank" rel="noopener">Rain Pursuit</a></div>
+  <div class="foot" style="margin-top:8px;"><a href="https://paddle-watch.fly.dev/" target="_blank" rel="noopener">Paddle Watch</a></div>
   <div class="foot" style="margin-top:16px; padding-top:8px; border-top:1px solid #ddd;"><a href="test_visual_indicators.html" target="_blank">🧪 Visual Indicators Test Suite</a></div>
 </div>
 </body></html>"""
@@ -1392,6 +1417,17 @@ def main():
             if not args.quiet:
                 print(f"[WARN] Drought client initialization failed: {e}")
 
+    # Initialize air quality client (Open-Meteo)
+    aqi_client = None
+    if AQI_AVAILABLE:
+        aqi_cache = os.environ.get("AQI_CACHE", "/data/aqi_cache.sqlite")
+        aqi_ttl_hours = int(os.environ.get("AQI_TTL_HOURS", "1"))
+        try:
+            aqi_client = AirQualityClient(cache_path=aqi_cache, ttl_hours=aqi_ttl_hours)
+        except Exception as e:
+            if not args.quiet:
+                print(f"[WARN] AQI client initialization failed: {e}")
+
     # Initialize TVA history database for long-term storage
     if TVA_HISTORY_AVAILABLE:
         tva_history_db = os.environ.get("TVA_HISTORY_DB", "/data/tva_history.sqlite")
@@ -1416,6 +1452,9 @@ def main():
         _init_streambeam_table(state_db)
         _init_streambeam_history_table(state_db)
         _load_streambeam_last_good(state_db)
+        # Share the main connection for StreamBeam history writes
+        global _streambeam_conn
+        _streambeam_conn = conn
 
     def get_site_state(site):
         if conn:
@@ -1675,6 +1714,21 @@ def main():
                 if not args.quiet:
                     print(f"[WARN] Drought fetch failed for {name} (FIPS {fips_code}): {e}")
 
+        # Fetch air quality data if lat/lon configured
+        aqi_data = None
+        site_lat = entry.get("lat")
+        site_lon = entry.get("lon")
+        if aqi_client and site_lat and site_lon:
+            try:
+                aqi_result = aqi_client.get_current_aqi(site_lat, site_lon)
+                if aqi_result:
+                    aqi_data = aqi_result.to_dict()
+                    if not args.quiet:
+                        print(f"[AQI] {name}: {aqi_result.aqi} ({aqi_result.category})")
+            except Exception as e:
+                if not args.quiet:
+                    print(f"[WARN] AQI fetch failed for {name}: {e}")
+
         # Fetch weather observations (temp, wind) if available
         # Try PWS (Personal Weather Stations) first, then fall back to NWS (official airport stations)
         obs_data = None
@@ -1769,6 +1823,7 @@ def main():
             "sparkline_threshold": sparkline_threshold,
             "qpf": qpf_data,
             "drought": drought_data,
+            "aqi": aqi_data,
             "obs": obs_data,
             "obs_secondary": obs_secondary,
             "river_url": river_url,

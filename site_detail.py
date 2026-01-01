@@ -211,6 +211,9 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
     site_id = site_data.get("site", "")
     current_cfs = site_data.get("cfs")
     current_ft = site_data.get("stage_ft")
+
+    # StreamBeam sites only have feet data, no CFS
+    is_streambeam = site_data.get("is_streambeam", False) or site_id == "1"
     current_temp = site_data.get("temp_f")
     current_wind_mph = site_data.get("wind_mph")
     current_wind_dir = site_data.get("wind_dir", "")
@@ -560,7 +563,7 @@ body {{
 
   {tva_forecast_html}
 
-  {"" if is_tva else f'''<div class="chart-row">
+  {"" if is_tva or is_streambeam else f'''<div class="chart-row">
     <div class="chart-box">
       <h2>Discharge (CFS)</h2>
       <div class="chart-value">{f"{int(current_cfs):,}" if current_cfs is not None else "N/A"} <span style="font-size:18px; font-weight:normal;">CFS</span></div>
@@ -569,18 +572,18 @@ body {{
         <canvas id="cfsChart"></canvas>
       </div>
     </div>
-  </div>
+  </div>'''}
 
-  <div class="chart-row">
+  {"" if is_tva else f'''<div class="chart-row">
     <div class="chart-box">
-      <h2>Gage Height (Feet)</h2>
+      <h2>{"Water Level" if is_streambeam else "Gage Height"} (Feet)</h2>
       <div class="chart-value">{current_ft:.2f} <span style="font-size:18px; font-weight:normal;">ft</span></div>
       <div class="chart-meta">7-day average: {avg_ft:.2f} ft · Range: {min_ft:.2f} - {max_ft:.2f}</div>
       <div class="chart-canvas">
         <canvas id="feetChart"></canvas>
       </div>
     </div>
-  </div>
+  </div>'''}
 
   <div class="stats-grid">
     <div class="stat-box">
@@ -603,7 +606,7 @@ body {{
     </div>
   </div>
 
-  <div class="history-section">
+  {"" if is_streambeam else '''<div class="history-section">
     <div class="history-header">
       <div class="history-title">Historical Data</div>
       <div class="history-subtitle">Select time range to view historical trends</div>
@@ -657,8 +660,10 @@ console.log('CFS Values:', {json.dumps(cfs_values)});
 console.log('Feet Labels:', {json.dumps(feet_labels)});
 console.log('Feet Values:', {json.dumps(feet_values)});
 
-// CFS Chart
-const cfsCtx = document.getElementById('cfsChart').getContext('2d');
+// CFS Chart (skip if element doesn't exist - e.g., StreamBeam sites)
+const cfsChartEl = document.getElementById('cfsChart');
+if (cfsChartEl) {{
+const cfsCtx = cfsChartEl.getContext('2d');
 const cfsLabels = {json.dumps(cfs_labels)};
 const cfsValues = {json.dumps(cfs_values)};
 
@@ -709,6 +714,7 @@ if (cfsLabels.length === 0 || cfsValues.length === 0) {{
   }}
   }});
 }}
+}} // End cfsChartEl check
 
 // Feet Chart
 const feetCtx = document.getElementById('feetChart').getContext('2d');
@@ -763,8 +769,13 @@ if (feetLabels.length === 0 || feetValues.length === 0) {{
   }});
 }}
 
-// History Chart with Time Range Selection
+// History Chart with Time Range Selection (skip if element doesn't exist - e.g., StreamBeam sites)
 (function() {{
+  const historyChartEl = document.getElementById('historyChart');
+  if (!historyChartEl) {{
+    console.log('History chart element not found - skipping history chart initialization');
+    return;
+  }}
   const siteId = '{site_id}';
   let historyChart = null;
 

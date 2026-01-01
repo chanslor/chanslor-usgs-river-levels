@@ -20,40 +20,19 @@ USGS Multi-Site River Gauge Alert System — Monitors USGS river gauges and send
 - **API Info**: https://docker-blue-sound-1751.fly.dev/api (API documentation)
 - **ESP32 API**: https://docker-blue-sound-1751.fly.dev/api/river-levels/{site_id}
 
-## Short Creek StreamBeam Calibration Status (2025-12-30)
+## Short Creek StreamBeam Gauge
 
-**Current Status**: Using raw StreamBeam readings (offset `0.0`)
+See **[SHORT_CREEK_STREAMBEAM.md](SHORT_CREEK_STREAMBEAM.md)** for complete documentation including:
+- Current offset configuration (22.39)
+- Recalibration procedure
+- Troubleshooting guide
+- History of datum changes
 
-### Configuration:
-- **Offset Setting**: `streambeam_zero_offset: 0.0` (StreamBeam now returns calibrated values)
-- **Floor Setting**: `streambeam_floor_at_zero: false` (allows negative values)
-- **Validation Range**: `[-5.0, 15.0]` ft
-- **StreamBeam Site ID**: 1
-- **Gauge Location**: Short Creek near Hustleville Road
-
-### Reference Links:
-- StreamBeam Gauge: https://www.streambeam.net/Home/Gauge?siteID=1
-- Production API: https://docker-blue-sound-1751.fly.dev/api/river-levels/name/short
-
-### History (2025-12-30)
-StreamBeam's datum changed, causing the previous offset of `22.39` to produce invalid readings (`-22.86 ft`). Reset offset to `0.0` since StreamBeam now returns pre-calibrated values near actual creek level.
-
-### StreamBeam History Storage (NEW - 2025-12-30)
-StreamBeam readings are now stored in `streambeam_history` table in `/data/state.sqlite` for sparkline/trend data:
-- Each unique reading (by timestamp) is stored
-- `_get_streambeam_trend_data()` fetches recent readings for sparklines
-- Sparklines populate over time as StreamBeam provides new readings (~15 min intervals)
-
-### To Recalibrate (if needed):
-1. **Go on-site** with staff gauge or known reference point
-2. **Record both values**:
-   - What StreamBeam website shows: X.XX ft
-   - What actual staff gauge/reference shows: Y.YY ft
-3. **Calculate offset**: `streambeam_zero_offset = X.XX - Y.YY`
-4. **Update both config files**:
-   - `gauges.conf.json` (local dev)
-   - `gauges.conf.cloud.json` (production)
-5. **Deploy**: `fly deploy -a docker-blue-sound-1751 --local-only`
+**Quick Reference:**
+- StreamBeam Site ID: 1
+- Current Offset: `22.39` (raw - offset = actual level)
+- Validation Range: `[-5.0, 30.0]` ft
+- Dashboard: https://www.streambeam.net/Home/Gauge?siteID=1
 
 ## Container Build & Run
 
@@ -835,8 +814,9 @@ systemctl --user restart usgs-alert.service
 - `API_README.md` - REST API documentation and ESP32 examples
 - `CONTAINERFILES.md` - Complete guide to all Containerfiles
 - `README.md` - General project information
-- `VALIDATOR_README.md` - Dashboard validation tool documentation
+- `SHORT_CREEK_STREAMBEAM.md` - Short Creek gauge calibration and troubleshooting
 - `TVA_HIWASSEE_DRIES.md` - TVA API discovery and Hiwassee Dries integration details
+- `VALIDATOR_README.md` - Dashboard validation tool documentation
 
 **Backup Files:**
 Backup files exist in backups/ directory. Several experimental/patched versions present:

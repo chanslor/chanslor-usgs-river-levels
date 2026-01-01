@@ -29,6 +29,7 @@ COPY pws_observations.py /app/pws_observations.py
 COPY site_detail.py     /app/site_detail.py
 COPY predictions.py     /app/predictions.py
 COPY drought.py         /app/drought.py
+COPY air_quality.py     /app/air_quality.py
 COPY tva_fetch.py       /app/tva_fetch.py
 COPY tva_history.py     /app/tva_history.py
 COPY ocoee_correlation.py /app/ocoee_correlation.py
