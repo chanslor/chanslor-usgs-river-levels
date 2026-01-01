@@ -241,7 +241,37 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - Cache is stored at `/data/drought_cache.sqlite`
    - To force refresh: delete cache file and restart container
 
-10. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
+10. **air_quality.py** — Air Quality Index integration (Open-Meteo)
+   - Fetches current air quality from Open-Meteo Air Quality API
+   - API endpoint: `https://air-quality-api.open-meteo.com/v1/air-quality`
+   - No authentication required (free for non-commercial use)
+   - SQLite caching with configurable TTL (default 1 hour)
+   - Uses lat/lon coordinates from gauges.conf.json
+   - Environment variables: `AQI_CACHE`, `AQI_TTL_HOURS`
+   - Cache is stored at `/data/aqi_cache.sqlite`
+   - **US AQI Scale (0-500):**
+     | AQI Range | Category | Color | Hex |
+     |-----------|----------|-------|-----|
+     | 0-50 | Good | Green | `#00e400` |
+     | 51-100 | Moderate | Yellow | `#ffff00` |
+     | 101-150 | Unhealthy for Sensitive Groups | Orange | `#ff7e00` |
+     | 151-200 | Unhealthy | Red | `#ff0000` |
+     | 201-300 | Very Unhealthy | Purple | `#8f3f97` |
+     | 301-500 | Hazardous | Maroon | `#7e0023` |
+   - **PM2.5 Levels (μg/m³):**
+     | PM2.5 Range | Health Concern |
+     |-------------|----------------|
+     | 0-12.0 | Good |
+     | 12.1-35.4 | Moderate |
+     | 35.5-55.4 | Unhealthy for Sensitive Groups |
+     | 55.5-150.4 | Unhealthy |
+     | 150.5-250.4 | Very Unhealthy |
+     | 250.5+ | Hazardous |
+   - Reference links:
+     - AQI: https://www.airnow.gov/aqi/aqi-basics/
+     - PM2.5: https://www.epa.gov/pm-pollution/particulate-matter-pm-basics
+
+11. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
    - Runs initial gauge check immediately on startup
    - Launches background loop to refresh data every `RUN_INTERVAL_SEC` (default 60s)
    - Starts Flask API server on port 8080
@@ -471,6 +501,7 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
   - `observations.py` - NWS weather observations (fallback)
   - `pws_observations.py` - PWS weather observations (primary)
   - `drought.py` - US Drought Monitor integration
+  - `air_quality.py` - Air Quality Index integration (Open-Meteo)
   - `tva_fetch.py` - TVA dam data fetcher (Hiwassee Dries, Ocoee)
   - `tva_history.py` - TVA historical data storage module
   - `ocoee_correlation.py` - Ocoee cascade correlation page generator
@@ -745,6 +776,13 @@ systemctl --user restart usgs-alert.service
 - **Total Sites Monitored**: 12 rivers
 
 **Recent Updates:**
+- **2025-12-31: Added Air Quality Index (AQI) Integration**
+  - New `air_quality.py` module fetches data from Open-Meteo Air Quality API
+  - Displays US AQI value, category, and PM2.5 concentration for each river
+  - Color-coded by EPA standard (Green=Good through Maroon=Hazardous)
+  - SQLite caching with 1-hour TTL
+  - AQI and PM2.5 labels are clickable links to EPA explanation pages
+
 - **2025-12-30: Fixed Short Creek StreamBeam Integration & Added History Storage**
   - Fixed offset issue: Changed `streambeam_zero_offset` from `22.39` to `0.0`
   - StreamBeam's datum changed, causing readings to fail validation (-22.86 ft outside [-5.0, 15.0])

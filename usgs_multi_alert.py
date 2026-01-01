@@ -1063,7 +1063,7 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
             aqi_cat = aqi.get("category", "")
             aqi_color = aqi.get("color", "#888")
             pm25 = aqi.get("pm2_5", 0)
-            aqi_line = f'<div class="sub aqi-info">🌬️ AQI: <span class="aqi-level" style="color:{aqi_color}">{aqi_val} {aqi_cat}</span> · PM2.5: {pm25:.1f}</div>'
+            aqi_line = f'<div class="sub aqi-info">🌬️ <a href="https://www.airnow.gov/aqi/aqi-basics/" target="_blank" rel="noopener" style="color:inherit">AQI</a>: <span class="aqi-level" style="color:{aqi_color}">{aqi_val} {aqi_cat}</span> · <a href="https://www.epa.gov/pm-pollution/particulate-matter-pm-basics" target="_blank" rel="noopener" style="color:inherit">PM2.5</a>: {pm25:.1f}</div>'
 
         # Build USGS site URL
         site_id = r.get('site', '')
