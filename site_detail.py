@@ -333,6 +333,33 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
     else:
         avg_rain = max_rain = total_rain = 0
 
+    # Extract QPF (forecast) data for chart
+    qpf_data = site_data.get("qpf", {}) or {}
+    qpf_labels = []
+    qpf_values = []
+    if qpf_data:
+        # QPF data comes as {date_str: inches, ...} sorted by date
+        today = datetime.now().date()
+        sorted_dates = sorted(qpf_data.keys())
+        for date_str in sorted_dates:
+            try:
+                dt = datetime.strptime(date_str, "%Y-%m-%d").date()
+                # Label: Today, Tomorrow, or day name
+                days_diff = (dt - today).days
+                if days_diff == 0:
+                    label = "Today (QPF)"
+                elif days_diff == 1:
+                    label = "Tomorrow (QPF)"
+                else:
+                    label = dt.strftime("%a (QPF)")
+                qpf_labels.append(label)
+                qpf_values.append(qpf_data[date_str] or 0)
+            except Exception:
+                continue
+
+    # Calculate total QPF forecast
+    total_qpf = sum(qpf_values) if qpf_values else 0
+
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -694,11 +721,21 @@ body {{
 
   {"" if is_tva else f'''<div class="chart-row">
     <div class="chart-box" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);">
-      <h2 style="color: #0369a1;">🌧️ Rainfall (Inches)</h2>
-      <div class="chart-value" style="color: #0284c7;">{total_rain:.2f} <span style="font-size:18px; font-weight:normal;">in total</span></div>
-      <div class="chart-meta">7-day average: {avg_rain:.2f} in/day · Max: {max_rain:.2f} in</div>
+      <h2 style="color: #0369a1;">🌧️ Rainfall & Forecast (Inches)</h2>
+      <div class="chart-value" style="color: #0284c7;">{total_rain:.2f} <span style="font-size:18px; font-weight:normal;">in (7-day)</span>{f' + <span style="color:#f59e0b;">{total_qpf:.2f}</span> <span style="font-size:18px; font-weight:normal;">in forecast</span>' if total_qpf > 0 else ''}</div>
+      <div class="chart-meta">7-day avg: {avg_rain:.2f} in/day · Max: {max_rain:.2f} in{f' · <span style="color:#f59e0b;">QPF: {total_qpf:.2f} in</span>' if total_qpf > 0 else ''}</div>
       <div class="chart-canvas">
         <canvas id="rainChart"></canvas>
+      </div>
+      <div style="display: flex; justify-content: center; gap: 24px; margin-top: 12px; font-size: 13px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="display: inline-block; width: 16px; height: 12px; background: rgba(14, 165, 233, 0.7); border-radius: 2px;"></span>
+          <span style="color: #0369a1;">Historical Rain</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="display: inline-block; width: 16px; height: 12px; background: rgba(245, 158, 11, 0.7); border-radius: 2px;"></span>
+          <span style="color: #d97706;">QPF Forecast</span>
+        </div>
       </div>
     </div>
   </div>'''}
@@ -935,28 +972,45 @@ if (feetLabels.length === 0 || feetValues.length === 0) {{
   }});
 }}
 
-// Rainfall Chart (bar chart for daily totals)
+// Rainfall Chart (bar chart for daily totals + QPF forecast)
 const rainChartEl = document.getElementById('rainChart');
 if (rainChartEl) {{
   const rainCtx = rainChartEl.getContext('2d');
   const rainLabels = {json.dumps(rain_labels)};
   const rainValues = {json.dumps(rain_values)};
+  const qpfLabels = {json.dumps(qpf_labels)};
+  const qpfValues = {json.dumps(qpf_values)};
 
-  if (rainLabels.length === 0 || rainValues.length === 0) {{
+  // Combine historical + QPF labels and create datasets
+  const allLabels = [...rainLabels, ...qpfLabels];
+  const historicalData = [...rainValues, ...Array(qpfLabels.length).fill(null)];
+  const forecastData = [...Array(rainLabels.length).fill(null), ...qpfValues];
+
+  if (allLabels.length === 0) {{
     rainCtx.canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">No rainfall data available for this site</div>';
   }} else {{
     new Chart(rainCtx, {{
       type: 'bar',
       data: {{
-        labels: rainLabels,
-        datasets: [{{
-          label: 'Rainfall (in)',
-          data: rainValues,
-          backgroundColor: 'rgba(14, 165, 233, 0.7)',
-          borderColor: 'rgba(3, 105, 161, 1)',
-          borderWidth: 1,
-          borderRadius: 4,
-        }}]
+        labels: allLabels,
+        datasets: [
+          {{
+            label: 'Historical Rain',
+            data: historicalData,
+            backgroundColor: 'rgba(14, 165, 233, 0.7)',
+            borderColor: 'rgba(3, 105, 161, 1)',
+            borderWidth: 1,
+            borderRadius: 4,
+          }},
+          {{
+            label: 'QPF Forecast',
+            data: forecastData,
+            backgroundColor: 'rgba(245, 158, 11, 0.7)',
+            borderColor: 'rgba(217, 119, 6, 1)',
+            borderWidth: 1,
+            borderRadius: 4,
+          }}
+        ]
       }},
       options: {{
         responsive: true,
@@ -966,7 +1020,9 @@ if (rainChartEl) {{
           tooltip: {{
             callbacks: {{
               label: function(context) {{
-                return context.parsed.y.toFixed(2) + ' inches';
+                if (context.parsed.y === null) return null;
+                const type = context.dataset.label;
+                return type + ': ' + context.parsed.y.toFixed(2) + ' inches';
               }}
             }}
           }}

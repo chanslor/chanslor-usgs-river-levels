@@ -2104,6 +2104,9 @@ def main():
                         "precip_today_in": active_obs.get("precip_today_in") if active_obs else None,
                     }
 
+                    # Add QPF (rainfall forecast) data
+                    site_data["qpf"] = row.get("qpf")
+
                     # Add rainfall history stats if available
                     if RAINFALL_HISTORY_AVAILABLE and rainfall_history_db:
                         river_name = row.get("name")
