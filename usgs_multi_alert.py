@@ -2116,12 +2116,18 @@ def main():
                                         site_data["precip_today_in"] = r.get("precip_in")
                                         site_data["pws_station"] = r.get("station_id")
                                         break
+                                # Get 48-hour (2-day) rainfall stats
+                                rain_stats_48h = get_rainfall_stats(river_name, days=2, db_path=rainfall_history_db)
+                                site_data["rainfall_48h"] = rain_stats_48h
                                 # Get 7-day rainfall stats
                                 rain_stats = get_rainfall_stats(river_name, days=7, db_path=rainfall_history_db)
                                 site_data["rainfall_7d"] = rain_stats
                                 # Get 30-day stats too
                                 rain_stats_30d = get_rainfall_stats(river_name, days=30, db_path=rainfall_history_db)
                                 site_data["rainfall_30d"] = rain_stats_30d
+                                # Get daily rainfall for chart (7 days)
+                                rain_daily = get_daily_rainfall(river_name, days=7, db_path=rainfall_history_db)
+                                site_data["rainfall_daily"] = rain_daily
                             except Exception as rain_err:
                                 if not args.quiet:
                                     print(f"[DETAIL] Rainfall fetch failed for {river_name}: {rain_err}")

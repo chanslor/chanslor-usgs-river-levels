@@ -300,10 +300,12 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
     precip_today = site_data.get("precip_today_in")
     pws_station = site_data.get("pws_station")
     pws_label = site_data.get("pws_label")
+    rainfall_48h = site_data.get("rainfall_48h", {})
     rainfall_7d = site_data.get("rainfall_7d", {})
     rainfall_30d = site_data.get("rainfall_30d", {})
 
     # Extract rainfall stats
+    rain_48h_total = rainfall_48h.get("total_precip_in", 0)
     rain_7d_total = rainfall_7d.get("total_precip_in", 0)
     rain_7d_rainy_days = rainfall_7d.get("rainy_days", 0)
     rain_30d_total = rainfall_30d.get("total_precip_in", 0)
@@ -710,6 +712,11 @@ body {{
         <div class="card-icon">☔</div>
         <div class="card-label">Today's Rain</div>
         <div class="card-value">{f'{precip_today:.2f}"' if precip_today is not None else "N/A"}</div>
+      </div>
+      <div class="weather-card{' rain-highlight' if rain_48h_total > 0.5 else ''}">
+        <div class="card-icon">⏱️</div>
+        <div class="card-label">48-Hour Rain</div>
+        <div class="card-value">{f'{rain_48h_total:.2f}"' if rain_48h_total else "N/A"}</div>
       </div>
       <div class="weather-card{' rain-highlight' if rain_7d_total > 0.5 else ''}">
         <div class="card-icon">📊</div>
