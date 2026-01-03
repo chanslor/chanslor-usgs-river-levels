@@ -26,6 +26,19 @@ except ImportError:
     tva_history_available = False
     print("Note: TVA history module not available. Historical charts will be disabled.")
 
+# Rainfall History database (for precipitation tracking)
+try:
+    from rainfall_history import (
+        get_daily_rainfall,
+        get_rainfall_stats,
+        get_weekly_summary,
+        get_all_rivers_today
+    )
+    rainfall_history_available = True
+except ImportError:
+    rainfall_history_available = False
+    print("Note: Rainfall history module not available. Precipitation tracking will be disabled.")
+
 app = Flask(__name__)
 
 if cors_available:
@@ -128,6 +141,9 @@ def format_for_display(site_data):
         },
         "timestamp": site_data.get('ts_iso'),
         "in_range": site_data.get('in_range', False),
+        "aqi": site_data.get('aqi'),
+        "drought": site_data.get('drought'),
+        "trend_data": site_data.get('trend_data'),
 
         # Formatted strings for ESP32 display (5 lines)
         "display_lines": [
@@ -539,12 +555,100 @@ def get_ocoee_combined_history():
     })
 
 
+@app.route('/api/rainfall', methods=['GET'])
+def get_rainfall_today():
+    """
+    Get today's rainfall totals for all rivers.
+
+    Returns current precipitation amounts recorded from PWS stations.
+    """
+    if not rainfall_history_available:
+        return jsonify({
+            "error": "Rainfall history not available",
+            "message": "Precipitation tracking is not configured"
+        }), 503
+
+    try:
+        today_data = get_all_rivers_today()
+        return jsonify({
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "rivers": today_data,
+            "count": len(today_data)
+        })
+    except Exception as e:
+        return jsonify({
+            "error": "Failed to get rainfall data",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/rainfall/<river_name>', methods=['GET'])
+def get_river_rainfall(river_name):
+    """
+    Get rainfall history for a specific river.
+
+    Query Parameters:
+        days: Number of days of history (default: 30, max: 365)
+
+    Example: /api/rainfall/Little%20River?days=30
+    """
+    if not rainfall_history_available:
+        return jsonify({
+            "error": "Rainfall history not available",
+            "message": "Precipitation tracking is not configured"
+        }), 503
+
+    days = request.args.get('days', 30, type=int)
+    days = min(max(days, 1), 365)
+
+    try:
+        # Get daily rainfall data
+        daily_data = get_daily_rainfall(river_name, days=days)
+
+        # Get stats
+        stats = get_rainfall_stats(river_name, days=days)
+
+        return jsonify({
+            "river_name": river_name,
+            "days_requested": days,
+            "stats": stats,
+            "daily": daily_data
+        })
+    except Exception as e:
+        return jsonify({
+            "error": "Failed to get rainfall data",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/rainfall/<river_name>/weekly', methods=['GET'])
+def get_river_rainfall_weekly(river_name):
+    """
+    Get weekly rainfall summary for a river.
+
+    Example: /api/rainfall/Little%20River/weekly
+    """
+    if not rainfall_history_available:
+        return jsonify({
+            "error": "Rainfall history not available"
+        }), 503
+
+    try:
+        weekly = get_weekly_summary(river_name)
+        return jsonify(weekly)
+    except Exception as e:
+        return jsonify({
+            "error": "Failed to get weekly summary",
+            "message": str(e)
+        }), 500
+
+
 @app.route('/api')
 def api_info():
     """API documentation endpoint"""
     return jsonify({
         "name": "USGS River Levels API",
-        "version": "1.4",
+        "version": "1.5",
         "dashboard": "/",
         "endpoints": {
             "health": "/api/health",
@@ -555,7 +659,10 @@ def api_info():
             "usgs_history": "/api/usgs-history/{site_id}?days=7",
             "tva_history": "/api/tva-history/{site_code}?days=7",
             "tva_stats": "/api/tva-history/{site_code}/stats?days=30",
-            "ocoee_combined": "/api/tva-history/ocoee/combined?days=7"
+            "ocoee_combined": "/api/tva-history/ocoee/combined?days=7",
+            "rainfall_today": "/api/rainfall",
+            "rainfall_history": "/api/rainfall/{river_name}?days=30",
+            "rainfall_weekly": "/api/rainfall/{river_name}/weekly"
         },
         "examples": {
             "little_river": "/api/river-levels/02399200",
@@ -568,13 +675,17 @@ def api_info():
             "hiwassee_history_30d": "/api/tva-history/HADT1?days=30",
             "hiwassee_stats": "/api/tva-history/HADT1/stats?days=90",
             "ocoee_combined_7d": "/api/tva-history/ocoee/combined?days=7",
-            "ocoee_combined_30d": "/api/tva-history/ocoee/combined?days=30"
+            "ocoee_combined_30d": "/api/tva-history/ocoee/combined?days=30",
+            "rainfall_today": "/api/rainfall",
+            "rainfall_little_river": "/api/rainfall/Little%20River?days=30",
+            "rainfall_weekly": "/api/rainfall/Little%20River/weekly"
         },
         "new_features": {
             "predictions": "River predictions based on QPF forecast and 90-day historical response patterns",
             "usgs_history": "Historical USGS data with 7d/30d/90d/1yr time range options",
             "tva_history": "Long-term historical data for TVA dam sites (Hiwassee Dries)",
-            "ocoee_combined": "Combined Ocoee dam cascade data showing all 3 dams for correlation analysis"
+            "ocoee_combined": "Combined Ocoee dam cascade data showing all 3 dams for correlation analysis",
+            "rainfall_history": "Daily precipitation tracking from PWS stations for rain-to-runnable correlation"
         }
     })
 

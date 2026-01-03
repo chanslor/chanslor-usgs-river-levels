@@ -296,6 +296,19 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
     if wind_chill_temp is None and current_temp is not None and current_wind_mph is not None:
         wind_chill_temp, wind_chill_emoji, wind_chill_desc = calculate_wind_chill(current_temp, current_wind_mph)
 
+    # Extract rainfall data
+    precip_today = site_data.get("precip_today_in")
+    pws_station = site_data.get("pws_station")
+    pws_label = site_data.get("pws_label")
+    rainfall_7d = site_data.get("rainfall_7d", {})
+    rainfall_30d = site_data.get("rainfall_30d", {})
+
+    # Extract rainfall stats
+    rain_7d_total = rainfall_7d.get("total_precip_in", 0)
+    rain_7d_rainy_days = rainfall_7d.get("rainy_days", 0)
+    rain_30d_total = rainfall_30d.get("total_precip_in", 0)
+    rain_30d_rainy_days = rainfall_30d.get("rainy_days", 0)
+
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -545,6 +558,76 @@ body {{
     gap: 8px;
   }}
 }}
+
+/* Weather & Rainfall Section */
+.weather-rainfall-section {{
+  background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+  border-radius: 12px;
+  padding: 24px;
+  margin: 24px 0;
+  color: white;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}}
+.weather-rainfall-header {{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}}
+.weather-rainfall-title {{
+  font-size: 20px;
+  font-weight: bold;
+}}
+.weather-rainfall-source {{
+  font-size: 12px;
+  opacity: 0.8;
+  background: rgba(255,255,255,0.1);
+  padding: 4px 10px;
+  border-radius: 12px;
+}}
+.weather-rainfall-grid {{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+}}
+.weather-card {{
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  backdrop-filter: blur(5px);
+}}
+.weather-card .card-icon {{
+  font-size: 28px;
+  margin-bottom: 8px;
+}}
+.weather-card .card-label {{
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+  margin-bottom: 6px;
+}}
+.weather-card .card-value {{
+  font-size: 22px;
+  font-weight: bold;
+}}
+.weather-card .card-sub {{
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 4px;
+}}
+.weather-card.rain-highlight {{
+  background: rgba(59, 130, 246, 0.3);
+  border: 1px solid rgba(59, 130, 246, 0.5);
+}}
+@media (max-width: 600px) {{
+  .weather-rainfall-grid {{
+    grid-template-columns: repeat(2, 1fr);
+  }}
+}}
 </style>
 </head>
 <body>
@@ -603,6 +686,49 @@ body {{
       <div class="label">Wind Chill {wind_chill_emoji if wind_chill_emoji else ""}</div>
       <div class="value">{f"{wind_chill_temp:.1f}°F" if wind_chill_temp is not None else "N/A"}</div>
       <div class="range">{wind_chill_desc if wind_chill_desc else "No wind chill" if current_temp is not None and current_wind_mph is not None else "Data unavailable"}</div>
+    </div>
+  </div>
+
+  <div class="weather-rainfall-section">
+    <div class="weather-rainfall-header">
+      <div class="weather-rainfall-title">🌧️ Weather & Rainfall</div>
+      {f'<div class="weather-rainfall-source">PWS: {h(pws_label or pws_station or "N/A")}</div>' if pws_station else ''}
+    </div>
+    <div class="weather-rainfall-grid">
+      <div class="weather-card">
+        <div class="card-icon">🌡️</div>
+        <div class="card-label">Temperature</div>
+        <div class="card-value">{f"{current_temp:.0f}°F" if current_temp is not None else "N/A"}</div>
+      </div>
+      <div class="weather-card">
+        <div class="card-icon">💨</div>
+        <div class="card-label">Wind</div>
+        <div class="card-value">{f"{current_wind_mph:.0f}" if current_wind_mph is not None else "N/A"}</div>
+        <div class="card-sub">{f"mph {current_wind_dir}" if current_wind_mph is not None else ""}</div>
+      </div>
+      <div class="weather-card{' rain-highlight' if precip_today and precip_today > 0 else ''}">
+        <div class="card-icon">☔</div>
+        <div class="card-label">Today's Rain</div>
+        <div class="card-value">{f'{precip_today:.2f}"' if precip_today is not None else "N/A"}</div>
+      </div>
+      <div class="weather-card{' rain-highlight' if rain_7d_total > 0.5 else ''}">
+        <div class="card-icon">📊</div>
+        <div class="card-label">7-Day Rain</div>
+        <div class="card-value">{f'{rain_7d_total:.2f}"' if rain_7d_total else "N/A"}</div>
+        <div class="card-sub">{f"{rain_7d_rainy_days} rainy days" if rain_7d_rainy_days else ""}</div>
+      </div>
+      <div class="weather-card">
+        <div class="card-icon">📈</div>
+        <div class="card-label">30-Day Rain</div>
+        <div class="card-value">{f'{rain_30d_total:.2f}"' if rain_30d_total else "N/A"}</div>
+        <div class="card-sub">{f"{rain_30d_rainy_days} rainy days" if rain_30d_rainy_days else ""}</div>
+      </div>
+      <div class="weather-card">
+        <div class="card-icon">{wind_chill_emoji if wind_chill_emoji else "❄️"}</div>
+        <div class="card-label">Feels Like</div>
+        <div class="card-value">{f"{wind_chill_temp:.0f}°F" if wind_chill_temp is not None else f"{current_temp:.0f}°F" if current_temp is not None else "N/A"}</div>
+        <div class="card-sub">{wind_chill_desc if wind_chill_desc else ""}</div>
+      </div>
     </div>
   </div>
 

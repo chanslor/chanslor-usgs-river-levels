@@ -94,7 +94,7 @@ curl https://docker-blue-sound-1751.fly.dev/api
 ```json
 {
   "name": "USGS River Levels API",
-  "version": "1.4",
+  "version": "1.5",
   "dashboard": "/",
   "endpoints": {
     "health": "/api/health",
@@ -105,7 +105,10 @@ curl https://docker-blue-sound-1751.fly.dev/api
     "usgs_history": "/api/usgs-history/{site_id}?days=7",
     "tva_history": "/api/tva-history/{site_code}?days=7",
     "tva_stats": "/api/tva-history/{site_code}/stats?days=30",
-    "ocoee_combined": "/api/tva-history/ocoee/combined?days=7"
+    "ocoee_combined": "/api/tva-history/ocoee/combined?days=7",
+    "rainfall_today": "/api/rainfall",
+    "rainfall_history": "/api/rainfall/{river_name}?days=30",
+    "rainfall_weekly": "/api/rainfall/{river_name}/weekly"
   },
   "examples": {
     "little_river": "/api/river-levels/02399200",
@@ -116,13 +119,17 @@ curl https://docker-blue-sound-1751.fly.dev/api
     "rush_south_history_30d": "/api/usgs-history/02341460?days=30",
     "hiwassee_history_7d": "/api/tva-history/HADT1?days=7",
     "hiwassee_history_30d": "/api/tva-history/HADT1?days=30",
-    "ocoee_cascade_7d": "/api/tva-history/ocoee/combined?days=7"
+    "ocoee_cascade_7d": "/api/tva-history/ocoee/combined?days=7",
+    "rainfall_all_today": "/api/rainfall",
+    "rainfall_locust_30d": "/api/rainfall/Locust Fork?days=30",
+    "rainfall_weekly_short_creek": "/api/rainfall/Short Creek/weekly"
   },
   "new_features": {
     "predictions": "River predictions based on QPF forecast and 90-day historical response patterns",
     "usgs_history": "Historical USGS data with 7d/30d/90d/1yr time range options",
     "tva_history": "Long-term historical data for TVA dam sites",
-    "ocoee_cascade": "Combined data for all 3 Ocoee dams to visualize water flow downstream"
+    "ocoee_cascade": "Combined data for all 3 Ocoee dams to visualize water flow downstream",
+    "rainfall_history": "Historical rainfall data per river with 365-day backfill from Open-Meteo"
   }
 }
 ```
@@ -556,6 +563,172 @@ curl https://docker-blue-sound-1751.fly.dev/api/tva-history/ocoee/combined?days=
 
 ---
 
+### Get All Rivers Rainfall Today
+```bash
+GET /api/rainfall
+```
+
+Returns today's rainfall for all monitored rivers from PWS (Personal Weather Station) observations.
+
+**Example:**
+```bash
+curl https://docker-blue-sound-1751.fly.dev/api/rainfall
+```
+
+**Response:**
+```json
+{
+  "date": "2026-01-02",
+  "generated_at": "2026-01-02T14:30:00-06:00",
+  "river_count": 12,
+  "rivers": [
+    {
+      "river_name": "Little River",
+      "date": "2026-01-02",
+      "total_inches": 0.52,
+      "max_inches": 0.52,
+      "observation_count": 8,
+      "source": "pws",
+      "pws_station": "KALCEDAR14"
+    },
+    {
+      "river_name": "Mulberry Fork",
+      "date": "2026-01-02",
+      "total_inches": 1.01,
+      "max_inches": 1.01,
+      "observation_count": 12,
+      "source": "pws",
+      "pws_station": "KALHAYDE19"
+    }
+  ]
+}
+```
+
+---
+
+### Get River Rainfall History
+```bash
+GET /api/rainfall/{river_name}?days={days}
+```
+
+Returns historical daily rainfall for a specific river. Data comes from PWS observations (real-time) and Open-Meteo API (historical backfill).
+
+**Parameters:**
+| Parameter | Description | Default | Max |
+|-----------|-------------|---------|-----|
+| `river_name` | River name (URL encoded) | required | - |
+| `days` | Number of days of history | 30 | 365 |
+
+**Example:**
+```bash
+curl "https://docker-blue-sound-1751.fly.dev/api/rainfall/Little%20River?days=30"
+```
+
+**Response:**
+```json
+{
+  "river_name": "Little River",
+  "days_requested": 30,
+  "stats": {
+    "total_inches": 4.23,
+    "max_daily": 1.52,
+    "avg_daily": 0.14,
+    "rainy_days": 8,
+    "dry_days": 22
+  },
+  "daily": [
+    {
+      "date": "2026-01-02",
+      "total_inches": 0.52,
+      "source": "pws",
+      "pws_station": "KALCEDAR14"
+    },
+    {
+      "date": "2026-01-01",
+      "total_inches": 0.00,
+      "source": "open-meteo"
+    },
+    {
+      "date": "2025-12-31",
+      "total_inches": 0.12,
+      "source": "open-meteo"
+    }
+  ]
+}
+```
+
+---
+
+### Get River Weekly Rainfall Summary
+```bash
+GET /api/rainfall/{river_name}/weekly
+```
+
+Returns aggregated weekly rainfall summary for the past 12 weeks.
+
+**Example:**
+```bash
+curl "https://docker-blue-sound-1751.fly.dev/api/rainfall/Locust%20Fork/weekly"
+```
+
+**Response:**
+```json
+{
+  "river_name": "Locust Fork",
+  "weeks": 12,
+  "weekly_data": [
+    {
+      "week_start": "2025-12-30",
+      "week_end": "2026-01-05",
+      "total_inches": 1.53,
+      "rainy_days": 3,
+      "max_daily": 0.82
+    },
+    {
+      "week_start": "2025-12-23",
+      "week_end": "2025-12-29",
+      "total_inches": 0.45,
+      "rainy_days": 2,
+      "max_daily": 0.31
+    }
+  ],
+  "stats": {
+    "total_12_weeks": 8.72,
+    "avg_weekly": 0.73,
+    "wettest_week": "2025-12-09",
+    "driest_week": "2025-11-18"
+  }
+}
+```
+
+---
+
+### Rainfall Data Sources
+
+The rainfall history system uses two data sources:
+
+1. **PWS (Personal Weather Stations)** - Real-time data
+   - Captured every 60 seconds from Weather Underground PWS stations
+   - Each river has a chain of 4 fallback stations
+   - Provides `precip_today_in` accumulation values
+   - Source field: `"pws"`
+
+2. **Open-Meteo Historical Weather API** - Backfill data
+   - Used to populate historical data (up to 365 days back)
+   - Free API, no authentication required
+   - Provides daily precipitation totals
+   - Source field: `"open-meteo"`
+
+**Database:** Rainfall data is stored indefinitely in `/data/rainfall_history.sqlite`
+
+**Use Cases:**
+- Correlate rainfall amounts with river level changes
+- Predict when rivers will reach runnable levels after rain events
+- Track seasonal rainfall patterns per watershed
+- Historical analysis for trip planning
+
+---
+
 ## ESP32/Heltec Integration
 
 The API returns a `display_lines` array optimized for the Heltec ESP32 LoRa V3 OLED display (128x64 pixels, 5 lines).
@@ -775,12 +948,14 @@ The system uses a dual-service architecture:
 │  - Fetches TVA dam data (Hiwassee)      │
 │  - Fetches StreamBeam data (Short Creek)│
 │  - Fetches PWS weather (primary)        │
+│  - Records PWS rainfall to history DB   │
 │  - Falls back to NWS weather if needed  │
 │  - Fetches NWS QPF forecast data        │
 │  - Fetches US Drought Monitor data      │
 │  - Generates gauges.json                │
 │  - Generates index.html dashboard       │
 │  - Updates SQLite state DB              │
+│  - Updates rainfall_history.sqlite      │
 └─────────────────────────────────────────┘
                  ↓
 ┌─────────────────────────────────────────┐
@@ -788,7 +963,9 @@ The system uses a dual-service architecture:
 │  - Serves HTML dashboard at /           │
 │  - Serves API info at /api              │
 │  - Serves ESP32 data at /api/river-*    │
+│  - Serves rainfall history /api/rainfall│
 │  - Reads from cached gauges.json        │
+│  - Reads from rainfall_history.sqlite   │
 └─────────────────────────────────────────┘
                  ↓
         ┌────────┴────────┐

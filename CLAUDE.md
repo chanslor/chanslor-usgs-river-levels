@@ -271,7 +271,30 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
      - AQI: https://www.airnow.gov/aqi/aqi-basics/
      - PM2.5: https://www.epa.gov/pm-pollution/particulate-matter-pm-basics
 
-11. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
+11. **rainfall_history.py** — Rainfall History Storage (NEW - 2026-01-02)
+   - SQLite database module for indefinite storage of daily precipitation data
+   - Records rainfall from two sources:
+     - **PWS (Weather Underground)** - Real-time daily totals, captured every 60 seconds
+     - **Open-Meteo Historical API** - For backfilling historical data and validation
+   - Database location: `/data/rainfall_history.sqlite`
+   - Environment variable: `RAINFALL_HISTORY_DB`
+   - **Key Functions:**
+     - `init_database()` - Initialize rainfall history tables
+     - `record_pws_rainfall()` - Record PWS observation with precipitation data
+     - `save_daily_rainfall()` - Save daily total for a river/date
+     - `get_daily_rainfall()` - Retrieve daily history for a river
+     - `get_rainfall_stats()` - Get statistics (total, avg, max, rainy days)
+     - `get_weekly_summary()` - Get 7-day breakdown with totals
+     - `get_all_rivers_today()` - Get today's rainfall for all rivers
+     - `backfill_historical_data()` - Fetch historical data from Open-Meteo
+   - **Database Tables:**
+     - `daily_rainfall` - Final daily totals per river/date/source
+     - `rainfall_observations` - Real-time PWS observations throughout the day
+     - `rainfall_river_correlation` - Links rain events to river level peaks (future analysis)
+   - **Purpose:** Correlate rainfall amounts with river level rises to predict when rivers will reach min/max thresholds
+   - API endpoints: `/api/rainfall`, `/api/rainfall/{river_name}`, `/api/rainfall/{river_name}/weekly`
+
+12. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
    - Runs initial gauge check immediately on startup
    - Launches background loop to refresh data every `RUN_INTERVAL_SEC` (default 60s)
    - Starts Flask API server on port 8080
@@ -345,10 +368,11 @@ The dashboard includes a **River Predictions** panel that forecasts which rivers
 │  External APIs                                             │
 │  - USGS Instantaneous Values API                          │
 │  - NWS Quantitative Precipitation Forecast (QPF)          │
-│  - Weather Underground PWS API (primary weather)          │
+│  - Weather Underground PWS API (primary weather + precip) │
 │  - NWS Observations API (fallback weather)                │
 │  - StreamBeam API (Short Creek gauge)                     │
 │  - TVA REST API (Hiwassee Dries / Apalachia Dam)          │
+│  - Open-Meteo Historical Weather API (rainfall backfill)  │
 └────────────────────────────────────────────────────────────┘
                          ↓
 ┌────────────────────────────────────────────────────────────┐
@@ -357,6 +381,7 @@ The dashboard includes a **River Predictions** panel that forecasts which rivers
 │  - Fetches + processes data                                │
 │  - Updates SQLite state DB                                 │
 │  - Saves TVA observations to tva_history.sqlite            │
+│  - Saves PWS rainfall to rainfall_history.sqlite           │
 │  - Sends email alerts (on threshold changes)               │
 │  - Generates output files:                                 │
 │    • gauges.json (API data source)                         │
@@ -374,6 +399,8 @@ The dashboard includes a **River Predictions** panel that forecasts which rivers
 │  - GET /api/river-levels/name/{name} → search by name      │
 │  - GET /api/predictions → river predictions JSON           │
 │  - GET /api/tva-history/{site} → TVA historical data       │
+│  - GET /api/rainfall → today's rainfall for all rivers     │
+│  - GET /api/rainfall/{river} → rainfall history            │
 │  - GET /gauges.json → raw data feed                        │
 │  - GET /details/{site}.html → detail pages                 │
 └────────────────────────────────────────────────────────────┘
@@ -444,6 +471,18 @@ The Flask API provides the following endpoints:
   - Each site includes: observations, stats, date_range
   - Used by the Ocoee cascade correlation page for overlapping charts
 
+### Rainfall History Endpoints (NEW - 2026-01-02)
+- **`GET /api/rainfall`** - Get today's rainfall totals for all rivers
+  - Returns: date, array of rivers with precip_in, source, station_id
+  - Updated every 60 seconds from PWS stations
+- **`GET /api/rainfall/{river_name}?days=30`** - Get historical rainfall for a river
+  - Query param `days`: Number of days of history (1-365, default: 30)
+  - Returns: daily rainfall totals, statistics (total, avg, max, rainy days)
+  - Example: `/api/rainfall/Little%20River?days=30`
+- **`GET /api/rainfall/{river_name}/weekly`** - Get 7-day rainfall summary
+  - Returns: daily breakdown with day names, week total
+  - Example: `/api/rainfall/Locust%20Fork/weekly`
+
 ### ESP32 Response Format
 
 Each river data endpoint returns a `display_lines` array optimized for ESP32 OLED displays (5 lines):
@@ -492,6 +531,7 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
 - `QPF_CACHE`: Path to QPF SQLite cache (default: /data/qpf_cache.sqlite)
 - `DROUGHT_TTL_HOURS`: Cache TTL for drought data (default: 12)
 - `DROUGHT_CACHE`: Path to drought SQLite cache (default: /data/drought_cache.sqlite)
+- `RAINFALL_HISTORY_DB`: Path to rainfall history SQLite database (default: /data/rainfall_history.sqlite)
 
 ### File Locations (in container)
 
@@ -502,6 +542,7 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
   - `pws_observations.py` - PWS weather observations (primary)
   - `drought.py` - US Drought Monitor integration
   - `air_quality.py` - Air Quality Index integration (Open-Meteo)
+  - `rainfall_history.py` - Rainfall history storage module
   - `tva_fetch.py` - TVA dam data fetcher (Hiwassee Dries, Ocoee)
   - `tva_history.py` - TVA historical data storage module
   - `ocoee_correlation.py` - Ocoee cascade correlation page generator
@@ -515,6 +556,7 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
   - `qpf_cache.sqlite` - QPF cache database
   - `drought_cache.sqlite` - Drought monitor cache database
   - `tva_history.sqlite` - TVA historical observations (indefinite storage)
+  - `rainfall_history.sqlite` - Rainfall history (indefinite storage)
 - `/site/`: Generated output (bind mount required)
   - `index.html` - Main dashboard
   - `gauges.json` - JSON data feed
@@ -709,6 +751,7 @@ The system uses SQLite caching for external API data to reduce load and improve 
 | `drought_cache.sqlite` | Drought status | 12 hours | USDM API |
 | `state.sqlite` | Alert state | Permanent | Internal |
 | `tva_history.sqlite` | TVA dam observations | Permanent | TVA API |
+| `rainfall_history.sqlite` | Daily precipitation | Permanent | PWS + Open-Meteo |
 
 ### Deploying Code Changes That Affect Cached Data
 
@@ -766,16 +809,27 @@ systemctl --user restart usgs-alert.service
 
 ## Git Repository State
 
-**Current Production Status**: Working as of 12-23-2025
+**Current Production Status**: Working as of 01-02-2026
 
 **Production Deployment:**
 - URL: https://docker-blue-sound-1751.fly.dev/
 - Containerfile: `Containerfile.api.simple`
 - Entrypoint: `entrypoint-api.sh`
-- Features: Flask API + Dashboard + ESP32 endpoints + TVA integration + Historical Charts
+- Features: Flask API + Dashboard + ESP32 endpoints + TVA integration + Historical Charts + Rainfall History
 - **Total Sites Monitored**: 12 rivers
 
 **Recent Updates:**
+- **2026-01-02: Added Rainfall History Tracking**
+  - New `rainfall_history.py` module for indefinite precipitation storage
+  - Records daily rainfall from PWS (Weather Underground) stations
+  - Backfill capability from Open-Meteo Historical Weather API
+  - 365 days of historical data pre-loaded for all rivers
+  - New API endpoints: `/api/rainfall`, `/api/rainfall/{river_name}`, `/api/rainfall/{river_name}/weekly`
+  - Database tables: `daily_rainfall`, `rainfall_observations`, `rainfall_river_correlation`
+  - Purpose: Correlate rainfall amounts with river level rises for prediction
+  - PWS captures `precipTotal` every 60 seconds during monitoring loop
+  - Example: "0.52" rain → Little River Canyon peaks at X CFS in Y hours"
+
 - **2025-12-31: Added Air Quality Index (AQI) Integration**
   - New `air_quality.py` module fetches data from Open-Meteo Air Quality API
   - Displays US AQI value, category, and PM2.5 concentration for each river

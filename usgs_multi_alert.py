@@ -105,6 +105,21 @@ try:
 except ImportError:
     AQI_AVAILABLE = False
 
+# Import rainfall history storage
+try:
+    from rainfall_history import (
+        init_database as init_rainfall_history,
+        record_pws_rainfall,
+        save_daily_rainfall,
+        backfill_historical_data as backfill_rainfall,
+        get_rainfall_stats,
+        get_daily_rainfall,
+        get_all_rivers_today
+    )
+    RAINFALL_HISTORY_AVAILABLE = True
+except ImportError:
+    RAINFALL_HISTORY_AVAILABLE = False
+
 # Weather station mapping for each river site
 # PWS = Weather Underground Personal Weather Stations (primary, more local)
 # NWS = National Weather Service official stations (fallback)
@@ -1437,6 +1452,16 @@ def main():
             if not args.quiet:
                 print(f"[WARN] TVA history database initialization failed: {e}")
 
+    # Initialize rainfall history database for precipitation tracking
+    rainfall_history_db = None
+    if RAINFALL_HISTORY_AVAILABLE:
+        rainfall_history_db = os.environ.get("RAINFALL_HISTORY_DB", "/data/rainfall_history.sqlite")
+        try:
+            init_rainfall_history(rainfall_history_db)
+        except Exception as e:
+            if not args.quiet:
+                print(f"[WARN] Rainfall history database initialization failed: {e}")
+
     state_db = cfg.get("state_db"); state_file_legacy = cfg.get("state_file")
 
     now = time.time()
@@ -1757,6 +1782,22 @@ def main():
                     if not args.quiet:
                         label = get_station_label(pws_station)
                         print(f"[PWS] {name}: {pws_obs['temp_f']}°F, {pws_obs['wind_mph']} mph from {pws_station} ({label})")
+
+                    # Record rainfall to history database
+                    if RAINFALL_HISTORY_AVAILABLE and rainfall_history_db:
+                        precip_today = pws_obs.get("precip_today_in")
+                        if precip_today is not None:
+                            try:
+                                record_pws_rainfall(
+                                    river_name=name,
+                                    pws_observation=pws_obs,
+                                    db_path=rainfall_history_db
+                                )
+                                if not args.quiet and precip_today > 0:
+                                    print(f"[RAIN] {name}: {precip_today}\" recorded from {pws_station}")
+                            except Exception as rain_e:
+                                if not args.quiet:
+                                    print(f"[WARN] Rainfall recording failed for {name}: {rain_e}")
             except Exception as e:
                 if not args.quiet:
                     print(f"[WARN] PWS fetch failed for {name}: {e}")
@@ -2055,8 +2096,35 @@ def main():
                         "in_range": row.get("in_range", False),
                         "last_in_time": last_in_time,
                         "is_tva": is_tva_source,
-                        "tva_site_code": site_id if is_tva_source else None
+                        "tva_site_code": site_id if is_tva_source else None,
+                        # PWS station info
+                        "pws_station": active_obs.get("station_id") if active_obs else None,
+                        "pws_label": active_obs.get("station_label") if active_obs else None,
+                        # Today's rainfall from PWS
+                        "precip_today_in": active_obs.get("precip_today_in") if active_obs else None,
                     }
+
+                    # Add rainfall history stats if available
+                    if RAINFALL_HISTORY_AVAILABLE and rainfall_history_db:
+                        river_name = row.get("name")
+                        if river_name:
+                            try:
+                                # Get today's rainfall from database
+                                today_rain_all = get_all_rivers_today(db_path=rainfall_history_db)
+                                for r in today_rain_all:
+                                    if r.get("river_name") == river_name:
+                                        site_data["precip_today_in"] = r.get("precip_in")
+                                        site_data["pws_station"] = r.get("station_id")
+                                        break
+                                # Get 7-day rainfall stats
+                                rain_stats = get_rainfall_stats(river_name, days=7, db_path=rainfall_history_db)
+                                site_data["rainfall_7d"] = rain_stats
+                                # Get 30-day stats too
+                                rain_stats_30d = get_rainfall_stats(river_name, days=30, db_path=rainfall_history_db)
+                                site_data["rainfall_30d"] = rain_stats_30d
+                            except Exception as rain_err:
+                                if not args.quiet:
+                                    print(f"[DETAIL] Rainfall fetch failed for {river_name}: {rain_err}")
 
                     # Generate HTML
                     detail_html = generate_site_detail_html(site_data, cfs_history, feet_history)
