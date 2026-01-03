@@ -1348,6 +1348,9 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   <div class="foot" style="margin-top:8px;"><a href="https://paddle-watch.fly.dev/" target="_blank" rel="noopener">Paddle Watch</a></div>
   <div class="foot" style="margin-top:16px; padding-top:8px; border-top:1px solid #ddd;"><a href="test_visual_indicators.html" target="_blank">🧪 Visual Indicators Test Suite</a></div>
 </div>
+<footer style="text-align:center; padding:20px; margin-top:30px; border-top:1px solid #e5e7eb; color:#6b7280; font-size:14px;">
+  Michael Chanslor 2026
+</footer>
 </body></html>"""
 
 # --------------- Main ---------------

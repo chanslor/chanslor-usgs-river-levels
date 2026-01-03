@@ -1230,6 +1230,9 @@ if (rainChartEl) {{
 }})();
 </script>'''}
 
+<footer style="text-align:center; padding:20px; margin-top:30px; border-top:1px solid #e5e7eb; color:#6b7280; font-size:14px;">
+  Michael Chanslor 2026
+</footer>
 </body>
 </html>"""
 
