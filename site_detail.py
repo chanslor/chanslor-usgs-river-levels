@@ -311,6 +311,28 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
     rain_30d_total = rainfall_30d.get("total_precip_in", 0)
     rain_30d_rainy_days = rainfall_30d.get("rainy_days", 0)
 
+    # Prepare rainfall chart data (daily totals for 7 days)
+    rainfall_daily = site_data.get("rainfall_daily", [])
+    rain_labels = []
+    rain_values = []
+    for day in rainfall_daily:
+        try:
+            # Parse date and format as "Mon Jan 2"
+            dt = datetime.strptime(day.get("date", ""), "%Y-%m-%d")
+            label = dt.strftime("%a %b %d")
+            rain_labels.append(label)
+            rain_values.append(day.get("precip_in", 0) or 0)
+        except Exception:
+            continue
+
+    # Calculate rainfall chart stats
+    if rain_values:
+        avg_rain = sum(rain_values) / len(rain_values)
+        max_rain = max(rain_values)
+        total_rain = sum(rain_values)
+    else:
+        avg_rain = max_rain = total_rain = 0
+
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -670,6 +692,17 @@ body {{
     </div>
   </div>'''}
 
+  {"" if is_tva else f'''<div class="chart-row">
+    <div class="chart-box" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);">
+      <h2 style="color: #0369a1;">🌧️ Rainfall (Inches)</h2>
+      <div class="chart-value" style="color: #0284c7;">{total_rain:.2f} <span style="font-size:18px; font-weight:normal;">in total</span></div>
+      <div class="chart-meta">7-day average: {avg_rain:.2f} in/day · Max: {max_rain:.2f} in</div>
+      <div class="chart-canvas">
+        <canvas id="rainChart"></canvas>
+      </div>
+    </div>
+  </div>'''}
+
   <div class="stats-grid">
     <div class="stat-box">
       <div class="label">Current Temperature</div>
@@ -900,6 +933,61 @@ if (feetLabels.length === 0 || feetValues.length === 0) {{
     }}
   }}
   }});
+}}
+
+// Rainfall Chart (bar chart for daily totals)
+const rainChartEl = document.getElementById('rainChart');
+if (rainChartEl) {{
+  const rainCtx = rainChartEl.getContext('2d');
+  const rainLabels = {json.dumps(rain_labels)};
+  const rainValues = {json.dumps(rain_values)};
+
+  if (rainLabels.length === 0 || rainValues.length === 0) {{
+    rainCtx.canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">No rainfall data available for this site</div>';
+  }} else {{
+    new Chart(rainCtx, {{
+      type: 'bar',
+      data: {{
+        labels: rainLabels,
+        datasets: [{{
+          label: 'Rainfall (in)',
+          data: rainValues,
+          backgroundColor: 'rgba(14, 165, 233, 0.7)',
+          borderColor: 'rgba(3, 105, 161, 1)',
+          borderWidth: 1,
+          borderRadius: 4,
+        }}]
+      }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {{
+          legend: {{ display: false }},
+          tooltip: {{
+            callbacks: {{
+              label: function(context) {{
+                return context.parsed.y.toFixed(2) + ' inches';
+              }}
+            }}
+          }}
+        }},
+        scales: {{
+          x: {{
+            grid: {{ display: false }}
+          }},
+          y: {{
+            beginAtZero: true,
+            title: {{
+              display: true,
+              text: 'Inches',
+              color: '#0369a1'
+            }},
+            grid: {{ color: 'rgba(0,0,0,0.05)' }}
+          }}
+        }}
+      }}
+    }});
+  }}
 }}
 
 // History Chart with Time Range Selection (skip if element doesn't exist - e.g., StreamBeam sites)
