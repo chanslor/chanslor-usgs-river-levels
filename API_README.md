@@ -108,7 +108,9 @@ curl https://docker-blue-sound-1751.fly.dev/api
     "ocoee_combined": "/api/tva-history/ocoee/combined?days=7",
     "rainfall_today": "/api/rainfall",
     "rainfall_history": "/api/rainfall/{river_name}?days=30",
-    "rainfall_weekly": "/api/rainfall/{river_name}/weekly"
+    "rainfall_weekly": "/api/rainfall/{river_name}/weekly",
+    "paddle_log": "/api/paddle-log",
+    "paddle_log_stats": "/api/paddle-log/stats"
   },
   "examples": {
     "little_river": "/api/river-levels/02399200",
@@ -122,14 +124,18 @@ curl https://docker-blue-sound-1751.fly.dev/api
     "ocoee_cascade_7d": "/api/tva-history/ocoee/combined?days=7",
     "rainfall_all_today": "/api/rainfall",
     "rainfall_locust_30d": "/api/rainfall/Locust Fork?days=30",
-    "rainfall_weekly_short_creek": "/api/rainfall/Short Creek/weekly"
+    "rainfall_weekly_short_creek": "/api/rainfall/Short Creek/weekly",
+    "paddle_log_all": "/api/paddle-log",
+    "paddle_log_locust": "/api/paddle-log?river=Locust Fork",
+    "paddle_stats": "/api/paddle-log/stats"
   },
   "new_features": {
     "predictions": "River predictions based on QPF forecast and 90-day historical response patterns",
     "usgs_history": "Historical USGS data with 7d/30d/90d/1yr time range options",
     "tva_history": "Long-term historical data for TVA dam sites",
     "ocoee_cascade": "Combined data for all 3 Ocoee dams to visualize water flow downstream",
-    "rainfall_history": "Historical rainfall data per river with 365-day backfill from Open-Meteo"
+    "rainfall_history": "Historical rainfall data per river with 365-day backfill from Open-Meteo",
+    "paddle_log": "Track successful paddle runs to build rain-to-runnable correlation data"
   }
 }
 ```
@@ -726,6 +732,115 @@ The rainfall history system uses two data sources:
 - Predict when rivers will reach runnable levels after rain events
 - Track seasonal rainfall patterns per watershed
 - Historical analysis for trip planning
+
+---
+
+### Paddle Event Log
+
+Track successful paddle runs to build historical data about rain-to-runnable patterns.
+
+```bash
+GET /api/paddle-log
+GET /api/paddle-log?river={river_name}&limit={limit}
+```
+
+Returns list of logged paddle events.
+
+**Example:**
+```bash
+curl "https://docker-blue-sound-1751.fly.dev/api/paddle-log?river=Locust%20Fork"
+```
+
+**Response:**
+```json
+{
+  "count": 1,
+  "events": [
+    {
+      "id": 1,
+      "river_name": "Locust Fork",
+      "paddle_date": "2026-01-03",
+      "cfs_at_paddle": 314.0,
+      "feet_at_paddle": 2.44,
+      "rain_24h": 0.0,
+      "rain_48h": 1.0,
+      "rain_72h": 1.0,
+      "water_trend": "rising",
+      "notes": "Good flow, water still rising from 1 inch rain on Jan 2"
+    }
+  ]
+}
+```
+
+---
+
+### Log a Paddle Event
+
+```bash
+POST /api/paddle-log
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "river_name": "Locust Fork",
+  "paddle_date": "2026-01-03",
+  "cfs_at_paddle": 314,
+  "feet_at_paddle": 2.44,
+  "rain_24h": 0.0,
+  "rain_48h": 1.0,
+  "rain_72h": 1.0,
+  "water_trend": "rising",
+  "notes": "Good flow, water still rising"
+}
+```
+
+**Example:**
+```bash
+curl -X POST https://docker-blue-sound-1751.fly.dev/api/paddle-log \
+  -H "Content-Type: application/json" \
+  -d '{"river_name": "Locust Fork", "paddle_date": "2026-01-03", "cfs_at_paddle": 314}'
+```
+
+---
+
+### Paddle Statistics
+
+```bash
+GET /api/paddle-log/stats
+GET /api/paddle-log/stats?river={river_name}
+```
+
+Returns statistics about paddle events.
+
+**Example:**
+```bash
+curl "https://docker-blue-sound-1751.fly.dev/api/paddle-log/stats?river=Locust%20Fork"
+```
+
+**Response:**
+```json
+{
+  "river_name": "Locust Fork",
+  "total_paddles": 1,
+  "avg_rain_48h": 1.0,
+  "min_rain_48h": 1.0,
+  "max_rain_48h": 1.0,
+  "avg_cfs": 314,
+  "min_cfs": 314,
+  "max_cfs": 314,
+  "avg_feet": 2.44,
+  "first_paddle": "2026-01-03",
+  "last_paddle": "2026-01-03"
+}
+```
+
+**Use Cases:**
+- Learn how much rain each river needs to become runnable
+- Track typical CFS/feet ranges when paddling
+- Understand response time from rain to runnable conditions
+- Plan trips based on historical success patterns
 
 ---
 

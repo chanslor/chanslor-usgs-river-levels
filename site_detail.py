@@ -246,16 +246,23 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
         except Exception:
             continue
 
-    # Calculate stats
+    # Calculate stats (7-day range, but 3-day average)
+    # 3 days of data at 15-min intervals = 288 points
+    three_day_points = 288
+
     if cfs_values:
-        avg_cfs = sum(cfs_values) / len(cfs_values)
+        # Use last 3 days for average, full range for min/max
+        recent_cfs = cfs_values[-three_day_points:] if len(cfs_values) > three_day_points else cfs_values
+        avg_cfs = sum(recent_cfs) / len(recent_cfs)
         max_cfs = max(cfs_values)
         min_cfs = min(cfs_values)
     else:
         avg_cfs = max_cfs = min_cfs = 0
 
     if feet_values:
-        avg_ft = sum(feet_values) / len(feet_values)
+        # Use last 3 days for average, full range for min/max
+        recent_ft = feet_values[-three_day_points:] if len(feet_values) > three_day_points else feet_values
+        avg_ft = sum(recent_ft) / len(recent_ft)
         max_ft = max(feet_values)
         min_ft = min(feet_values)
     else:
@@ -610,6 +617,47 @@ body {{
   }}
 }}
 
+/* Average Period Selector */
+.avg-controls {{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}}
+.avg-label {{
+  font-size: 13px;
+  color: #666;
+  margin-right: 4px;
+}}
+.avg-btn {{
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+  padding: 4px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}}
+.avg-btn:hover {{
+  background: #e5e7eb;
+}}
+.avg-btn.active {{
+  background: #1a73e8;
+  border-color: #1a73e8;
+  color: white;
+  font-weight: 600;
+}}
+.avg-display {{
+  font-size: 13px;
+  color: #666;
+  margin-left: 12px;
+}}
+.avg-display .avg-value {{
+  font-weight: 600;
+  color: #1a73e8;
+}}
+
 /* Weather & Rainfall Section */
 .weather-rainfall-section {{
   background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
@@ -701,7 +749,15 @@ body {{
     <div class="chart-box">
       <h2>Discharge (CFS)</h2>
       <div class="chart-value">{f"{int(current_cfs):,}" if current_cfs is not None else "N/A"} <span style="font-size:18px; font-weight:normal;">CFS</span></div>
-      <div class="chart-meta">7-day average: {f"{int(avg_cfs):,}" if avg_cfs > 0 else "N/A"} CFS · Range: {f"{int(min_cfs):,} - {int(max_cfs):,}" if max_cfs > 0 else "N/A"}</div>
+      <div class="avg-controls">
+        <span class="avg-label">Average:</span>
+        <button class="avg-btn" data-hours="24" data-target="cfs">24h</button>
+        <button class="avg-btn" data-hours="48" data-target="cfs">48h</button>
+        <button class="avg-btn active" data-hours="72" data-target="cfs">3d</button>
+        <button class="avg-btn" data-hours="168" data-target="cfs">7d</button>
+        <span class="avg-display"><span class="avg-value" id="cfsAvgValue">{f"{int(avg_cfs):,}" if avg_cfs > 0 else "N/A"}</span> CFS</span>
+      </div>
+      <div class="chart-meta">Range: {f"{int(min_cfs):,} - {int(max_cfs):,}" if max_cfs > 0 else "N/A"} CFS (7-day)</div>
       <div class="chart-canvas">
         <canvas id="cfsChart"></canvas>
       </div>
@@ -712,7 +768,15 @@ body {{
     <div class="chart-box">
       <h2>{"Water Level" if is_streambeam else "Gage Height"} (Feet)</h2>
       <div class="chart-value">{current_ft:.2f} <span style="font-size:18px; font-weight:normal;">ft</span></div>
-      <div class="chart-meta">7-day average: {avg_ft:.2f} ft · Range: {min_ft:.2f} - {max_ft:.2f}</div>
+      <div class="avg-controls">
+        <span class="avg-label">Average:</span>
+        <button class="avg-btn" data-hours="24" data-target="feet">24h</button>
+        <button class="avg-btn" data-hours="48" data-target="feet">48h</button>
+        <button class="avg-btn active" data-hours="72" data-target="feet">3d</button>
+        <button class="avg-btn" data-hours="168" data-target="feet">7d</button>
+        <span class="avg-display"><span class="avg-value" id="feetAvgValue">{avg_ft:.2f}</span> ft</span>
+      </div>
+      <div class="chart-meta">Range: {min_ft:.2f} - {max_ft:.2f} ft (7-day)</div>
       <div class="chart-canvas">
         <canvas id="feetChart"></canvas>
       </div>
@@ -862,6 +926,49 @@ console.log('CFS Labels:', {json.dumps(cfs_labels)});
 console.log('CFS Values:', {json.dumps(cfs_values)});
 console.log('Feet Labels:', {json.dumps(feet_labels)});
 console.log('Feet Values:', {json.dumps(feet_values)});
+
+// Average Period Calculator
+(function() {{
+  const cfsValues = {json.dumps(cfs_values)};
+  const feetValues = {json.dumps(feet_values)};
+
+  // Data is ~4 readings per hour (15-min intervals)
+  const pointsPerHour = 4;
+
+  function calculateAvg(values, hours) {{
+    if (!values || values.length === 0) return null;
+    const points = hours * pointsPerHour;
+    const slice = values.slice(-Math.min(points, values.length));
+    const sum = slice.reduce((a, b) => a + b, 0);
+    return sum / slice.length;
+  }}
+
+  function formatValue(val, isCfs) {{
+    if (val === null) return 'N/A';
+    if (isCfs) return Math.round(val).toLocaleString();
+    return val.toFixed(2);
+  }}
+
+  // Handle button clicks
+  document.querySelectorAll('.avg-btn').forEach(btn => {{
+    btn.addEventListener('click', function() {{
+      const target = this.dataset.target;
+      const hours = parseInt(this.dataset.hours);
+
+      // Update active button state
+      document.querySelectorAll(`.avg-btn[data-target="${{target}}"]`).forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+
+      // Calculate and update average
+      const values = target === 'cfs' ? cfsValues : feetValues;
+      const avg = calculateAvg(values, hours);
+      const displayEl = document.getElementById(target === 'cfs' ? 'cfsAvgValue' : 'feetAvgValue');
+      if (displayEl) {{
+        displayEl.textContent = formatValue(avg, target === 'cfs');
+      }}
+    }});
+  }});
+}})();
 
 // CFS Chart (skip if element doesn't exist - e.g., StreamBeam sites)
 const cfsChartEl = document.getElementById('cfsChart');

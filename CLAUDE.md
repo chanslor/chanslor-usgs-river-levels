@@ -294,7 +294,31 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
    - **Purpose:** Correlate rainfall amounts with river level rises to predict when rivers will reach min/max thresholds
    - API endpoints: `/api/rainfall`, `/api/rainfall/{river_name}`, `/api/rainfall/{river_name}/weekly`
 
-12. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
+12. **paddle_log.py** — Paddle Event Log (NEW - 2026-01-03)
+   - SQLite database module for tracking successful paddle runs
+   - Records paddle events with rainfall correlation data to understand rain-to-runnable patterns
+   - Database location: `/data/paddle_log.sqlite`
+   - **Key Functions:**
+     - `init_database()` - Initialize paddle events table
+     - `log_paddle_event()` - Record a paddle event with rainfall and river data
+     - `get_paddle_events()` - Query events, optionally filtered by river
+     - `get_river_stats()` - Get statistics for a specific river
+     - `get_all_river_stats()` - Get statistics for all rivers
+   - **Data Captured Per Event:**
+     - River name, paddle date/time
+     - CFS and feet at time of paddle
+     - Rainfall in last 24h, 48h, 72h, 7 days
+     - Peak CFS/feet (can be updated later)
+     - Response hours (time from rain to runnable)
+     - Water trend (rising/falling/steady)
+     - Notes
+   - **Purpose:** Build historical data to understand:
+     - How much rain each river needs to become runnable
+     - Typical response time from rain to runnable conditions
+     - Optimal CFS/feet ranges for each river
+   - API endpoints: `/api/paddle-log`, `/api/paddle-log/stats`
+
+13. **entrypoint-api.sh** — Container orchestration (PRODUCTION)
    - Runs initial gauge check immediately on startup
    - Launches background loop to refresh data every `RUN_INTERVAL_SEC` (default 60s)
    - Starts Flask API server on port 8080
@@ -543,6 +567,7 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
   - `drought.py` - US Drought Monitor integration
   - `air_quality.py` - Air Quality Index integration (Open-Meteo)
   - `rainfall_history.py` - Rainfall history storage module
+  - `paddle_log.py` - Paddle event log for tracking successful runs
   - `tva_fetch.py` - TVA dam data fetcher (Hiwassee Dries, Ocoee)
   - `tva_history.py` - TVA historical data storage module
   - `ocoee_correlation.py` - Ocoee cascade correlation page generator
@@ -557,6 +582,7 @@ See `API_README.md` for detailed API documentation and ESP32 integration example
   - `drought_cache.sqlite` - Drought monitor cache database
   - `tva_history.sqlite` - TVA historical observations (indefinite storage)
   - `rainfall_history.sqlite` - Rainfall history (indefinite storage)
+  - `paddle_log.sqlite` - Paddle event log (tracks successful runs with rainfall data)
 - `/site/`: Generated output (bind mount required)
   - `index.html` - Main dashboard
   - `gauges.json` - JSON data feed
@@ -819,6 +845,30 @@ systemctl --user restart usgs-alert.service
 - **Total Sites Monitored**: 12 rivers
 
 **Recent Updates:**
+- **2026-01-03: Added Paddle Event Log**
+  - New `paddle_log.py` module for tracking successful paddle runs
+  - Records paddle events with rainfall correlation data (24h, 48h, 72h, 7d rain)
+  - Captures CFS/feet at paddle, peak values, water trend, response time
+  - Purpose: Build historical data to understand rain-to-runnable patterns per river
+  - New API endpoints: `/api/paddle-log`, `/api/paddle-log/stats`
+  - First event logged: Locust Fork on 2026-01-03 (314 CFS, 2.44 ft, 1.0" rain in 48h)
+  - Statistics show avg rain needed, typical CFS range, response hours per river
+
+- **2026-01-03: Added Average Period Selector to Detail Pages**
+  - Interactive buttons (24h, 48h, 3d, 7d) to switch average calculation period
+  - Both CFS and Feet charts have independent selectors
+  - Client-side JavaScript calculates averages instantly (no page reload)
+
+- **2026-01-03: Added QPF Forecast Bars to Rainfall Chart**
+  - Detail pages now show both historical rainfall and QPF forecast
+  - Blue bars = historical rain (past 7 days)
+  - Orange bars = QPF forecast (Today, Tomorrow, Day 3)
+  - Legend distinguishes between actual and forecast data
+
+- **2026-01-03: Added Footer with Contact Info**
+  - "Michael Chanslor 2026" footer on main page and all detail pages
+  - Helps paddle community identify who to contact about the site
+
 - **2026-01-02: Added Rainfall History Tracking**
   - New `rainfall_history.py` module for indefinite precipitation storage
   - Records daily rainfall from PWS (Weather Underground) stations

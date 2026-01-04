@@ -39,6 +39,19 @@ except ImportError:
     rainfall_history_available = False
     print("Note: Rainfall history module not available. Precipitation tracking will be disabled.")
 
+# Paddle Log database (for tracking successful paddle events)
+try:
+    from paddle_log import (
+        log_paddle_event,
+        get_paddle_events,
+        get_river_stats as get_paddle_river_stats,
+        get_all_river_stats as get_all_paddle_stats
+    )
+    paddle_log_available = True
+except ImportError:
+    paddle_log_available = False
+    print("Note: Paddle log module not available. Paddle event tracking will be disabled.")
+
 app = Flask(__name__)
 
 if cors_available:
@@ -643,12 +656,141 @@ def get_river_rainfall_weekly(river_name):
         }), 500
 
 
+# =============================================================================
+# Paddle Log Endpoints - Track successful paddle runs
+# =============================================================================
+
+@app.route('/api/paddle-log', methods=['GET'])
+def get_paddle_log():
+    """
+    Get paddle events, optionally filtered by river.
+
+    Query Parameters:
+        river: Filter by river name (optional)
+        limit: Maximum number of events (default: 50)
+
+    Example: /api/paddle-log?river=Locust%20Fork&limit=10
+    """
+    if not paddle_log_available:
+        return jsonify({
+            "error": "Paddle log not available",
+            "message": "Paddle event tracking is not configured"
+        }), 503
+
+    river = request.args.get('river')
+    limit = request.args.get('limit', 50, type=int)
+
+    events = get_paddle_events(river_name=river, limit=limit)
+
+    return jsonify({
+        "count": len(events),
+        "events": events
+    })
+
+
+@app.route('/api/paddle-log', methods=['POST'])
+def add_paddle_event():
+    """
+    Log a new paddle event.
+
+    JSON Body:
+        river_name: River name (required)
+        paddle_date: Date in YYYY-MM-DD format (required)
+        cfs_at_paddle: CFS reading
+        feet_at_paddle: Feet reading
+        rain_24h: Rain in last 24 hours
+        rain_48h: Rain in last 48 hours
+        rain_72h: Rain in last 72 hours
+        rain_7d: Rain in last 7 days
+        water_trend: 'rising', 'falling', or 'steady'
+        notes: Free-form notes
+
+    Example:
+        POST /api/paddle-log
+        {"river_name": "Locust Fork", "paddle_date": "2026-01-03", "cfs_at_paddle": 314}
+    """
+    if not paddle_log_available:
+        return jsonify({
+            "error": "Paddle log not available",
+            "message": "Paddle event tracking is not configured"
+        }), 503
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+
+    river_name = data.get('river_name')
+    paddle_date = data.get('paddle_date')
+
+    if not river_name or not paddle_date:
+        return jsonify({"error": "river_name and paddle_date are required"}), 400
+
+    try:
+        row_id = log_paddle_event(
+            river_name=river_name,
+            paddle_date=paddle_date,
+            cfs_at_paddle=data.get('cfs_at_paddle'),
+            feet_at_paddle=data.get('feet_at_paddle'),
+            rain_24h=data.get('rain_24h'),
+            rain_48h=data.get('rain_48h'),
+            rain_72h=data.get('rain_72h'),
+            rain_7d=data.get('rain_7d'),
+            peak_cfs=data.get('peak_cfs'),
+            peak_feet=data.get('peak_feet'),
+            response_hours=data.get('response_hours'),
+            water_trend=data.get('water_trend'),
+            notes=data.get('notes'),
+            paddle_time=data.get('paddle_time')
+        )
+
+        return jsonify({
+            "success": True,
+            "id": row_id,
+            "message": f"Paddle event logged for {river_name} on {paddle_date}"
+        }), 201
+
+    except Exception as e:
+        return jsonify({
+            "error": "Failed to log paddle event",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/paddle-log/stats', methods=['GET'])
+def get_paddle_stats():
+    """
+    Get paddle statistics for all rivers or a specific river.
+
+    Query Parameters:
+        river: Filter by river name (optional, returns all if not specified)
+
+    Example: /api/paddle-log/stats?river=Locust%20Fork
+    """
+    if not paddle_log_available:
+        return jsonify({
+            "error": "Paddle log not available",
+            "message": "Paddle event tracking is not configured"
+        }), 503
+
+    river = request.args.get('river')
+
+    if river:
+        stats = get_paddle_river_stats(river)
+        return jsonify(stats)
+    else:
+        all_stats = get_all_paddle_stats()
+        return jsonify({
+            "rivers": all_stats,
+            "total_rivers": len(all_stats)
+        })
+
+
 @app.route('/api')
 def api_info():
     """API documentation endpoint"""
     return jsonify({
         "name": "USGS River Levels API",
-        "version": "1.5",
+        "version": "1.6",
         "dashboard": "/",
         "endpoints": {
             "health": "/api/health",
@@ -662,7 +804,9 @@ def api_info():
             "ocoee_combined": "/api/tva-history/ocoee/combined?days=7",
             "rainfall_today": "/api/rainfall",
             "rainfall_history": "/api/rainfall/{river_name}?days=30",
-            "rainfall_weekly": "/api/rainfall/{river_name}/weekly"
+            "rainfall_weekly": "/api/rainfall/{river_name}/weekly",
+            "paddle_log": "/api/paddle-log",
+            "paddle_log_stats": "/api/paddle-log/stats"
         },
         "examples": {
             "little_river": "/api/river-levels/02399200",
