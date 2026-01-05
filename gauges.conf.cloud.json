@@ -23,7 +23,7 @@
       "site": "02455000",
       "name": "Locust Fork",
       "include_discharge": true,
-      "min_ft": 1.70,
+      "min_ft": 2.0,
       "min_cfs": null,
       "good_ft": 2.5,
       "good_cfs": null,

@@ -893,7 +893,7 @@ void fetchRiverData() {
 | Site ID | Name | Measurement | min | good | Source |
 |---------|------|-------------|-----|------|--------|
 | 02450000 | Mulberry Fork | Stage (ft) | 5.0 ft | 10.0 ft | USGS |
-| 02455000 | Locust Fork | Stage (ft) | 1.70 ft | 2.5 ft | USGS |
+| 02455000 | Locust Fork | Stage (ft) | 2.0 ft | 2.5 ft | USGS |
 | 03572900 | Town Creek | Flow (cfs) | 180 cfs | 250 cfs | USGS |
 | 03572690 | South Sauty | Stage (ft) | 8.34 ft | 8.9 ft | USGS |
 | 03518500 | Tellico River | Stage (ft) | 1.70 ft | 2.0 ft | USGS |
@@ -932,6 +932,53 @@ Each river has configurable thresholds that determine its status:
 | 800-1,500 | Good medium | Light Green |
 | 1,500-2,500 | Good high (BEST!) | Green |
 | 2,500+ | Too high | Red |
+
+## Level Prediction Panel (Detail Pages)
+
+Each river's detail page (e.g., `/details/02455000.html`) includes a **Level Prediction Panel** that provides real-time analysis of water level trends and predictions.
+
+**Features:**
+- **Current Level** - Real-time water level reading
+- **Threshold** - The configured runnable threshold for that river
+- **Trend (8h)** - Direction based on 8-hour analysis:
+  - Rising ↗ (green) - water level increasing
+  - Falling ↘ (amber) - water level decreasing
+  - Steady → (gray) - minimal change
+- **Rate of Change** - Speed of rise/fall in ft/hr (8-hour average)
+- **Recent Peak** - Highest level observed in the 3-day window
+- **Distance to Threshold** - How far above (+) or below (-) the threshold
+- **ETA to Threshold** - Predicted time to reach/drop below threshold
+
+**Why 8 hours?** Using an 8-hour window provides more stable and representative predictions than shorter periods. Rivers can have temporary slowdowns or speedups in their rise/fall rate, and the 8-hour average smooths out these fluctuations.
+
+**Panel Appearance:**
+| State | Background Color | Meaning |
+|-------|------------------|---------|
+| Above threshold | Green gradient | Currently runnable |
+| Below threshold | Yellow/amber gradient | Not yet runnable |
+
+**Example Display:**
+```
+Level Prediction (Based on 8-hour trend analysis)
+
+Current Level: 2.16 ft    Threshold: 2.00 ft    Trend (8h): Falling ↘
+                                                             0.015 ft/hr
+
+Recent Peak: 2.55 ft    Distance to Threshold: +0.16 ft    ETA to Drop Below: ~10.7 hours
+```
+
+**Update Frequency:** Every 60 seconds with each data refresh.
+
+**Chart Threshold Lines:**
+The CFS and Feet charts also display a **green dashed horizontal line** at the runnable threshold, making it easy to visualize when the water level crosses the runnable point.
+
+**Chart Visual Improvements (2026-01-05):**
+- All charts feature subtle **vertical grid lines** (`rgba(0,0,0,0.08)`) for easier time reading
+- Increased x-axis tick marks (24 max) for better time resolution
+- Optimized font size (9px) for label readability
+- Applied to: CFS chart, Feet chart, and Historical chart
+
+---
 
 ## TVA Tailwater Trend (Dam Sites Only)
 

@@ -109,6 +109,8 @@ def get_location_links(site_id, tva_site_code):
                 'target="_blank" class="location-link">🚀 Suicide put in</a> '
                 '<a href="https://maps.app.goo.gl/WuMrPD13zbDKwzwx6" '
                 'target="_blank" class="location-link">📍 Eberhart Point</a> '
+                '<a href="https://maps.app.goo.gl/xV6Db9HyhbhEe8sT6" '
+                'target="_blank" class="location-link">🥾 Powell Trail</a> '
                 '<a href="https://maps.app.goo.gl/Rt7pv8qZzzUsFFh37" '
                 'target="_blank" class="location-link">🏁 Chair Lift Take Out</a>')
 
@@ -141,7 +143,7 @@ def get_location_links(site_id, tva_site_code):
 
 def fetch_usgs_7day_data(site_id, parameter_code):
     """
-    Fetch 7 days of historical data from USGS IV service.
+    Fetch 3 days of historical data from USGS IV service.
 
     Args:
         site_id: USGS site number (e.g., "02455000")
@@ -151,7 +153,7 @@ def fetch_usgs_7day_data(site_id, parameter_code):
         List of (timestamp_iso, value) tuples
     """
     end_date = datetime.now(timezone.utc)
-    start_date = end_date - timedelta(days=7)
+    start_date = end_date - timedelta(days=3)
 
     params = {
         "sites": site_id,
@@ -214,6 +216,19 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
 
     # StreamBeam sites only have feet data, no CFS
     is_streambeam = site_data.get("is_streambeam", False) or site_id == "1"
+
+    # Little River Canyon has special 6-level flow classification
+    is_lrc = site_id == "02399200"
+
+    # LRC flow guide levels and colors (from Adam Goshorn)
+    lrc_levels = [
+        {"min": 0, "max": 250, "label": "Not Runnable", "color": "#9ca3af"},
+        {"min": 250, "max": 400, "label": "Good Low", "color": "#fbbf24"},
+        {"min": 400, "max": 800, "label": "Shitty Medium", "color": "#a67c52"},
+        {"min": 800, "max": 1500, "label": "Good Medium", "color": "#86efac"},
+        {"min": 1500, "max": 2500, "label": "BEST!", "color": "#22c55e"},
+        {"min": 2500, "max": 99999, "label": "Too High", "color": "#ef4444"},
+    ]
     current_temp = site_data.get("temp_f")
     current_wind_mph = site_data.get("wind_mph")
     current_wind_dir = site_data.get("wind_dir", "")
@@ -267,6 +282,78 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
         min_ft = min(feet_values)
     else:
         avg_ft = max_ft = min_ft = 0
+
+    # Calculate level prediction (when will it reach threshold?)
+    level_prediction = None
+    if feet_values and len(feet_values) >= 32 and threshold_ft is not None:
+        current_level = feet_values[-1]
+
+        # Find peak in the data
+        peak_val = max(feet_values)
+        peak_idx = feet_values.index(peak_val)
+
+        # Calculate rate over last 8 hours (32 readings at 15-min intervals)
+        # Using 8 hours provides a more stable/representative rate than shorter windows
+        points_8h = 32
+        if len(feet_values) >= points_8h:
+            level_8h_ago = feet_values[-points_8h]
+            change_8h = current_level - level_8h_ago  # positive = rising, negative = falling
+            rate_per_hour = change_8h / 8.0
+
+            # Determine trend
+            if abs(rate_per_hour) < 0.005:
+                trend = "steady"
+                trend_icon = "→"
+                trend_color = "#6b7280"
+            elif rate_per_hour > 0:
+                trend = "rising"
+                trend_icon = "↗"
+                trend_color = "#22c55e"
+            else:
+                trend = "falling"
+                trend_icon = "↘"
+                trend_color = "#f59e0b"
+
+            # Calculate ETA to threshold
+            eta_hours = None
+            eta_text = None
+            distance_to_threshold = current_level - threshold_ft
+
+            if trend == "falling" and current_level > threshold_ft:
+                # Falling toward threshold - predict when we'll reach it
+                if rate_per_hour < 0:
+                    eta_hours = distance_to_threshold / abs(rate_per_hour)
+                    if eta_hours < 1:
+                        eta_text = f"~{int(eta_hours * 60)} minutes"
+                    elif eta_hours < 24:
+                        eta_text = f"~{eta_hours:.1f} hours"
+                    else:
+                        eta_text = f"~{eta_hours / 24:.1f} days"
+            elif trend == "rising" and current_level < threshold_ft:
+                # Rising toward threshold - predict when we'll reach it
+                if rate_per_hour > 0:
+                    eta_hours = abs(distance_to_threshold) / rate_per_hour
+                    if eta_hours < 1:
+                        eta_text = f"~{int(eta_hours * 60)} minutes"
+                    elif eta_hours < 24:
+                        eta_text = f"~{eta_hours:.1f} hours"
+                    else:
+                        eta_text = f"~{eta_hours / 24:.1f} days"
+
+            level_prediction = {
+                "current": current_level,
+                "threshold": threshold_ft,
+                "peak": peak_val,
+                "trend": trend,
+                "trend_icon": trend_icon,
+                "trend_color": trend_color,
+                "rate_per_hour": abs(rate_per_hour),
+                "change_8h": abs(change_8h),
+                "distance_to_threshold": abs(distance_to_threshold),
+                "eta_hours": eta_hours,
+                "eta_text": eta_text,
+                "above_threshold": current_level >= threshold_ft
+            }
 
     status_color = "#4ade80" if in_range else "#ef4444"
     status_text = "RUNNABLE" if in_range else "TOO LOW"
@@ -757,12 +844,49 @@ body {{
         <button class="avg-btn" data-hours="168" data-target="cfs">7d</button>
         <span class="avg-display"><span class="avg-value" id="cfsAvgValue">{f"{int(avg_cfs):,}" if avg_cfs > 0 else "N/A"}</span> CFS</span>
       </div>
-      <div class="chart-meta">Range: {f"{int(min_cfs):,} - {int(max_cfs):,}" if max_cfs > 0 else "N/A"} CFS (7-day)</div>
+      <div class="chart-meta">Range: {f"{int(min_cfs):,} - {int(max_cfs):,}" if max_cfs > 0 else "N/A"} CFS (3-day)</div>
       <div class="chart-canvas">
         <canvas id="cfsChart"></canvas>
       </div>
     </div>
   </div>'''}
+
+  {f'''<div class="lrc-flow-guide" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
+    <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 24px;">🌊</span> LRC Flow Guide
+      <span style="font-size: 12px; color: #64748b; font-weight: normal;">(Adam Goshorn)</span>
+    </h3>
+    <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;">
+      <div style="text-align: center; padding: 12px 8px; background: #9ca3af; border-radius: 8px; color: white;">
+        <div style="font-size: 13px; font-weight: bold;">&lt;250</div>
+        <div style="font-size: 11px; margin-top: 4px;">Not Runnable</div>
+      </div>
+      <div style="text-align: center; padding: 12px 8px; background: #fbbf24; border-radius: 8px; color: #78350f;">
+        <div style="font-size: 13px; font-weight: bold;">250-400</div>
+        <div style="font-size: 11px; margin-top: 4px;">Good Low</div>
+      </div>
+      <div style="text-align: center; padding: 12px 8px; background: #a67c52; border-radius: 8px; color: white;">
+        <div style="font-size: 13px; font-weight: bold;">400-800</div>
+        <div style="font-size: 11px; margin-top: 4px;">Shitty Medium</div>
+      </div>
+      <div style="text-align: center; padding: 12px 8px; background: #86efac; border-radius: 8px; color: #14532d;">
+        <div style="font-size: 13px; font-weight: bold;">800-1500</div>
+        <div style="font-size: 11px; margin-top: 4px;">Good Medium</div>
+      </div>
+      <div style="text-align: center; padding: 12px 8px; background: #22c55e; border-radius: 8px; color: white; box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);">
+        <div style="font-size: 13px; font-weight: bold;">1500-2500</div>
+        <div style="font-size: 11px; margin-top: 4px;">BEST! ⭐</div>
+      </div>
+      <div style="text-align: center; padding: 12px 8px; background: #ef4444; border-radius: 8px; color: white;">
+        <div style="font-size: 13px; font-weight: bold;">&gt;2500</div>
+        <div style="font-size: 11px; margin-top: 4px;">Too High</div>
+      </div>
+    </div>
+    <div style="margin-top: 12px; text-align: center; font-size: 12px; color: #64748b;">
+      Current: <strong style="color: #1e293b;">{int(current_cfs):,} CFS</strong>
+      {f' — <span style="background: {[l["color"] for l in lrc_levels if l["min"] <= (current_cfs or 0) < l["max"]][0] if current_cfs else "#9ca3af"}; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold;">{[l["label"] for l in lrc_levels if l["min"] <= (current_cfs or 0) < l["max"]][0] if current_cfs else "N/A"}</span>' if current_cfs else ''}
+    </div>
+  </div>''' if is_lrc else ''}
 
   {"" if is_tva else f'''<div class="chart-row">
     <div class="chart-box">
@@ -776,12 +900,49 @@ body {{
         <button class="avg-btn" data-hours="168" data-target="feet">7d</button>
         <span class="avg-display"><span class="avg-value" id="feetAvgValue">{avg_ft:.2f}</span> ft</span>
       </div>
-      <div class="chart-meta">Range: {min_ft:.2f} - {max_ft:.2f} ft (7-day)</div>
+      <div class="chart-meta">Range: {min_ft:.2f} - {max_ft:.2f} ft (3-day)</div>
       <div class="chart-canvas">
         <canvas id="feetChart"></canvas>
       </div>
     </div>
   </div>'''}
+
+  {f'''<div class="prediction-panel" style="background: linear-gradient(135deg, {'#ecfdf5' if level_prediction and level_prediction['above_threshold'] else '#fef3c7'} 0%, {'#d1fae5' if level_prediction and level_prediction['above_threshold'] else '#fde68a'} 100%); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <span style="font-size: 28px;">{level_prediction['trend_icon'] if level_prediction else '→'}</span>
+      <div>
+        <h3 style="margin: 0; font-size: 18px; color: #374151;">Level Prediction</h3>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #6b7280;">Based on 8-hour trend analysis</p>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px;">
+      <div style="background: white; border-radius: 8px; padding: 12px; text-align: center;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">Current Level</div>
+        <div style="font-size: 24px; font-weight: bold; color: #1f2937;">{level_prediction['current']:.2f} ft</div>
+      </div>
+      <div style="background: white; border-radius: 8px; padding: 12px; text-align: center;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">Threshold</div>
+        <div style="font-size: 24px; font-weight: bold; color: #22c55e;">{level_prediction['threshold']:.2f} ft</div>
+      </div>
+      <div style="background: white; border-radius: 8px; padding: 12px; text-align: center;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">Trend (8h)</div>
+        <div style="font-size: 24px; font-weight: bold; color: {level_prediction['trend_color']};">{level_prediction['trend'].title()} {level_prediction['trend_icon']}</div>
+        <div style="font-size: 12px; color: #6b7280;">{level_prediction['rate_per_hour']:.3f} ft/hr</div>
+      </div>
+      <div style="background: white; border-radius: 8px; padding: 12px; text-align: center;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">Recent Peak</div>
+        <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">{level_prediction['peak']:.2f} ft</div>
+      </div>
+      <div style="background: white; border-radius: 8px; padding: 12px; text-align: center;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">Distance to Threshold</div>
+        <div style="font-size: 24px; font-weight: bold; color: {'#22c55e' if level_prediction['above_threshold'] else '#f59e0b'};">{'+' if level_prediction['above_threshold'] else '-'}{level_prediction['distance_to_threshold']:.2f} ft</div>
+      </div>
+      <div style="background: {'#dcfce7' if level_prediction['eta_text'] and level_prediction['above_threshold'] else '#fef9c3' if level_prediction['eta_text'] else 'white'}; border-radius: 8px; padding: 12px; text-align: center;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">{'ETA to Drop Below' if level_prediction['above_threshold'] else 'ETA to Reach'} Threshold</div>
+        <div style="font-size: 20px; font-weight: bold; color: {'#16a34a' if level_prediction['above_threshold'] else '#d97706'};">{level_prediction['eta_text'] if level_prediction['eta_text'] else 'N/A'}</div>
+      </div>
+    </div>
+  </div>''' if level_prediction and not is_tva else ''}
 
   {"" if is_tva else f'''<div class="chart-row">
     <div class="chart-box" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);">
@@ -879,7 +1040,8 @@ body {{
       <div class="history-subtitle">Select time range to view historical trends</div>
     </div>
     <div class="history-controls">
-      <button class="range-btn active" data-days="7">7 Days</button>
+      <button class="range-btn active" data-days="3">3 Days</button>
+      <button class="range-btn" data-days="7">7 Days</button>
       <button class="range-btn" data-days="30">30 Days</button>
       <button class="range-btn" data-days="90">90 Days</button>
       <button class="range-btn" data-days="365">1 Year</button>
@@ -976,52 +1138,144 @@ if (cfsChartEl) {{
 const cfsCtx = cfsChartEl.getContext('2d');
 const cfsLabels = {json.dumps(cfs_labels)};
 const cfsValues = {json.dumps(cfs_values)};
+const thresholdCfs = {threshold_cfs if threshold_cfs is not None else 'null'};
+const isLrc = {'true' if is_lrc else 'false'};
+
+// LRC flow guide levels and colors (from Adam Goshorn)
+const lrcLevels = [
+  {{ cfs: 250, label: 'Good Low', color: '#fbbf24' }},
+  {{ cfs: 400, label: 'Shitty Medium', color: '#a67c52' }},
+  {{ cfs: 800, label: 'Good Medium', color: '#86efac' }},
+  {{ cfs: 1500, label: 'BEST!', color: '#22c55e' }},
+  {{ cfs: 2500, label: 'Too High', color: '#ef4444' }}
+];
 
 if (cfsLabels.length === 0 || cfsValues.length === 0) {{
   cfsCtx.canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">No CFS data available for this site</div>';
 }} else {{
+  // Get current CFS to determine which threshold lines to show
+  const currentCfs = cfsValues[cfsValues.length - 1];
+
+  // Build datasets - main data line + threshold lines
+  const cfsDatasets = [{{
+    label: 'CFS',
+    data: cfsValues,
+    borderColor: '#1a73e8',
+    backgroundColor: 'rgba(26, 115, 232, 0.1)',
+    borderWidth: 2,
+    tension: 0.4,
+    fill: true,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+    order: 10
+  }}];
+
+  // Add LRC threshold lines - only show relevant ones based on current CFS
+  if (isLrc) {{
+    // Determine which zone we're in and show only relevant thresholds
+    let relevantLevels = [];
+
+    if (currentCfs < 250) {{
+      // Not Runnable - show threshold to Good Low
+      relevantLevels = lrcLevels.filter(l => l.cfs === 250);
+    }} else if (currentCfs < 400) {{
+      // Good Low - show lower bound and next threshold
+      relevantLevels = lrcLevels.filter(l => l.cfs === 250 || l.cfs === 400);
+    }} else if (currentCfs < 800) {{
+      // Shitty Medium - show bounds
+      relevantLevels = lrcLevels.filter(l => l.cfs === 400 || l.cfs === 800);
+    }} else if (currentCfs < 1500) {{
+      // Good Medium - show bounds
+      relevantLevels = lrcLevels.filter(l => l.cfs === 800 || l.cfs === 1500);
+    }} else if (currentCfs < 2500) {{
+      // BEST! - show bounds
+      relevantLevels = lrcLevels.filter(l => l.cfs === 1500 || l.cfs === 2500);
+    }} else {{
+      // Too High - show the threshold we crossed
+      relevantLevels = lrcLevels.filter(l => l.cfs === 2500);
+    }}
+
+    relevantLevels.forEach((level, idx) => {{
+      cfsDatasets.push({{
+        label: level.cfs + ' CFS (' + level.label + ')',
+        data: cfsLabels.map(() => level.cfs),
+        borderColor: level.color,
+        borderWidth: 2,
+        borderDash: [6, 4],
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        fill: false,
+        tension: 0,
+        order: idx
+      }});
+    }});
+  }} else if (thresholdCfs !== null) {{
+    cfsDatasets.push({{
+      label: 'Runnable Threshold',
+      data: cfsLabels.map(() => thresholdCfs),
+      borderColor: '#22c55e',
+      borderWidth: 2,
+      borderDash: [6, 4],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      fill: false,
+      tension: 0,
+      order: 0
+    }});
+  }}
+
   new Chart(cfsCtx, {{
     type: 'line',
     data: {{
       labels: cfsLabels,
-      datasets: [{{
-        label: 'CFS',
-        data: cfsValues,
-      borderColor: '#1a73e8',
-      backgroundColor: 'rgba(26, 115, 232, 0.1)',
-      borderWidth: 2,
-      tension: 0.4,
-      fill: true,
-      pointRadius: 0,
-      pointHoverRadius: 4
-    }}]
-  }},
-  options: {{
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {{
-      legend: {{ display: false }},
-      tooltip: {{
-        mode: 'index',
-        intersect: false,
-      }}
+      datasets: cfsDatasets
     }},
-    scales: {{
-      x: {{
-        ticks: {{
-          maxRotation: 45,
-          minRotation: 45,
-          autoSkip: true,
-          maxTicksLimit: 10
+    options: {{
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {{
+        legend: {{
+          display: isLrc || thresholdCfs !== null,
+          position: 'top',
+          labels: {{
+            usePointStyle: true,
+            boxWidth: 30,
+            font: {{ size: 10 }},
+            filter: function(legendItem, data) {{
+              // For LRC, show threshold lines in legend; for others, hide threshold
+              if (isLrc) {{
+                return legendItem.text !== 'CFS';  // Show all threshold lines, hide main CFS line from legend
+              }}
+              return legendItem.text !== 'Runnable Threshold';
+            }}
+          }}
         }},
-        grid: {{ display: false }}
+        tooltip: {{
+          mode: 'index',
+          intersect: false,
+          filter: function(tooltipItem) {{
+            // Hide all threshold lines from tooltip
+            return tooltipItem.dataset.label === 'CFS';
+          }}
+        }}
       }},
-      y: {{
-        beginAtZero: false,
-        grid: {{ color: 'rgba(0,0,0,0.05)' }}
+      scales: {{
+        x: {{
+          ticks: {{
+            maxRotation: 45,
+            minRotation: 45,
+            autoSkip: true,
+            maxTicksLimit: 24,
+            font: {{ size: 9 }}
+          }},
+          grid: {{ color: 'rgba(0,0,0,0.08)' }}
+        }},
+        y: {{
+          beginAtZero: false,
+          grid: {{ color: 'rgba(0,0,0,0.05)' }}
+        }}
       }}
     }}
-  }}
   }});
 }}
 }} // End cfsChartEl check
@@ -1030,52 +1284,86 @@ if (cfsLabels.length === 0 || cfsValues.length === 0) {{
 const feetCtx = document.getElementById('feetChart').getContext('2d');
 const feetLabels = {json.dumps(feet_labels)};
 const feetValues = {json.dumps(feet_values)};
+const thresholdFt = {threshold_ft if threshold_ft is not None else 'null'};
 
 if (feetLabels.length === 0 || feetValues.length === 0) {{
   feetCtx.canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">No gage height data available for this site</div>';
 }} else {{
+  // Build datasets - main data line + optional threshold line
+  const feetDatasets = [{{
+    label: 'Feet',
+    data: feetValues,
+    borderColor: '#1a73e8',
+    backgroundColor: 'rgba(26, 115, 232, 0.1)',
+    borderWidth: 2,
+    tension: 0.4,
+    fill: true,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+    order: 1
+  }}];
+
+  // Add threshold line if we have a threshold value
+  if (thresholdFt !== null) {{
+    feetDatasets.push({{
+      label: 'Runnable Threshold',
+      data: feetLabels.map(() => thresholdFt),
+      borderColor: '#22c55e',
+      borderWidth: 2,
+      borderDash: [6, 4],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      fill: false,
+      tension: 0,
+      order: 0
+    }});
+  }}
+
   new Chart(feetCtx, {{
     type: 'line',
     data: {{
       labels: feetLabels,
-      datasets: [{{
-        label: 'Feet',
-        data: feetValues,
-      borderColor: '#1a73e8',
-      backgroundColor: 'rgba(26, 115, 232, 0.1)',
-      borderWidth: 2,
-      tension: 0.4,
-      fill: true,
-      pointRadius: 0,
-      pointHoverRadius: 4
-    }}]
-  }},
-  options: {{
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {{
-      legend: {{ display: false }},
-      tooltip: {{
-        mode: 'index',
-        intersect: false,
-      }}
+      datasets: feetDatasets
     }},
-    scales: {{
-      x: {{
-        ticks: {{
-          maxRotation: 45,
-          minRotation: 45,
-          autoSkip: true,
-          maxTicksLimit: 10
+    options: {{
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {{
+        legend: {{
+          display: thresholdFt !== null,
+          position: 'top',
+          labels: {{
+            usePointStyle: true,
+            boxWidth: 30,
+            font: {{ size: 11 }}
+          }}
         }},
-        grid: {{ display: false }}
+        tooltip: {{
+          mode: 'index',
+          intersect: false,
+          filter: function(tooltipItem) {{
+            // Hide threshold line from tooltip
+            return tooltipItem.dataset.label !== 'Runnable Threshold';
+          }}
+        }}
       }},
-      y: {{
-        beginAtZero: false,
-        grid: {{ color: 'rgba(0,0,0,0.05)' }}
+      scales: {{
+        x: {{
+          ticks: {{
+            maxRotation: 45,
+            minRotation: 45,
+            autoSkip: true,
+            maxTicksLimit: 24,
+            font: {{ size: 9 }}
+          }},
+          grid: {{ color: 'rgba(0,0,0,0.08)' }}
+        }},
+        y: {{
+          beginAtZero: false,
+          grid: {{ color: 'rgba(0,0,0,0.05)' }}
+        }}
       }}
     }}
-  }}
   }});
 }}
 
@@ -1204,9 +1492,22 @@ if (rainChartEl) {{
       return;
     }}
 
+    // Format labels based on time range for better readability
+    const currentDays = parseInt(document.querySelector('.range-btn.active')?.dataset.days || 3);
     const labels = data.cfs.map(o => {{
       const d = new Date(o.timestamp);
-      return d.toLocaleDateString('en-US', {{ month: 'short', day: 'numeric', hour: 'numeric' }});
+      if (currentDays <= 3) {{
+        // For 3 days or less, show day + time (e.g., "Sat 2pm")
+        return d.toLocaleDateString('en-US', {{ weekday: 'short' }}) + ' ' +
+               d.toLocaleTimeString('en-US', {{ hour: 'numeric', hour12: true }});
+      }} else if (currentDays <= 7) {{
+        // For 7 days, show month/day + hour (e.g., "Jan 4 2pm")
+        return d.toLocaleDateString('en-US', {{ month: 'short', day: 'numeric' }}) + ' ' +
+               d.toLocaleTimeString('en-US', {{ hour: 'numeric', hour12: true }});
+      }} else {{
+        // For longer ranges, show month/day only
+        return d.toLocaleDateString('en-US', {{ month: 'short', day: 'numeric' }});
+      }}
     }});
 
     const cfsData = data.cfs.map(o => o.value);
@@ -1282,9 +1583,10 @@ if (rainChartEl) {{
               maxRotation: 45,
               minRotation: 45,
               autoSkip: true,
-              maxTicksLimit: 12
+              maxTicksLimit: 24,
+              font: {{ size: 9 }}
             }},
-            grid: {{ display: false }}
+            grid: {{ color: 'rgba(0,0,0,0.08)' }}
           }},
           y: {{
             type: 'linear',
@@ -1332,8 +1634,8 @@ if (rainChartEl) {{
     }});
   }});
 
-  // Initial load
-  updateChart(7);
+  // Initial load - default to 3 days
+  updateChart(3);
 }})();
 </script>'''}
 

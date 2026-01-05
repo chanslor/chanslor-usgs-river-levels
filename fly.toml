@@ -2,7 +2,7 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 
 app = 'docker-blue-sound-1751'
-primary_region = 'iad'
+primary_region = 'dfw'
 
 [build]
   dockerfile = "Containerfile.api.simple"

@@ -218,8 +218,17 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
 
 8. **site_detail.py** — Site detail page generator
    - Creates individual detail pages for each gauge
-   - Historical section with 7d/30d/90d/1yr time range selector
+   - **3-day CFS and Feet charts** with runnable threshold line (green dashed)
+   - **Level Prediction Panel** - Shows trend analysis and ETA to threshold:
+     - Current level, threshold, trend (rising/falling/steady)
+     - Rate of change (ft/hr) based on 8-hour analysis
+     - Distance to threshold (+/- feet)
+     - ETA to reach or drop below threshold
+     - Updates every 60 seconds with fresh data
+   - Historical section with 3d/7d/30d/90d/1yr time range selector
    - Dual-axis Chart.js charts (CFS left, gage height right)
+   - Average period selector (24h/48h/3d/7d) for quick stats
+   - Rainfall chart with QPF forecast overlay
    - Stats cards showing data points, max/avg CFS, max height
    - Fetches data dynamically from `/api/usgs-history/{site_id}`
    - Linked from main dashboard for deep-dive analysis
@@ -662,7 +671,7 @@ TVA dam sites display tailwater trend when water is pouring over the dam spillwa
 | River | min | good | Data Source |
 |-------|-----|------|-------------|
 | Mulberry Fork | 5.0 ft | 10.0 ft | USGS |
-| Locust Fork | 1.70 ft | 2.5 ft | USGS |
+| Locust Fork | 2.0 ft | 2.5 ft | USGS |
 | Town Creek | 180 cfs | 250 cfs | USGS |
 | South Sauty | 8.34 ft | 8.9 ft | USGS |
 | Tellico River | 1.70 ft | 2.0 ft | USGS |
@@ -835,16 +844,70 @@ systemctl --user restart usgs-alert.service
 
 ## Git Repository State
 
-**Current Production Status**: Working as of 01-02-2026
+**Current Production Status**: Working as of 01-05-2026
 
 **Production Deployment:**
 - URL: https://docker-blue-sound-1751.fly.dev/
+- Region: Dallas (dfw) - migrated from iad on 2026-01-05
 - Containerfile: `Containerfile.api.simple`
 - Entrypoint: `entrypoint-api.sh`
-- Features: Flask API + Dashboard + ESP32 endpoints + TVA integration + Historical Charts + Rainfall History
+- Features: Flask API + Dashboard + ESP32 endpoints + TVA integration + Historical Charts + Rainfall History + Level Predictions
 - **Total Sites Monitored**: 12 rivers
 
+**Fly.io Reference**: See **[FLY_IO.md](FLY_IO.md)** for complete Fly.io deployment guide including:
+- Basic commands reference
+- Region migration procedures
+- Volume management
+- Troubleshooting common issues
+
 **Recent Updates:**
+- **2026-01-05: Migrated to Dallas (dfw) Region**
+  - Forked volume from iad to dfw to preserve all historical data
+  - Migration required due to persistent "insufficient memory" errors in iad region
+  - All SQLite databases preserved: rainfall_history, tva_history, paddle_log, state, caches
+  - Updated fly.toml `primary_region` from 'iad' to 'dfw'
+  - See FLY_IO.md for complete migration procedure
+
+- **2026-01-05: Added Vertical Grid Lines to Charts**
+  - All detail page charts now have subtle vertical grid lines for better time reading
+  - Changed x-axis grid from `display: false` to `color: 'rgba(0,0,0,0.08)'`
+  - Increased `maxTicksLimit` from 18 to 24 for more x-axis time labels
+  - Reduced font size from 10 to 9 for better label fit
+  - Applied to: CFS chart, Feet chart, Historical chart
+
+- **2026-01-05: Added LRC Flow Guide to Little River Canyon Detail Page**
+  - Interactive flow guide panel with 6-level classification (from Adam Goshorn)
+  - Color-coded zones: Not Runnable (<250), Good Low (250-400), Shitty Medium (400-800), Good Medium (800-1500), BEST! (1500-2500), Too High (>2500)
+  - Multi-level horizontal threshold lines on CFS chart matching flow guide colors
+  - Current CFS shown with matching zone badge
+  - Only appears on Little River Canyon (02399200) detail page
+
+- **2026-01-04: Added Level Prediction Panel to Detail Pages**
+  - Real-time prediction of when river will reach/drop below runnable threshold
+  - Shows current level, threshold, trend direction (rising ↗ / falling ↘ / steady →)
+  - Calculates rate of change (ft/hr) based on 8-hour trend analysis
+  - Uses 8-hour window for more stable/representative predictions than shorter periods
+  - Displays distance to threshold (+/- feet) and ETA
+  - Green-tinted panel when above threshold, yellow when below
+  - Updates every 60 seconds with each data refresh
+  - Example: "Falling ↘ at 0.015 ft/hr → ETA to 2.0 ft: ~10.7 hours"
+
+- **2026-01-04: Added Runnable Threshold Lines to Charts**
+  - Green dashed horizontal line on Feet chart at runnable threshold
+  - Green dashed horizontal line on CFS chart at runnable threshold (if CFS-based)
+  - Makes it easy to see when water level crosses runnable threshold
+  - Legend shows "Runnable Threshold" label
+
+- **2026-01-04: Changed Default Chart Range to 3 Days**
+  - Detail page CFS and Feet charts now show 3 days instead of 7 days
+  - Historical section default changed from 7 days to 3 days
+  - More x-axis tick marks for better time resolution
+  - Smarter time labels: "Sat 2pm" for 3-day, "Jan 4 2pm" for 7-day
+
+- **2026-01-04: Updated Locust Fork Threshold**
+  - Changed runnable threshold from 1.70 ft to 2.0 ft
+  - Based on paddler experience and better reflects actual runnable conditions
+
 - **2026-01-03: Added Paddle Event Log**
   - New `paddle_log.py` module for tracking successful paddle runs
   - Records paddle events with rainfall correlation data (24h, 48h, 72h, 7d rain)
