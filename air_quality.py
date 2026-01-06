@@ -22,7 +22,7 @@ import requests
 # AQI category definitions (US EPA standard)
 AQI_CATEGORIES = [
     (50, "Good", "#00e400"),           # Green
-    (100, "Moderate", "#ffff00"),       # Yellow
+    (100, "Moderate", "#b8860b"),       # Dark Goldenrod (readable yellow)
     (150, "Unhealthy for Sensitive", "#ff7e00"),  # Orange
     (200, "Unhealthy", "#ff0000"),      # Red
     (300, "Very Unhealthy", "#8f3f97"), # Purple

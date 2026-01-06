@@ -552,6 +552,29 @@ def _get_streambeam_trend_data(site_name: str, hours: int = 12):
     except Exception:
         return None
 
+
+def get_streambeam_history_for_detail(site_name: str, days: int = 3):
+    """
+    Fetch StreamBeam history for detail page charts.
+    Returns list of (timestamp, feet) tuples in same format as fetch_usgs_7day_data().
+    """
+    global _streambeam_conn
+    if _streambeam_conn is None:
+        return []
+    try:
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+        rows = _streambeam_conn.execute("""
+            SELECT timestamp, stage_ft FROM streambeam_history
+            WHERE site_name = ? AND timestamp >= ?
+            ORDER BY timestamp ASC
+        """, (site_name, cutoff)).fetchall()
+
+        # Return as list of (timestamp, value) tuples
+        return [(row[0], row[1]) for row in rows]
+    except Exception as e:
+        print(f"[STREAMBEAM] Error fetching history for {site_name}: {e}")
+        return []
+
 def convert_streambeam_timestamp_to_iso(timestamp_str: str) -> str:
     """
     Convert StreamBeam timestamp format to ISO 8601.
@@ -2057,9 +2080,20 @@ def main():
                     continue
 
                 try:
-                    # Fetch 7-day historical data
-                    cfs_history = fetch_usgs_7day_data(site_id, "00060")  # Discharge
-                    feet_history = fetch_usgs_7day_data(site_id, "00065")  # Gage height
+                    # Check if this is a StreamBeam site (site_id = "1")
+                    is_streambeam_site = site_id == "1"
+
+                    if is_streambeam_site:
+                        # StreamBeam sites use local history table, not USGS API
+                        site_name = row.get("name", "Short Creek")
+                        cfs_history = []  # StreamBeam doesn't have CFS data
+                        feet_history = get_streambeam_history_for_detail(site_name, days=3)
+                        if not args.quiet:
+                            print(f"[STREAMBEAM] Fetched {len(feet_history)} history points for {site_name}")
+                    else:
+                        # Fetch 7-day historical data from USGS
+                        cfs_history = fetch_usgs_7day_data(site_id, "00060")  # Discharge
+                        feet_history = fetch_usgs_7day_data(site_id, "00065")  # Gage height
 
                     # Get state data for last_in_epoch
                     site_state = get_site_state(site_id) if conn else {}
@@ -2099,6 +2133,7 @@ def main():
                         "in_range": row.get("in_range", False),
                         "last_in_time": last_in_time,
                         "is_tva": is_tva_source,
+                        "is_streambeam": is_streambeam_site,
                         "tva_site_code": site_id if is_tva_source else None,
                         # PWS station info
                         "pws_station": active_obs.get("station_id") if active_obs else None,

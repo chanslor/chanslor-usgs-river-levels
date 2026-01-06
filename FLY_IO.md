@@ -156,6 +156,8 @@ fly volumes extend <volume_id> --size 2 -a docker-blue-sound-1751
 fly platform regions
 ```
 
+![Fly.io Platform Regions](fly-io.stats.png)
+
 ### Common Regions
 
 | Code | Location | Notes |
@@ -544,4 +546,4 @@ Files stored in `/data/` (persistent across deployments):
 
 ---
 
-*Last Updated: 2026-01-05*
+*Last Updated: 2026-01-04*

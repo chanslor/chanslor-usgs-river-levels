@@ -217,6 +217,9 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
     # StreamBeam sites only have feet data, no CFS
     is_streambeam = site_data.get("is_streambeam", False) or site_id == "1"
 
+    # Locust Fork - hide CFS chart (user preference - feet-based river)
+    hide_cfs_chart = site_id == "02455000"
+
     # Little River Canyon has special 6-level flow classification
     is_lrc = site_id == "02399200"
 
@@ -832,7 +835,7 @@ body {{
 
   {tva_forecast_html}
 
-  {"" if is_tva or is_streambeam else f'''<div class="chart-row">
+  {"" if is_tva or is_streambeam or hide_cfs_chart else f'''<div class="chart-row">
     <div class="chart-box">
       <h2>Discharge (CFS)</h2>
       <div class="chart-value">{f"{int(current_cfs):,}" if current_cfs is not None else "N/A"} <span style="font-size:18px; font-weight:normal;">CFS</span></div>
