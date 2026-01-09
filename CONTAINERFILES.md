@@ -4,6 +4,24 @@ This document describes all available Containerfiles in this project and their u
 
 ## Production Containerfiles
 
+### Containerfile (symlink) ⭐ DEFAULT
+
+**Purpose**: Symlink to `Containerfile.api.simple` for convenient default builds
+
+**Note:** `Containerfile` is a symbolic link, not a standalone file:
+```
+Containerfile -> Containerfile.api.simple
+```
+
+**Build:**
+```bash
+podman build -t usgs-api:latest .
+```
+
+This uses the production configuration by default.
+
+---
+
 ### Containerfile.api.simple ⭐ CURRENT PRODUCTION
 
 **Purpose**: Single-stage Ubuntu build with Flask API + Dashboard
@@ -35,28 +53,6 @@ podman build -f Containerfile.api.simple -t usgs-api:latest .
 ---
 
 ## Legacy/Alternative Containerfiles
-
-### Containerfile
-
-**Purpose**: Original multi-stage Alpine build
-
-**Features:**
-- Base: Alpine Linux
-- Multi-stage build (builder + runtime)
-- Python HTTP server (no Flask)
-- Static file serving only
-- Smaller image size
-
-**Build:**
-```bash
-podman build -t usgs-alert:latest .
-```
-
-**Use Case:** Lightweight deployments without API requirements
-
-**Entry Point:** `/app/entrypoint.sh`
-
----
 
 ### Containerfile.cloud
 
@@ -128,26 +124,29 @@ podman build -f Containerfile.ubuntu -t usgs-ubuntu:latest .
 
 | Containerfile | Base OS | Stages | Flask API | Image Size | Complexity | Production Ready |
 |---------------|---------|--------|-----------|------------|------------|------------------|
+| **Containerfile** (symlink) | Ubuntu 22.04 | Single | ✅ Yes | ~450MB | Low | ✅ **DEFAULT** |
 | **Containerfile.api.simple** | Ubuntu 22.04 | Single | ✅ Yes | ~450MB | Low | ✅ **CURRENT** |
-| Containerfile | Alpine | Multi | ❌ No | ~200MB | Medium | ✅ Yes |
 | Containerfile.cloud | Alpine | Multi | ❌ No | ~200MB | Medium | ✅ Yes |
 | Containerfile.cloud.api | Alpine | Multi | ✅ Yes | ~250MB | Medium | ⚠️ Maybe |
 | Containerfile.ubuntu | Ubuntu 22.04 | Single | ❌ No | ~400MB | Low | ✅ Yes |
+
+**Note:** `Containerfile` is a symlink to `Containerfile.api.simple`, so they produce identical images.
 
 ---
 
 ## Choosing a Containerfile
 
 ### For Production (Fly.io)
-**Use:** `Containerfile.api.simple`
+**Use:** `Containerfile` (or `Containerfile.api.simple`)
+- Default symlink points to production config
 - Most reliable
 - Full Python compatibility
 - Flask API + Dashboard
 - Currently deployed
 
 ### For Lightweight Deployments (No API)
-**Use:** `Containerfile` or `Containerfile.cloud`
-- Smaller footprint
+**Use:** `Containerfile.cloud`
+- Smaller footprint (Alpine base)
 - Dashboard only
 - No ESP32 API
 
