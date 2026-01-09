@@ -200,9 +200,12 @@ This index provides a quick overview of all documentation files and their purpos
 
 ## 🔄 Documentation Updates
 
-**Last Full Review**: December 23, 2025
+**Last Full Review**: January 7, 2026
 
 **Recent Documentation Changes:**
+- ✅ Added North Chickamauga Creek (TN) with Visual Gauge conversion (2026-01-07)
+- ✅ Added Visual Gauge chart to North Chickamauga detail page (2026-01-07)
+- ✅ Added Rain Forecast Marquee feature documentation (2026-01-05)
 - ✅ Added USGS history API endpoint documentation (`/api/usgs-history/{site_id}`)
 - ✅ Updated detail pages to include 7d/30d/90d/1yr time range selector
 - ✅ Updated API_README.md with historical data endpoints
@@ -245,10 +248,10 @@ If documentation is unclear or outdated:
 
 | Document | Completeness | Accuracy | Last Updated |
 |----------|--------------|----------|--------------|
-| CLAUDE.md | ✅ 100% | ✅ Current | 2025-12-23 |
+| CLAUDE.md | ✅ 100% | ✅ Current | 2026-01-07 |
 | API_README.md | ✅ 100% | ✅ Current | 2025-12-23 |
-| DOCS_INDEX.md | ✅ 100% | ✅ Current | 2025-12-23 |
-| README.md | ✅ 100% | ✅ Current | 2025-12-23 |
+| DOCS_INDEX.md | ✅ 100% | ✅ Current | 2026-01-07 |
+| README.md | ✅ 100% | ✅ Current | 2026-01-07 |
 | DEPLOYMENT_SUMMARY.md | ✅ 100% | ✅ Current | 2025-11-19 |
 | CONTAINERFILES.md | ✅ 100% | ✅ Current | 2025-11-19 |
 | TVA_HIWASSEE_DRIES.md | ✅ 100% | ✅ Current | 2025-12-19 |

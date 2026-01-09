@@ -447,6 +447,14 @@ tail -f /tmp/flask.log  # if logging to file
 
 ## Changelog
 
+### 2026-01-05 - Rain Forecast Marquee
+- ✅ Added scrolling rain forecast banner at top of main dashboard
+- ✅ Appears when any river has >0.25" QPF forecast
+- ✅ Shows which rivers have rain and timing (Today, Tomorrow, Day 3)
+- ✅ Dark blue gradient with smooth horizontal scroll animation
+- ✅ Pauses on hover for easy reading
+- ✅ Hidden when no rain is forecast
+
 ### 2025-12-15 - Sparkline Threshold-Based Coloring & Drought Monitor
 - ✅ Changed sparkline bars to show runnable status instead of rising/falling
 - ✅ Green bars = at or above threshold (runnable)

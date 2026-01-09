@@ -108,6 +108,17 @@
       "fips": "13215"
     },
     {
+      "site": "03566535",
+      "name": "North Chickamauga",
+      "include_discharge": true,
+      "min_ft": 5.2,
+      "min_cfs": null,
+      "good_ft": 6.6,
+      "good_cfs": null,
+      "lat": 35.2112,
+      "lon": -85.2152
+    },
+    {
       "source": "tva",
       "tva_site_code": "HADT1",
       "name": "Hiwassee Dries",
@@ -129,7 +140,8 @@
       "good_ft": null,
       "good_cfs": 1250,
       "lat": 35.040,
-      "lon": -84.467
+      "lon": -84.467,
+      "experimental": true
     },
     {
       "source": "tva",
@@ -141,7 +153,8 @@
       "good_ft": null,
       "good_cfs": 1250,
       "lat": 35.093,
-      "lon": -84.510
+      "lon": -84.510,
+      "experimental": true
     },
     {
       "source": "tva",
@@ -153,7 +166,8 @@
       "good_ft": null,
       "good_cfs": 1000,
       "lat": 35.095,
-      "lon": -84.647
+      "lon": -84.647,
+      "experimental": true
     }
   ],
 
@@ -282,6 +296,14 @@
         "rain_needed_inches": 0,
         "responsiveness": "dam-controlled",
         "notes": "TVA Parksville Dam releases for Lower Ocoee."
+      },
+      "03566535": {
+        "name": "North Chickamauga",
+        "avg_response_hours": 18,
+        "response_range": [12, 24],
+        "rain_needed_inches": 2.0,
+        "responsiveness": "fast",
+        "notes": "Fast up, fast down. Needs several inches of rain. Tracking data to refine predictions."
       }
     }
   },

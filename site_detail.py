@@ -223,6 +223,11 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
     # Little River Canyon has special 6-level flow classification
     is_lrc = site_id == "02399200"
 
+    # North Chickamauga has visual gauge conversion
+    # Visual = 0.69 × USGS_Stage - 1.89
+    is_north_chick = site_id == "03566535"
+    visual_threshold = 1.7  # Runnable threshold in visual feet
+
     # LRC flow guide levels and colors (from Adam Goshorn)
     lrc_levels = [
         {"min": 0, "max": 250, "label": "Not Runnable", "color": "#9ca3af"},
@@ -264,6 +269,15 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
         except Exception:
             continue
 
+    # Calculate visual gauge values for North Chickamauga
+    # Formula: Visual = 0.69 × USGS_Stage - 1.89
+    visual_values = []
+    if is_north_chick and feet_values:
+        visual_values = [0.69 * ft - 1.89 for ft in feet_values]
+        current_visual = 0.69 * (current_ft or 0) - 1.89 if current_ft else None
+    else:
+        current_visual = None
+
     # Calculate stats (7-day range, but 3-day average)
     # 3 days of data at 15-min intervals = 288 points
     three_day_points = 288
@@ -285,6 +299,15 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
         min_ft = min(feet_values)
     else:
         avg_ft = max_ft = min_ft = 0
+
+    # Calculate visual gauge stats for North Chickamauga
+    if visual_values:
+        recent_visual = visual_values[-three_day_points:] if len(visual_values) > three_day_points else visual_values
+        avg_visual = sum(recent_visual) / len(recent_visual)
+        max_visual = max(visual_values)
+        min_visual = min(visual_values)
+    else:
+        avg_visual = max_visual = min_visual = 0
 
     # Calculate level prediction (when will it reach threshold?)
     level_prediction = None
@@ -835,6 +858,29 @@ body {{
 
   {tva_forecast_html}
 
+  {f'''<div class="chart-row">
+    <div class="chart-box" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+      <h2 style="color: #92400e;">📏 Visual Gauge (Estimated)</h2>
+      <div class="chart-value" style="color: #b45309;">{f"{current_visual:.2f}" if current_visual is not None else "N/A"} <span style="font-size:18px; font-weight:normal;">ft visual</span></div>
+      <div class="avg-controls">
+        <span class="avg-label">Average:</span>
+        <button class="avg-btn" data-hours="24" data-target="visual">24h</button>
+        <button class="avg-btn" data-hours="48" data-target="visual">48h</button>
+        <button class="avg-btn active" data-hours="72" data-target="visual">3d</button>
+        <button class="avg-btn" data-hours="168" data-target="visual">7d</button>
+        <span class="avg-display"><span class="avg-value" id="visualAvgValue">{f"{avg_visual:.2f}" if avg_visual else "N/A"}</span> ft</span>
+      </div>
+      <div class="chart-meta">Range: {f"{min_visual:.2f} - {max_visual:.2f}" if max_visual else "N/A"} ft visual (3-day) · <span style="color:#22c55e;">Runnable ≥ 1.7 ft</span></div>
+      <div class="chart-canvas">
+        <canvas id="visualChart"></canvas>
+      </div>
+      <div style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px; font-size: 12px; color: #78350f;">
+        <strong>Note:</strong> Visual gauge is calculated from USGS stage using formula: <code>Visual = 0.69 × Stage - 1.89</code>
+        <br>Calibration: 6.22 ft USGS = 2.42 ft visual, 5.34 ft USGS = 1.81 ft visual
+      </div>
+    </div>
+  </div>''' if is_north_chick else ''}
+
   {"" if is_tva or is_streambeam or hide_cfs_chart else f'''<div class="chart-row">
     <div class="chart-box">
       <h2>Discharge (CFS)</h2>
@@ -1096,6 +1142,7 @@ console.log('Feet Values:', {json.dumps(feet_values)});
 (function() {{
   const cfsValues = {json.dumps(cfs_values)};
   const feetValues = {json.dumps(feet_values)};
+  const visualValues = {json.dumps(visual_values)};
 
   // Data is ~4 readings per hour (15-min intervals)
   const pointsPerHour = 4;
@@ -1125,15 +1172,115 @@ console.log('Feet Values:', {json.dumps(feet_values)});
       this.classList.add('active');
 
       // Calculate and update average
-      const values = target === 'cfs' ? cfsValues : feetValues;
+      let values;
+      let displayElId;
+      if (target === 'cfs') {{
+        values = cfsValues;
+        displayElId = 'cfsAvgValue';
+      }} else if (target === 'visual') {{
+        values = visualValues;
+        displayElId = 'visualAvgValue';
+      }} else {{
+        values = feetValues;
+        displayElId = 'feetAvgValue';
+      }}
       const avg = calculateAvg(values, hours);
-      const displayEl = document.getElementById(target === 'cfs' ? 'cfsAvgValue' : 'feetAvgValue');
+      const displayEl = document.getElementById(displayElId);
       if (displayEl) {{
         displayEl.textContent = formatValue(avg, target === 'cfs');
       }}
     }});
   }});
 }})();
+
+// Visual Gauge Chart (only for North Chickamauga)
+const visualChartEl = document.getElementById('visualChart');
+if (visualChartEl) {{
+  const visualCtx = visualChartEl.getContext('2d');
+  const visualLabels = {json.dumps(feet_labels)};  // Same timestamps as feet
+  const visualValues = {json.dumps(visual_values)};
+  const visualThreshold = {visual_threshold};  // Runnable threshold in visual feet
+
+  if (visualLabels.length === 0 || visualValues.length === 0) {{
+    visualCtx.canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">No visual gauge data available</div>';
+  }} else {{
+    new Chart(visualCtx, {{
+      type: 'line',
+      data: {{
+        labels: visualLabels,
+        datasets: [
+          {{
+            label: 'Visual Gauge',
+            data: visualValues,
+            borderColor: '#b45309',
+            backgroundColor: 'rgba(180, 83, 9, 0.15)',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            order: 1
+          }},
+          {{
+            label: 'Runnable (1.7 ft)',
+            data: visualLabels.map(() => visualThreshold),
+            borderColor: '#22c55e',
+            borderWidth: 2,
+            borderDash: [6, 4],
+            pointRadius: 0,
+            pointHoverRadius: 0,
+            fill: false,
+            tension: 0,
+            order: 0
+          }}
+        ]
+      }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {{
+          legend: {{
+            display: true,
+            position: 'top',
+            labels: {{
+              usePointStyle: true,
+              boxWidth: 30,
+              font: {{ size: 11 }}
+            }}
+          }},
+          tooltip: {{
+            mode: 'index',
+            intersect: false,
+            filter: function(tooltipItem) {{
+              return tooltipItem.dataset.label === 'Visual Gauge';
+            }}
+          }}
+        }},
+        scales: {{
+          x: {{
+            ticks: {{
+              maxRotation: 45,
+              minRotation: 45,
+              autoSkip: true,
+              maxTicksLimit: 24,
+              font: {{ size: 9 }}
+            }},
+            grid: {{ color: 'rgba(0,0,0,0.08)' }}
+          }},
+          y: {{
+            beginAtZero: false,
+            title: {{
+              display: true,
+              text: 'Visual Gauge (ft)',
+              color: '#b45309'
+            }},
+            grid: {{ color: 'rgba(0,0,0,0.05)' }}
+          }}
+        }}
+      }}
+    }});
+  }}
+}}
 
 // CFS Chart (skip if element doesn't exist - e.g., StreamBeam sites)
 const cfsChartEl = document.getElementById('cfsChart');

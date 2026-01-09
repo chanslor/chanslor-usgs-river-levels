@@ -43,6 +43,7 @@ A containerized river gauge monitoring system that tracks USGS water levels, sen
 - 📈 **Color-coded trend indicators** (rising = green, falling = light red)
 - 🧪 **Comprehensive test suite** for visual indicator verification
 - 🏭 **TVA Dam monitoring** - Hiwassee Dries & Ocoee #1/#2/#3 (scheduled releases)
+- 🌧️ **Rain forecast marquee** - Scrolling banner at top of page when rain is in the QPF forecast
 
 ---
 
@@ -98,6 +99,7 @@ Each river has unique characteristics that affect how it responds to rain:
 | River | Avg Response | Rain Needed | Speed |
 |-------|--------------|-------------|-------|
 | Short Creek | 12 hours | 0.65" | ⚡ Fast |
+| North Chickamauga | 18 hours | 2.00" | ⚡ Fast |
 | Town Creek | 32 hours | 1.25" | 🔄 Moderate |
 | Tellico River | 24 hours | 1.50" | 🔄 Moderate |
 | Little River Canyon | 33 hours | 1.75" | 🔄 Moderate |
@@ -161,17 +163,20 @@ Thresholds are configured in `gauges.conf.json` and exposed via the API:
 | River | min | good | Data Source |
 |-------|-----|------|-------------|
 | Mulberry Fork | 5.0 ft | 10.0 ft | USGS |
-| Locust Fork | 1.70 ft | 2.5 ft | USGS |
+| Locust Fork | 2.0 ft | 2.5 ft | USGS |
 | Town Creek | 180 cfs | 250 cfs | USGS |
 | South Sauty | 8.34 ft | 8.9 ft | USGS |
 | Tellico River | 1.70 ft | 2.0 ft | USGS |
 | Little River Canyon | 300 cfs | (uses special 6-level above) | USGS |
 | Short Creek | 0.5 ft | 1.0 ft | StreamBeam |
+| North Chickamauga | 5.2 ft (1.7 visual) | 6.6 ft (2.7 visual) | USGS |
 | Hiwassee Dries | 3,000 cfs | 5,000 cfs | TVA |
 | Ocoee #3 (Upper) | 1,000 cfs | 1,250 cfs | TVA |
 | Ocoee #2 (Middle) | 1,000 cfs | 1,250 cfs | TVA |
 | Ocoee #1 (Lower) | 800 cfs | 1,000 cfs | TVA |
 | Rush South | 4,000 cfs | 8,000 cfs | USGS |
+
+**North Chickamauga Visual Gauge Note:** This creek uses a visual gauge at the take-out that differs from the USGS reading. Conversion: `Visual = 0.69 × USGS - 1.89`. Thresholds shown are USGS values with visual equivalents in parentheses.
 
 ### Weather Alerts
 
@@ -187,6 +192,19 @@ Thresholds are configured in `gauges.conf.json` and exposed via the API:
 **Rainfall Forecast:**
 - 🌧️ **> 0.5"**: Significant rainfall highlighted in **blue** with rain emoji
 - ≤ 0.5": Normal text color
+
+**Rain Forecast Marquee:**
+
+When rain is in the forecast (>0.25" for any river), a scrolling banner appears at the top of the main dashboard:
+
+| Feature | Description |
+|---------|-------------|
+| **Trigger** | Appears when any river has >0.25" QPF forecast |
+| **Content** | Shows which rivers have rain and when (Today, Tomorrow, Day 3) |
+| **Style** | Dark blue gradient background with cyan border |
+| **Animation** | Smooth horizontal scroll, pauses on hover |
+
+Example: `☔ RAIN FORECAST: up to 0.75" TODAY ☔ 🌧️ Locust Fork: 0.75" TODAY...`
 
 **Drought Status (Alabama rivers only):**
 - 🏜️ **D0**: Abnormally Dry (orange `#e89b3c`)

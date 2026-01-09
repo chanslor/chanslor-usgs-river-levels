@@ -33,6 +33,7 @@ PWS_STATIONS = {
     "Ocoee #2 (Middle)": ["KTNBENTO3", "KNCMURPH4", "KTNCLEVE20"],  # Same area as Hiwassee
     "Ocoee #1 (Lower)": ["KTNBENTO3", "KTNCLEVE20", "KNCMURPH4"],  # Near Parksville
     "Rush South": ["KGACOLUM39", "KGACOLUM96", "KGAPHENI5", "KGACOLUM50"],  # Columbus GA area
+    "North Chickamauga": ["KTNSODDY175", "KTNBENTO3", "KTNCLEVE20"],  # Soddy-Daisy TN
 }
 
 # Friendly labels for display
@@ -66,6 +67,7 @@ PWS_LABELS = {
     "KGACOLUM96": "COLMBS",   # Columbus GA
     "KGAPHENI5": "PHNXCY",    # Phenix City AL
     "KGACOLUM50": "COLMBS",   # Columbus GA
+    "KTNSODDY175": "SODDY",   # Soddy-Daisy TN
 }
 
 # Browser-style User-Agent

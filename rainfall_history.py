@@ -51,6 +51,7 @@ PWS_STATIONS = {
     "Ocoee #2 (Middle)": "KTNBENTO3",
     "Ocoee #1 (Lower)": "KTNBENTO3",
     "Rush South": "KGACOLUM39",
+    "North Chickamauga": "KTNSODDY175",
 }
 
 

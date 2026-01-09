@@ -709,6 +709,21 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
         </div>
       </div>
 
+      <div class="tailwater-chart-section">
+        <div class="tailwater-header">
+          <div class="tailwater-title">💧 TAILWATER LEVEL (3-Day)</div>
+          <div class="tailwater-subtitle">Water level below the dam - Rising = water pouring over spillway!</div>
+        </div>
+        <div class="tailwater-chart-container">
+          <canvas id="tailwaterChart"></canvas>
+        </div>
+        <div class="tailwater-legend">
+          <span class="tailwater-legend-item rising">↗ Rising = Water over dam!</span>
+          <span class="tailwater-legend-item steady">→ Steady</span>
+          <span class="tailwater-legend-item falling">↘ Falling</span>
+        </div>
+      </div>
+
       <div class="forecast-cards">
         {cards_html}
       </div>
@@ -1008,6 +1023,99 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
 
       // Initial load
       updateChart(7);
+
+      // Tailwater Chart (3-day dedicated view)
+      async function loadTailwaterChart() {{
+        const siteCode = '{site_code}';
+        try {{
+          const response = await fetch(`/api/tva-history/${{siteCode}}?days=3`);
+          if (!response.ok) throw new Error('Failed to fetch tailwater data');
+          const data = await response.json();
+
+          if (!data.observations || data.observations.length === 0) {{
+            document.getElementById('tailwaterChart').parentElement.innerHTML =
+              '<div style="padding:40px;text-align:center;color:#94a3b8;">No tailwater data available yet</div>';
+            return;
+          }}
+
+          const ctx = document.getElementById('tailwaterChart').getContext('2d');
+          const labels = data.observations.map(o => {{
+            const d = new Date(o.timestamp);
+            return d.toLocaleDateString('en-US', {{ weekday: 'short', hour: 'numeric', minute: '2-digit' }});
+          }});
+          const tailwaterData = data.observations.map(o => o.tailwater_ft);
+
+          // Calculate if rising or falling
+          const first = tailwaterData[0];
+          const last = tailwaterData[tailwaterData.length - 1];
+          const isRising = last > first + 0.5;
+          const isFalling = last < first - 0.5;
+          const lineColor = isRising ? '#4ade80' : isFalling ? '#f87171' : '#38bdf8';
+          const fillColor = isRising ? 'rgba(74, 222, 128, 0.2)' : isFalling ? 'rgba(248, 113, 113, 0.2)' : 'rgba(56, 189, 248, 0.2)';
+
+          new Chart(ctx, {{
+            type: 'line',
+            data: {{
+              labels: labels,
+              datasets: [{{
+                label: 'Tailwater (ft)',
+                data: tailwaterData,
+                borderColor: lineColor,
+                backgroundColor: fillColor,
+                borderWidth: 3,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 0,
+                pointHoverRadius: 5
+              }}]
+            }},
+            options: {{
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {{
+                legend: {{ display: false }},
+                tooltip: {{
+                  backgroundColor: 'rgba(0,0,0,0.8)',
+                  titleFont: {{ size: 14 }},
+                  bodyFont: {{ size: 14 }},
+                  padding: 12,
+                  callbacks: {{
+                    label: function(context) {{
+                      return 'Tailwater: ' + context.parsed.y.toFixed(2) + ' ft';
+                    }}
+                  }}
+                }}
+              }},
+              scales: {{
+                x: {{
+                  ticks: {{
+                    color: 'rgba(255,255,255,0.7)',
+                    maxRotation: 45,
+                    minRotation: 45,
+                    autoSkip: true,
+                    maxTicksLimit: 12
+                  }},
+                  grid: {{ color: 'rgba(255,255,255,0.1)' }}
+                }},
+                y: {{
+                  ticks: {{
+                    color: 'rgba(255,255,255,0.7)',
+                    callback: function(value) {{ return value.toFixed(1) + ' ft'; }}
+                  }},
+                  grid: {{ color: 'rgba(255,255,255,0.1)' }}
+                }}
+              }}
+            }}
+          }});
+        }} catch (error) {{
+          console.error('Tailwater chart error:', error);
+          document.getElementById('tailwaterChart').parentElement.innerHTML =
+            '<div style="padding:40px;text-align:center;color:#f87171;">Error loading tailwater data</div>';
+        }}
+      }}
+
+      // Load tailwater chart on page load
+      loadTailwaterChart();
     }})();
     </script>
 
@@ -1329,6 +1437,59 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
         flex-direction: column;
       }}
     }}
+
+    /* Tailwater Chart Section */
+    .tailwater-chart-section {{
+      margin-top: 24px;
+      padding: 20px;
+      background: linear-gradient(135deg, #0c4a6e 0%, #164e63 100%);
+      border-radius: 12px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }}
+    .tailwater-header {{
+      text-align: center;
+      margin-bottom: 16px;
+    }}
+    .tailwater-title {{
+      font-size: 18px;
+      font-weight: bold;
+      color: #38bdf8;
+      margin-bottom: 4px;
+    }}
+    .tailwater-subtitle {{
+      font-size: 13px;
+      color: rgba(255,255,255,0.7);
+    }}
+    .tailwater-chart-container {{
+      height: 200px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      padding: 10px;
+    }}
+    .tailwater-legend {{
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 12px;
+      font-size: 12px;
+    }}
+    .tailwater-legend-item {{
+      padding: 4px 10px;
+      border-radius: 4px;
+    }}
+    .tailwater-legend-item.rising {{
+      background: rgba(34, 197, 94, 0.3);
+      color: #4ade80;
+    }}
+    .tailwater-legend-item.steady {{
+      background: rgba(148, 163, 184, 0.3);
+      color: #94a3b8;
+    }}
+    .tailwater-legend-item.falling {{
+      background: rgba(239, 68, 68, 0.3);
+      color: #f87171;
+    }}
+
     .story-section {{
       margin-top: 24px;
       padding-top: 24px;

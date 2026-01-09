@@ -894,6 +894,55 @@ def format_timestamp_stacked(iso_str: str) -> str:
         return iso_str
 
 def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: float = 10, wind_alert_color: str = "#ffc107", temp_threshold_f: float = 55, temp_alert_color: str = "#add8e6", temp_cold_threshold_f: float = 45, temp_cold_alert_color: str = "#1e90ff", predictions_html: str = ""):
+    # Build rain forecast marquee content
+    def build_rain_marquee(rows):
+        """Aggregate QPF data from all rivers and build marquee content if rain is forecast."""
+        rain_alerts = []
+        max_rain_today = 0
+        max_rain_tomorrow = 0
+        max_rain_day3 = 0
+
+        for r in rows:
+            qpf = r.get("qpf")
+            if not qpf or not isinstance(qpf, dict):
+                continue
+            sorted_dates = sorted(qpf.keys())
+            river_name = r.get("name", "Unknown")
+            for i, date_key in enumerate(sorted_dates[:3]):
+                inches = qpf.get(date_key, 0)
+                if inches > 0.25:  # Only announce significant rain (> 0.25")
+                    if i == 0:
+                        max_rain_today = max(max_rain_today, inches)
+                        rain_alerts.append(f"🌧️ {river_name}: {inches:.2f}\" TODAY")
+                    elif i == 1:
+                        max_rain_tomorrow = max(max_rain_tomorrow, inches)
+                        rain_alerts.append(f"🌧️ {river_name}: {inches:.2f}\" Tomorrow")
+                    elif i == 2:
+                        max_rain_day3 = max(max_rain_day3, inches)
+                        rain_alerts.append(f"🌧️ {river_name}: {inches:.2f}\" Day 3")
+
+        if not rain_alerts:
+            return ""
+
+        # Build summary based on timing
+        summary_parts = []
+        if max_rain_today > 0:
+            summary_parts.append(f"up to {max_rain_today:.2f}\" TODAY")
+        if max_rain_tomorrow > 0:
+            summary_parts.append(f"{max_rain_tomorrow:.2f}\" tomorrow")
+        if max_rain_day3 > 0:
+            summary_parts.append(f"{max_rain_day3:.2f}\" day 3")
+
+        summary = "RAIN FORECAST: " + ", ".join(summary_parts) if summary_parts else "RAIN IN FORECAST"
+
+        # Combine into scrolling content (repeat for smooth continuous scroll)
+        marquee_content = f"☔ {summary} ☔ &nbsp;&nbsp;&nbsp; " + " &nbsp;&nbsp;&nbsp; ".join(rain_alerts)
+        marquee_content = marquee_content + " &nbsp;&nbsp;&nbsp; " + marquee_content  # Duplicate for seamless loop
+
+        return marquee_content
+
+    rain_marquee_content = build_rain_marquee(rows)
+
     def row_html(r):
         trend = r.get("trend_8h")
         trend_icon = "↗" if trend == "rising" else ("↘" if trend == "falling" else ("→" if trend else ""))
@@ -1139,8 +1188,45 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
           <td class="num">{("" if r.get('stage_ft') is None else f"{r['stage_ft']:.2f}")}</td>
           <td class="num timestamp-cell"><a href="{h(r.get('waterdata_url') or '#')}">{format_timestamp_stacked(r.get('ts_iso') or '')}{stale_indicator}</a></td>
         </tr>"""
-    rows_sorted = sorted(rows, key=lambda r: (not r.get("in_range", False), (r.get("name") or r.get("site") or "")))
-    trs = "\n".join(row_html(r) for r in rows_sorted)
+    # Separate experimental rows from normal rows
+    experimental_rows = [r for r in rows if r.get("experimental", False)]
+    normal_rows = [r for r in rows if not r.get("experimental", False)]
+
+    # Sort each group: runnable first, then alphabetically
+    normal_rows_sorted = sorted(normal_rows, key=lambda r: (not r.get("in_range", False), (r.get("name") or r.get("site") or "")))
+    experimental_rows_sorted = sorted(experimental_rows, key=lambda r: (not r.get("in_range", False), (r.get("name") or r.get("site") or "")))
+
+    # Generate HTML for normal rows
+    trs = "\n".join(row_html(r) for r in normal_rows_sorted)
+
+    # Generate collapsible experimental section if there are experimental rows
+    experimental_section = ""
+    if experimental_rows_sorted:
+        exp_count = len(experimental_rows_sorted)
+        exp_running = sum(1 for r in experimental_rows_sorted if r.get("in_range"))
+        exp_trs = "\n".join(row_html(r) for r in experimental_rows_sorted)
+        running_badge = f' <span style="color:#22c55e;font-weight:600;">({exp_running} running)</span>' if exp_running > 0 else ""
+        experimental_section = f'''
+  <tr class="experimental-toggle" onclick="toggleExperimental()">
+    <td colspan="6" style="background:#f1f5f9;padding:12px;cursor:pointer;font-weight:600;border-top:2px dashed #cbd5e1;">
+      <span id="exp-arrow">▶</span> Experimental ({exp_count}){running_badge}
+      <span style="font-weight:400;color:#64748b;font-size:13px;margin-left:8px;">Click to expand</span>
+    </td>
+  </tr>
+</tbody>
+<tbody id="experimental-rows" style="display:none;">
+{exp_trs}'''
+
+    # Generate rain marquee HTML only if rain is forecast
+    # TEMPORARILY DISABLED - uncomment to re-enable
+    # if rain_marquee_content:
+    #     rain_marquee_html = f'''<div class="rain-marquee-container">
+    #   <div class="rain-marquee-content">{rain_marquee_content}</div>
+    # </div>'''
+    # else:
+    #     rain_marquee_html = ""
+    rain_marquee_html = ""  # Marquee disabled
+
     return f"""<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -1226,6 +1312,32 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   .trend-falling {{ color:#f87171; font-weight:600; }}
   .tailwater-rising {{ color:#38bdf8; font-weight:600; }}  /* Bright blue - water over dam! */
   .tailwater-falling {{ color:#94a3b8; font-weight:500; }}  /* Muted gray */
+
+  /* Rain Forecast Marquee */
+  .rain-marquee-container {{
+    background: linear-gradient(135deg, #1e3a5f 0%, #0c4a6e 50%, #164e63 100%);
+    color: #fff;
+    overflow: hidden;
+    white-space: nowrap;
+    padding: 10px 0;
+    border-bottom: 2px solid #38bdf8;
+    position: relative;
+  }}
+  .rain-marquee-content {{
+    display: inline-block;
+    animation: marquee-scroll 30s linear infinite;
+    padding-left: 100%;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }}
+  @keyframes marquee-scroll {{
+    0% {{ transform: translateX(0); }}
+    100% {{ transform: translateX(-50%); }}
+  }}
+  .rain-marquee-container:hover .rain-marquee-content {{
+    animation-play-state: paused;
+  }}
 
   /* Predictions Panel */
   .predictions-panel {{
@@ -1359,11 +1471,25 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   }}
 </style>
 </head><body>
+{rain_marquee_html}
 <div class="wrap">
   <table>
     <thead><tr><td>River</td><td class="center">12hr Trend</td><td class="center">Change</td><td class="center">CFS</td><td class="num">Feet</td><td class="center">Updated</td></tr></thead>
-    <tbody>{trs}</tbody>
+    <tbody>{trs}{experimental_section}</tbody>
   </table>
+<script>
+function toggleExperimental() {{
+  var rows = document.getElementById('experimental-rows');
+  var arrow = document.getElementById('exp-arrow');
+  if (rows.style.display === 'none') {{
+    rows.style.display = '';
+    arrow.textContent = '▼';
+  }} else {{
+    rows.style.display = 'none';
+    arrow.textContent = '▶';
+  }}
+}}
+</script>
   {predictions_html}
   <div class="foot" style="margin-top:8px;"><a href="http://flowpage.alabamawhitewater.com/" target="_blank" rel="noopener">Alabama Flow Page</a></div>
   <div class="foot" style="margin-top:8px;"><a href="https://syotr.org/" target="_blank" rel="noopener">See You On The River</a></div>
@@ -1897,7 +2023,8 @@ def main():
             "waterdata_url": f"https://waterdata.usgs.gov/monitoring-location/{site}/#parameterCode=00065&period=P7D",
             "tailwater_trend": tailwater_trend,
             "pool_elevation_ft": pool_elevation_ft,
-            "tailwater_ft": tailwater_ft
+            "tailwater_ft": tailwater_ft,
+            "experimental": entry.get("experimental", False)
         })
 
         # Alerts

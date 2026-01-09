@@ -179,6 +179,7 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
      - Ocoee #2 (Middle): KTNBENTO3, KNCMURPH4, KTNCLEVE20
      - Ocoee #1 (Lower): KTNBENTO3, KTNCLEVE20, KNCMURPH4
      - Rush South: KGACOLUM39, KGACOLUM96, KGAPHENI5, KGACOLUM50
+     - North Chickamauga: KTNSODDY175, KTNBENTO3, KTNCLEVE20
 
 5. **tva_fetch.py** — TVA Dam Data Fetcher (NEW - 2025-12-18, Updated 2025-12-22)
    - Fetches observed data from TVA REST API for dam monitoring
@@ -219,6 +220,10 @@ grep -i 'Rain:' "$(pwd)/usgs-site/index.html" | head
 8. **site_detail.py** — Site detail page generator
    - Creates individual detail pages for each gauge
    - **3-day CFS and Feet charts** with runnable threshold line (green dashed)
+   - **Visual Gauge chart** (North Chickamauga only) - Shows calculated visual readings
+     - Formula: `Visual = 0.69 × USGS_Stage - 1.89`
+     - 1.7 ft threshold line, yellow-gradient styling
+     - Detection via `is_north_chick` flag for site 03566535
    - **Level Prediction Panel** - Shows trend analysis and ETA to threshold:
      - Current level, threshold, trend (rising/falling/steady)
      - Rate of change (ft/hr) based on 8-hour analysis
@@ -387,6 +392,7 @@ The dashboard includes a **River Predictions** panel that forecasts which rivers
 | River | Avg Response | Rain Needed | Responsiveness |
 |-------|--------------|-------------|----------------|
 | Short Creek | 12 hours | 0.65" | Fast |
+| North Chickamauga | 18 hours | 2.00" | Fast |
 | Town Creek | 32 hours | 1.25" | Moderate |
 | Tellico River | 24 hours | 1.50" | Moderate |
 | Little River Canyon | 33 hours | 1.75" | Moderate |
@@ -666,6 +672,29 @@ TVA dam sites display tailwater trend when water is pouring over the dam spillwa
 - Example: At Ocoee #1 (Parksville Dam), when release exceeds ~1,300 CFS, tailwater rises ~1 ft as water spills over
 - The tailwater indicator appears on the main dashboard next to the discharge trend
 
+### Rain Forecast Marquee
+
+When rain is in the forecast, a scrolling marquee banner appears at the top of the main dashboard page announcing the upcoming precipitation:
+
+| Feature | Description |
+|---------|-------------|
+| **Trigger** | Appears when any river has >0.25" QPF forecast |
+| **Content** | Shows which rivers have rain and when (Today, Tomorrow, Day 3) |
+| **Style** | Dark blue gradient background with cyan border |
+| **Animation** | Smooth horizontal scroll, pauses on hover |
+| **Location** | Top of page, above the river table |
+
+**Example marquee content:**
+```
+☔ RAIN FORECAST: up to 0.75" TODAY, 0.50" tomorrow ☔ 🌧️ Locust Fork: 0.75" TODAY 🌧️ Short Creek: 0.50" Tomorrow...
+```
+
+**Implementation Details:**
+- Aggregates QPF data from all monitored rivers
+- Only shows rivers with significant rainfall (>0.25")
+- Content duplicates for seamless looping animation
+- Hidden when no rain is forecast (0.00" for all days)
+
 ### Current River Thresholds
 
 | River | min | good | Data Source |
@@ -678,10 +707,41 @@ TVA dam sites display tailwater trend when water is pouring over the dam spillwa
 | Little River Canyon | 300 cfs | 500 cfs (uses special 6-level) | USGS |
 | Short Creek | 0.5 ft | 1.0 ft | StreamBeam |
 | Rush South | 4,000 cfs (2 units) | 8,000 cfs (3 units) | USGS |
+| North Chickamauga | 5.2 ft (1.7 visual) | 6.6 ft (2.7 visual) | USGS |
 | Hiwassee Dries | 3,000 cfs | 5,000 cfs | TVA |
 | Ocoee #3 (Upper) | 1,000 cfs | 1,250 cfs | TVA |
 | Ocoee #2 (Middle) | 1,000 cfs | 1,250 cfs | TVA |
 | Ocoee #1 (Lower) | 800 cfs | 1,000 cfs | TVA |
+
+### North Chickamauga Visual Gauge Conversion
+
+North Chickamauga Creek uses a **visual gauge** at the take-out that paddlers reference, which differs from the USGS gauge reading. Rain Pursuit (rainpursuit.org) displays both values and correlates them.
+
+**Conversion Formula:**
+```
+Visual (paddler) = 0.69 × USGS_Stage - 1.89
+USGS_Stage = (Visual + 1.89) / 0.69
+```
+
+**Calibration Data Points:**
+| Date | USGS Stage | CFS | Visual Reading |
+|------|------------|-----|----------------|
+| 02/25/2022 | 6.22 ft | 743 | 2.42 ft |
+| 02/26/2022 | 5.34 ft | 459 | 1.81 ft |
+
+**Threshold Conversion:**
+| Paddler Visual | USGS Stage | Status |
+|----------------|------------|--------|
+| 1.7 ft | 5.2 ft | Runnable (min) |
+| 2.7 ft | 6.6 ft | Good |
+
+**Example:** When USGS shows 2.69 ft, visual equivalent is ~0 ft (not runnable).
+
+**Data Source:**
+- USGS Site: 03566535 (North Chickamauga Creek at Mile Straight, TN)
+- Location: Soddy-Daisy, Hamilton County, TN
+- PWS Station: KTNSODDY175
+- Rain Pursuit: https://rainpursuit.org/stream_gauge.php?id=1008
 
 ## Systemd Integration
 
@@ -844,7 +904,7 @@ systemctl --user restart usgs-alert.service
 
 ## Git Repository State
 
-**Current Production Status**: Working as of 01-05-2026
+**Current Production Status**: Working as of 01-07-2026
 
 **Production Deployment:**
 - URL: https://docker-blue-sound-1751.fly.dev/
@@ -852,7 +912,7 @@ systemctl --user restart usgs-alert.service
 - Containerfile: `Containerfile.api.simple`
 - Entrypoint: `entrypoint-api.sh`
 - Features: Flask API + Dashboard + ESP32 endpoints + TVA integration + Historical Charts + Rainfall History + Level Predictions
-- **Total Sites Monitored**: 12 rivers
+- **Total Sites Monitored**: 13 rivers
 
 **Fly.io Reference**: See **[FLY_IO.md](FLY_IO.md)** for complete Fly.io deployment guide including:
 - Basic commands reference
@@ -861,6 +921,35 @@ systemctl --user restart usgs-alert.service
 - Troubleshooting common issues
 
 **Recent Updates:**
+- **2026-01-07: Added North Chickamauga Creek (Tennessee)**
+  - New river: North Chickamauga Creek at Mile Straight, TN
+  - USGS Site: 03566535
+  - Location: Soddy-Daisy, Hamilton County, TN
+  - PWS Weather Station: KTNSODDY175
+  - **Visual Gauge Conversion**: `Visual = 0.69 × USGS_Stage - 1.89`
+  - Thresholds: 5.2 ft runnable (1.7 visual), 6.6 ft good (2.7 visual)
+  - Characteristics: Fast responder, ~18 hours, needs ~2" rain
+  - Data source: Rain Pursuit aggregates from USGS
+  - Total monitored rivers now: 13
+
+- **2026-01-07: Added Visual Gauge Chart to North Chickamauga Detail Page**
+  - New chart showing calculated visual gauge readings (above CFS chart)
+  - Uses formula `Visual = 0.69 × USGS_Stage - 1.89` to convert USGS feet to visual gauge
+  - Green dashed threshold line at 1.7 ft (runnable threshold)
+  - Yellow-gradient styling to distinguish from other charts
+  - Average period selector (24h/48h/3d/7d) for visual gauge values
+  - Calibration note showing conversion formula and data points
+  - Only appears on North Chickamauga (03566535) detail page
+  - Implementation in `site_detail.py`: `is_north_chick` detection flag, `visual_values` calculation
+
+- **2026-01-05: Added Rain Forecast Marquee to Main Dashboard**
+  - Scrolling banner at top of page when rain is in the forecast
+  - Shows which rivers have rain forecast and timing (Today, Tomorrow, Day 3)
+  - Only appears when QPF > 0.25" for any river
+  - Dark blue gradient background with smooth horizontal scroll animation
+  - Pauses on hover for easy reading
+  - Aggregates QPF data from all monitored rivers
+
 - **2026-01-05: Migrated to Dallas (dfw) Region**
   - Forked volume from iad to dfw to preserve all historical data
   - Migration required due to persistent "insufficient memory" errors in iad region
