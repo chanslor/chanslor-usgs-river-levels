@@ -378,7 +378,78 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
                 "distance_to_threshold": abs(distance_to_threshold),
                 "eta_hours": eta_hours,
                 "eta_text": eta_text,
-                "above_threshold": current_level >= threshold_ft
+                "above_threshold": current_level >= threshold_ft,
+                "unit": "ft"
+            }
+
+    # CFS-based level prediction for rivers like Little River Canyon
+    if level_prediction is None and cfs_values and len(cfs_values) >= 32 and threshold_cfs is not None:
+        current_cfs = cfs_values[-1]
+
+        # Find peak in the data
+        peak_cfs = max(cfs_values)
+
+        # Calculate rate over last 8 hours (32 readings at 15-min intervals)
+        points_8h = 32
+        if len(cfs_values) >= points_8h:
+            cfs_8h_ago = cfs_values[-points_8h]
+            change_8h = current_cfs - cfs_8h_ago  # positive = rising, negative = falling
+            rate_per_hour = change_8h / 8.0
+
+            # Determine trend (using larger threshold for CFS since values are bigger)
+            if abs(rate_per_hour) < 1.0:  # Less than 1 CFS/hr is steady
+                trend = "steady"
+                trend_icon = "→"
+                trend_color = "#6b7280"
+            elif rate_per_hour > 0:
+                trend = "rising"
+                trend_icon = "↗"
+                trend_color = "#22c55e"
+            else:
+                trend = "falling"
+                trend_icon = "↘"
+                trend_color = "#f59e0b"
+
+            # Calculate ETA to threshold
+            eta_hours = None
+            eta_text = None
+            distance_to_threshold = current_cfs - threshold_cfs
+
+            if trend == "falling" and current_cfs > threshold_cfs:
+                # Falling toward threshold - predict when we'll drop below it
+                if rate_per_hour < 0:
+                    eta_hours = distance_to_threshold / abs(rate_per_hour)
+                    if eta_hours < 1:
+                        eta_text = f"~{int(eta_hours * 60)} minutes"
+                    elif eta_hours < 24:
+                        eta_text = f"~{eta_hours:.1f} hours"
+                    else:
+                        eta_text = f"~{eta_hours / 24:.1f} days"
+            elif trend == "rising" and current_cfs < threshold_cfs:
+                # Rising toward threshold - predict when we'll reach it
+                if rate_per_hour > 0:
+                    eta_hours = abs(distance_to_threshold) / rate_per_hour
+                    if eta_hours < 1:
+                        eta_text = f"~{int(eta_hours * 60)} minutes"
+                    elif eta_hours < 24:
+                        eta_text = f"~{eta_hours:.1f} hours"
+                    else:
+                        eta_text = f"~{eta_hours / 24:.1f} days"
+
+            level_prediction = {
+                "current": current_cfs,
+                "threshold": threshold_cfs,
+                "peak": peak_cfs,
+                "trend": trend,
+                "trend_icon": trend_icon,
+                "trend_color": trend_color,
+                "rate_per_hour": abs(rate_per_hour),
+                "change_8h": abs(change_8h),
+                "distance_to_threshold": abs(distance_to_threshold),
+                "eta_hours": eta_hours,
+                "eta_text": eta_text,
+                "above_threshold": current_cfs >= threshold_cfs,
+                "unit": "cfs"
             }
 
     status_color = "#4ade80" if in_range else "#ef4444"
@@ -937,6 +1008,43 @@ body {{
     </div>
   </div>''' if is_lrc else ''}
 
+  {f'''<div class="prediction-panel" style="background: linear-gradient(135deg, {'#ecfdf5' if level_prediction and level_prediction['above_threshold'] else '#fef3c7'} 0%, {'#d1fae5' if level_prediction and level_prediction['above_threshold'] else '#fde68a'} 100%); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <span style="font-size: 28px;">{level_prediction['trend_icon'] if level_prediction else '→'}</span>
+      <div>
+        <h3 style="margin: 0; font-size: 18px; color: #374151;">Flow Prediction</h3>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #6b7280;">Based on 8-hour trend analysis</p>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px;">
+      <div style="background: white; border-radius: 8px; padding: 12px; text-align: center;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">Current Flow</div>
+        <div style="font-size: 24px; font-weight: bold; color: #1f2937;">{int(level_prediction['current']):,} cfs</div>
+      </div>
+      <div style="background: white; border-radius: 8px; padding: 12px; text-align: center;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">Threshold</div>
+        <div style="font-size: 24px; font-weight: bold; color: #22c55e;">{int(level_prediction['threshold']):,} cfs</div>
+      </div>
+      <div style="background: white; border-radius: 8px; padding: 12px; text-align: center;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">Trend (8h)</div>
+        <div style="font-size: 24px; font-weight: bold; color: {level_prediction['trend_color']};">{level_prediction['trend'].title()} {level_prediction['trend_icon']}</div>
+        <div style="font-size: 12px; color: #6b7280;">{level_prediction['rate_per_hour']:.1f} cfs/hr</div>
+      </div>
+      <div style="background: white; border-radius: 8px; padding: 12px; text-align: center;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">Recent Peak</div>
+        <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">{int(level_prediction['peak']):,} cfs</div>
+      </div>
+      <div style="background: white; border-radius: 8px; padding: 12px; text-align: center;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">Distance to Threshold</div>
+        <div style="font-size: 24px; font-weight: bold; color: {'#22c55e' if level_prediction['above_threshold'] else '#f59e0b'};">{'+' if level_prediction['above_threshold'] else '-'}{int(level_prediction['distance_to_threshold']):,} cfs</div>
+      </div>
+      <div style="background: {'#dcfce7' if level_prediction['eta_text'] and level_prediction['above_threshold'] else '#fef9c3' if level_prediction['eta_text'] else 'white'}; border-radius: 8px; padding: 12px; text-align: center;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #6b7280; margin-bottom: 4px;">{'ETA to Drop Below' if level_prediction['above_threshold'] else 'ETA to Reach'} Threshold</div>
+        <div style="font-size: 20px; font-weight: bold; color: {'#16a34a' if level_prediction['above_threshold'] else '#d97706'};">{level_prediction['eta_text'] if level_prediction['eta_text'] else 'N/A'}</div>
+      </div>
+    </div>
+  </div>''' if level_prediction and level_prediction.get('unit') == 'cfs' and not is_tva else ''}
+
   {"" if is_tva else f'''<div class="chart-row">
     <div class="chart-box">
       <h2>{"Water Level" if is_streambeam else "Gage Height"} (Feet)</h2>
@@ -991,7 +1099,7 @@ body {{
         <div style="font-size: 20px; font-weight: bold; color: {'#16a34a' if level_prediction['above_threshold'] else '#d97706'};">{level_prediction['eta_text'] if level_prediction['eta_text'] else 'N/A'}</div>
       </div>
     </div>
-  </div>''' if level_prediction and not is_tva else ''}
+  </div>''' if level_prediction and level_prediction.get('unit') == 'ft' and not is_tva else ''}
 
   {"" if is_tva else f'''<div class="chart-row">
     <div class="chart-box" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);">

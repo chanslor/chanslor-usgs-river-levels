@@ -391,12 +391,18 @@ def get_usgs_history(site_id):
                 "avg": sum(feet_values) / len(feet_values)
             }
 
-        # Downsample for large date ranges
+        # Downsample for large date ranges, always include first and last points
         def downsample(data_list, target_points=200):
             if len(data_list) <= target_points:
                 return data_list
-            step = len(data_list) // target_points
-            return [data_list[i] for i in range(0, len(data_list), step)][:target_points]
+            # Reserve first and last, sample middle evenly
+            middle = data_list[1:-1]
+            middle_target = target_points - 2
+            step = len(middle) / middle_target
+            result = [data_list[0]]  # First point
+            result += [middle[int(i * step)] for i in range(middle_target)]
+            result.append(data_list[-1])  # Last point (most recent)
+            return result
 
         return jsonify({
             "site_id": site_id,

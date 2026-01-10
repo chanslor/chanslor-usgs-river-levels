@@ -411,10 +411,19 @@ def fetch_trend_data(site: str, hours: int, param_code: str = "00065"):
             direction = "steady"
 
         # Sample down to ~12 bars for display (take evenly spaced samples)
+        # Always include first and last values for accurate trend/% change
         target_bars = 12
         if len(values) > target_bars:
-            step = len(values) // target_bars
-            sampled = [values[i] for i in range(0, len(values), step)][:target_bars]
+            # Reserve first and last, sample middle evenly
+            middle_values = values[1:-1]
+            middle_bars = target_bars - 2
+            if len(middle_values) > middle_bars:
+                step = len(middle_values) / middle_bars
+                sampled = [values[0]]  # First value
+                sampled += [middle_values[int(i * step)] for i in range(middle_bars)]
+                sampled.append(values[-1])  # Last value (most recent)
+            else:
+                sampled = values
         else:
             sampled = values
 
@@ -1192,9 +1201,17 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
     experimental_rows = [r for r in rows if r.get("experimental", False)]
     normal_rows = [r for r in rows if not r.get("experimental", False)]
 
-    # Sort each group: runnable first, then alphabetically
-    normal_rows_sorted = sorted(normal_rows, key=lambda r: (not r.get("in_range", False), (r.get("name") or r.get("site") or "")))
-    experimental_rows_sorted = sorted(experimental_rows, key=lambda r: (not r.get("in_range", False), (r.get("name") or r.get("site") or "")))
+    # Sort key: running first, then by %change (highest rising first), then alphabetically
+    def sort_key(r):
+        in_range = r.get("in_range", False)
+        name = r.get("name") or r.get("site") or ""
+        # Get percent change (negative so higher values sort first)
+        pct, _ = calculate_percent_change(r.get("trend_data"))
+        pct_sort = -(pct or -999)  # -999 for None so they sort last
+        return (not in_range, pct_sort, name)
+
+    normal_rows_sorted = sorted(normal_rows, key=sort_key)
+    experimental_rows_sorted = sorted(experimental_rows, key=sort_key)
 
     # Generate HTML for normal rows
     trs = "\n".join(row_html(r) for r in normal_rows_sorted)
@@ -1253,7 +1270,11 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   .river {{ font-weight:600; }}
   .river a {{ color: #1a73e8; border-bottom: 1px solid #1a73e8; }}
   .river a:hover {{ color: #0d47a1; border-bottom-color: #0d47a1; }}
-  .sub{{font-size:14px;color:#444}}
+  .sub{{font-size:14px;color:#444;line-height:1.6;margin:4px 0;}}
+
+  /* Info cell line spacing for readability */
+  tbody tr td:first-child {{ line-height: 1.7; }}
+  tbody tr td:first-child > div {{ margin-bottom: 3px; }}
   .num {{ text-align:right; white-space:nowrap; }}
   .center {{ text-align:center; white-space:nowrap; }}
 
@@ -1304,9 +1325,9 @@ def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: fl
   .temp-alert {{ color:{temp_alert_color}; font-weight:600; }}
   .temp-cold-alert {{ color:{temp_cold_alert_color}; font-weight:600; }}
   .wind-chill {{ color:#87ceeb; font-weight:600; }}
-  .drought-info {{ font-size:12px; }}
+  .drought-info {{ font-size:13px; line-height:1.6; margin:3px 0; }}
   .drought-level {{ font-family: 'Fira Code', monospace; font-weight:500; }}
-  .aqi-info {{ font-size:12px; }}
+  .aqi-info {{ font-size:13px; line-height:1.6; margin:3px 0; }}
   .aqi-level {{ font-family: 'Fira Code', monospace; font-weight:500; }}
   .trend-rising {{ color:#4ade80; font-weight:600; }}
   .trend-falling {{ color:#f87171; font-weight:600; }}

@@ -369,10 +369,19 @@ def get_tva_trend_data(site_code: str, hours: int = 12) -> Optional[Dict[str, An
         direction = "steady"
 
     # Sample down to ~12 bars for display (take evenly spaced samples)
+    # Always include first and last values for accurate trend/% change
     target_bars = 12
     if len(values) > target_bars:
-        step = len(values) // target_bars
-        sampled = [values[i] for i in range(0, len(values), step)][:target_bars]
+        # Reserve first and last, sample middle evenly
+        middle_values = values[1:-1]
+        middle_bars = target_bars - 2
+        if len(middle_values) > middle_bars:
+            step = len(middle_values) / middle_bars
+            sampled = [values[0]]  # First value
+            sampled += [middle_values[int(i * step)] for i in range(middle_bars)]
+            sampled.append(values[-1])  # Last value (most recent)
+        else:
+            sampled = values
     else:
         sampled = values
 

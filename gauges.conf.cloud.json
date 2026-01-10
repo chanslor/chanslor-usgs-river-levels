@@ -128,7 +128,8 @@
       "good_ft": null,
       "good_cfs": 5000,
       "lat": 35.168,
-      "lon": -84.298
+      "lon": -84.298,
+      "experimental": true
     },
     {
       "source": "tva",
