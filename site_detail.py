@@ -9,6 +9,7 @@ import urllib.request
 import urllib.parse
 from datetime import datetime, timezone, timedelta
 import html
+from typing import Any, Dict, List, Optional, Tuple
 
 # Import TVA forecast generator (optional - only for TVA sites)
 try:
@@ -17,7 +18,7 @@ try:
 except ImportError:
     TVA_FORECAST_AVAILABLE = False
 
-def calculate_wind_chill(temp_f, wind_mph):
+def calculate_wind_chill(temp_f: Optional[float], wind_mph: Optional[float]) -> Tuple[Optional[float], Optional[str], Optional[str]]:
     """
     Calculate wind chill temperature using NWS formula.
 
@@ -65,7 +66,7 @@ def calculate_wind_chill(temp_f, wind_mph):
 
     return wind_chill, emoji, desc
 
-def get_location_links(site_id, tva_site_code):
+def get_location_links(site_id: str, tva_site_code: Optional[str]) -> str:
     """
     Get location links HTML for a river site.
 
@@ -141,7 +142,7 @@ def get_location_links(site_id, tva_site_code):
     return ""
 
 
-def fetch_usgs_7day_data(site_id, parameter_code):
+def fetch_usgs_7day_data(site_id: str, parameter_code: str) -> List[Tuple[str, float]]:
     """
     Fetch 3 days of historical data from USGS IV service.
 
@@ -195,7 +196,7 @@ def fetch_usgs_7day_data(site_id, parameter_code):
         print(f"Error fetching USGS data for {site_id} parameter {parameter_code}: {e}")
         return []
 
-def generate_site_detail_html(site_data, cfs_history, feet_history):
+def generate_site_detail_html(site_data: Dict[str, Any], cfs_history: List[Tuple[str, float]], feet_history: List[Tuple[str, float]]) -> str:
     """
     Generate Google Analytics-style HTML dashboard for a river site.
 
