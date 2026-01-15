@@ -18,6 +18,7 @@ import json
 import sqlite3
 import time
 from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 
@@ -41,7 +42,7 @@ DEFAULT_CACHE_TTL_HOURS = 12  # Drought data updates weekly, so 12 hours is plen
 class DroughtClient:
     """Client for fetching drought data from USDM API with SQLite caching."""
 
-    def __init__(self, cache_db: str = None, cache_ttl_hours: int = DEFAULT_CACHE_TTL_HOURS):
+    def __init__(self, cache_db: Optional[str] = None, cache_ttl_hours: int = DEFAULT_CACHE_TTL_HOURS) -> None:
         """
         Initialize drought client.
 
@@ -54,7 +55,7 @@ class DroughtClient:
         if cache_db:
             self._init_cache_table()
 
-    def _init_cache_table(self):
+    def _init_cache_table(self) -> None:
         """Create cache table if it doesn't exist."""
         with sqlite3.connect(self.cache_db) as conn:
             conn.execute("""
@@ -66,7 +67,7 @@ class DroughtClient:
             """)
             conn.commit()
 
-    def _get_cached(self, fips: str) -> dict | None:
+    def _get_cached(self, fips: str) -> Optional[Dict[str, Any]]:
         """Get cached drought data if still valid."""
         if not self.cache_db:
             return None
@@ -84,7 +85,7 @@ class DroughtClient:
             pass
         return None
 
-    def _set_cached(self, fips: str, data: dict):
+    def _set_cached(self, fips: str, data: Dict[str, Any]) -> None:
         """Store drought data in cache."""
         if not self.cache_db:
             return
@@ -98,7 +99,7 @@ class DroughtClient:
         except Exception:
             pass
 
-    def fetch_drought_status(self, fips: str) -> dict | None:
+    def fetch_drought_status(self, fips: str) -> Optional[Dict[str, Any]]:
         """
         Fetch current drought status for a county by FIPS code.
 
@@ -209,7 +210,7 @@ class DroughtClient:
             return None
 
 
-def get_drought_display_html(drought_data: dict, css_class: str = "drought-info") -> str:
+def get_drought_display_html(drought_data: Optional[Dict[str, Any]], css_class: str = "drought-info") -> str:
     """
     Generate HTML snippet for displaying drought status.
 
