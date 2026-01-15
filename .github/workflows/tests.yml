@@ -4,23 +4,20 @@ on:
   push:
     branches: [master, main]
     paths:
-      - 'docker/**/*.py'
-      - 'docker/tests/**'
+      - '**/*.py'
+      - 'tests/**'
       - '.github/workflows/tests.yml'
+      - 'requirements.txt'
   pull_request:
     branches: [master, main]
     paths:
-      - 'docker/**/*.py'
-      - 'docker/tests/**'
+      - '**/*.py'
+      - 'tests/**'
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
   test:
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: docker
 
     steps:
       - name: Checkout code
@@ -45,10 +42,6 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: docker
 
     steps:
       - name: Checkout code
@@ -82,8 +75,8 @@ jobs:
       - name: Build container (no push)
         uses: docker/build-push-action@v5
         with:
-          context: ./docker
-          file: ./docker/Containerfile.api.simple
+          context: .
+          file: ./Containerfile.api.simple
           push: false
           tags: usgs-api:test
           cache-from: type=gha
