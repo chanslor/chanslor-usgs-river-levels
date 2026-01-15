@@ -2138,35 +2138,39 @@ def main() -> None:
             send_email(smtp, subject, body)
             site_state["last_pct_change_epoch"] = now
 
-        try:
-            if notify_mode == "rising":
-                if (not was_in) and in_range and (now - last_alert_t >= cooldown_sec):
-                    do_in_alert()
-                    if not args.quiet: print(f"[ALERT] IN (rising) {site}")
-            else:
-                if in_range and (now - last_alert_t >= cooldown_sec):
-                    do_in_alert()
-                    if not args.quiet: print(f"[ALERT] IN (any) {site}")
+        # Check per-site notify flag (allows disabling alerts for specific sites)
+        site_notify_enabled = entry.get("notify", True)
 
-            if send_out and was_in and (not in_range) and (now - last_out_t >= out_cooldown_sec):
-                do_out_alert()
-                if not args.quiet: print(f"[ALERT] OUT {site}")
+        if site_notify_enabled:
+            try:
+                if notify_mode == "rising":
+                    if (not was_in) and in_range and (now - last_alert_t >= cooldown_sec):
+                        do_in_alert()
+                        if not args.quiet: print(f"[ALERT] IN (rising) {site}")
+                else:
+                    if in_range and (now - last_alert_t >= cooldown_sec):
+                        do_in_alert()
+                        if not args.quiet: print(f"[ALERT] IN (any) {site}")
 
-            # Percentage change alerts
-            if pct_change_enabled and stage is not None:
-                last_stage = site_state.get("last_stage_ft")
-                last_pct_t = float(site_state.get("last_pct_change_epoch", 0))
+                if send_out and was_in and (not in_range) and (now - last_out_t >= out_cooldown_sec):
+                    do_out_alert()
+                    if not args.quiet: print(f"[ALERT] OUT {site}")
 
-                if last_stage is not None and last_stage > 0 and (now - last_pct_t >= pct_change_cooldown_sec):
-                    pct_change = ((stage - last_stage) / last_stage) * 100.0
+                # Percentage change alerts
+                if pct_change_enabled and stage is not None:
+                    last_stage = site_state.get("last_stage_ft")
+                    last_pct_t = float(site_state.get("last_pct_change_epoch", 0))
 
-                    if abs(pct_change) >= pct_change_threshold:
-                        direction = "increased" if pct_change > 0 else "decreased"
-                        do_pct_change_alert(pct_change, direction)
-                        if not args.quiet:
-                            print(f"[ALERT] PCT_CHANGE {site}: {pct_change:+.1f}% ({last_stage:.2f} -> {stage:.2f} ft)")
-        except Exception as e:
-            print(f"[ALERT] email failed for {site}: {e}")
+                    if last_stage is not None and last_stage > 0 and (now - last_pct_t >= pct_change_cooldown_sec):
+                        pct_change = ((stage - last_stage) / last_stage) * 100.0
+
+                        if abs(pct_change) >= pct_change_threshold:
+                            direction = "increased" if pct_change > 0 else "decreased"
+                            do_pct_change_alert(pct_change, direction)
+                            if not args.quiet:
+                                print(f"[ALERT] PCT_CHANGE {site}: {pct_change:+.1f}% ({last_stage:.2f} -> {stage:.2f} ft)")
+            except Exception as e:
+                print(f"[ALERT] email failed for {site}: {e}")
 
         # persist last seen
         site_state["last_stage_ft"] = stage
