@@ -17,6 +17,7 @@ if '/app' not in sys.path:
 import argparse, json, time, smtplib, ssl, sqlite3, re
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
+from typing import Any, Dict, List, Optional, Tuple, Union
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 import urllib.parse as up
@@ -170,12 +171,12 @@ STATION_CITY_LABELS = {
 USGS_IV = "https://waterservices.usgs.gov/nwis/iv/"
 
 # ---------------- Utilities ----------------
-def ensure_parent_dir(path: str):
+def ensure_parent_dir(path: str) -> None:
     d = os.path.dirname(path or "")
     if d:
         os.makedirs(d, exist_ok=True)
 
-def _get(url):
+def _get(url: str) -> Dict[str, Any]:
     req = Request(url, headers={"User-Agent": "USGS-MultiAlert/3.1"})
     with urlopen(req, timeout=25) as r:
         return json.loads(r.read().decode("utf-8"))
@@ -195,7 +196,7 @@ def normalize_site_id(site: str) -> str:
     raise ValueError(f"Invalid USGS site value (no numeric id found): {site!r}")
 
 # ---------------- SQLite state ----------------
-def open_state_db(db_path: str):
+def open_state_db(db_path: str) -> sqlite3.Connection:
     ensure_parent_dir(db_path)
     conn = sqlite3.connect(db_path, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL;")
@@ -238,7 +239,7 @@ def open_state_db(db_path: str):
     conn.commit()
     return conn
 
-def read_site_state(conn, site: str):
+def read_site_state(conn: sqlite3.Connection, site: str) -> Dict[str, Any]:
     cur = conn.execute("""
         SELECT last_alert_epoch, last_out_epoch, last_stage_ft, last_ts_iso, last_cfs,
                COALESCE(last_in,0), COALESCE(last_pct_change_epoch,0), COALESCE(last_in_epoch,0),
@@ -263,7 +264,7 @@ def read_site_state(conn, site: str):
         "last_wind_gust_mph": row[11]
     }
 
-def write_site_state(conn, site: str, state: dict):
+def write_site_state(conn: sqlite3.Connection, site: str, state: Dict[str, Any]) -> None:
     conn.execute("""
         INSERT INTO site_state (site, last_alert_epoch, last_out_epoch, last_stage_ft, last_ts_iso, last_cfs, last_in, last_pct_change_epoch,
                                 last_in_epoch, last_temp_f, last_wind_mph, last_wind_dir, last_wind_gust_mph)
@@ -297,7 +298,7 @@ def write_site_state(conn, site: str, state: dict):
         float(state.get("last_wind_gust_mph")) if state.get("last_wind_gust_mph") is not None else None
     ))
 
-def migrate_json_to_db(json_path: str, conn):
+def migrate_json_to_db(json_path: str, conn: sqlite3.Connection) -> bool:
     try:
         with open(json_path, "r") as f:
             data = json.load(f)
@@ -313,7 +314,7 @@ def migrate_json_to_db(json_path: str, conn):
     return False
 
 # ---------------- USGS helpers ----------------
-def fetch_latest(site: str, include_discharge: bool):
+def fetch_latest(site: str, include_discharge: bool) -> Dict[str, Any]:
     site_id = normalize_site_id(site)
     params = {
         "sites": site_id,
@@ -341,7 +342,7 @@ def fetch_latest(site: str, include_discharge: bool):
         raise RuntimeError(f"Failed to parse USGS response for site {site_id}: {e}")
     return latest
 
-def fetch_trend_label(site: str, hours: int):
+def fetch_trend_label(site: str, hours: int) -> Optional[str]:
     if hours <= 0:
         return None
     site_id = normalize_site_id(site)
@@ -368,7 +369,7 @@ def fetch_trend_label(site: str, hours: int):
     except Exception:
         return None
 
-def fetch_trend_data(site: str, hours: int, param_code: str = "00065"):
+def fetch_trend_data(site: str, hours: int, param_code: str = "00065") -> Optional[Dict[str, Any]]:
     """Fetch historical data points for sparkline visualization.
 
     Args:
@@ -439,7 +440,7 @@ def fetch_trend_data(site: str, hours: int, param_code: str = "00065"):
 _streambeam_last_good = {}
 _streambeam_db_path = None  # Set by main() from config
 
-def _init_streambeam_table(db_path: str):
+def _init_streambeam_table(db_path: str) -> None:
     """Create the streambeam_last_good table if it doesn't exist."""
     global _streambeam_db_path
     _streambeam_db_path = db_path
@@ -453,7 +454,7 @@ def _init_streambeam_table(db_path: str):
         """)
         conn.commit()
 
-def _load_streambeam_last_good(db_path: str):
+def _load_streambeam_last_good(db_path: str) -> None:
     """Load last known good values from SQLite into memory cache."""
     global _streambeam_last_good
     try:
@@ -464,7 +465,7 @@ def _load_streambeam_last_good(db_path: str):
     except Exception:
         pass  # Table might not exist yet
 
-def _save_streambeam_last_good(site_name: str, value_ft: float):
+def _save_streambeam_last_good(site_name: str, value_ft: float) -> None:
     """Save last known good value to SQLite."""
     global _streambeam_db_path
     if _streambeam_db_path is None:
@@ -479,7 +480,7 @@ def _save_streambeam_last_good(site_name: str, value_ft: float):
     except Exception:
         pass  # Don't fail the whole fetch if DB write fails
 
-def _init_streambeam_history_table(db_path: str):
+def _init_streambeam_history_table(db_path: str) -> None:
     """Create the streambeam_history table for trend data/sparklines."""
     try:
         with sqlite3.connect(db_path, timeout=30) as conn:
@@ -504,7 +505,7 @@ def _init_streambeam_history_table(db_path: str):
 
 _streambeam_conn = None  # Shared connection for StreamBeam history
 
-def _save_streambeam_history(site_name: str, stage_ft: float, timestamp: str):
+def _save_streambeam_history(site_name: str, stage_ft: float, timestamp: str) -> None:
     """Save a StreamBeam reading to history for trend data."""
     global _streambeam_conn
     if _streambeam_conn is None:
@@ -521,7 +522,7 @@ def _save_streambeam_history(site_name: str, stage_ft: float, timestamp: str):
     except Exception as e:
         print(f"[HISTORY] Error saving {site_name}: {e}")
 
-def _get_streambeam_trend_data(site_name: str, hours: int = 12):
+def _get_streambeam_trend_data(site_name: str, hours: int = 12) -> Optional[Dict[str, Any]]:
     """
     Fetch recent StreamBeam readings for trend data/sparklines.
     Returns dict with 'values' list and 'direction' string, or None.
@@ -562,7 +563,7 @@ def _get_streambeam_trend_data(site_name: str, hours: int = 12):
         return None
 
 
-def get_streambeam_history_for_detail(site_name: str, days: int = 3):
+def get_streambeam_history_for_detail(site_name: str, days: int = 3) -> List[Tuple[str, float]]:
     """
     Fetch StreamBeam history for detail page charts.
     Returns list of (timestamp, feet) tuples in same format as fetch_usgs_7day_data().
@@ -616,7 +617,7 @@ def convert_streambeam_timestamp_to_iso(timestamp_str: str) -> str:
         # If parsing fails, return original
         return timestamp_str
 
-def fetch_streambeam_latest(entry):
+def fetch_streambeam_latest(entry: Dict[str, Any]) -> Dict[str, Any]:
     """
     Fetch latest StreamBeam gauge reading for a site.
     Returns data in same format as fetch_latest() for compatibility.
@@ -692,7 +693,7 @@ def fetch_streambeam_latest(entry):
         "discharge_cfs": None  # StreamBeam doesn't provide CFS
     }
 
-def generate_sparkline_html(trend_data, site_id, threshold=None):
+def generate_sparkline_html(trend_data: Optional[Dict[str, Any]], site_id: str, threshold: Optional[float] = None) -> str:
     """Generate smooth SVG line sparkline HTML with threshold line and endpoint dot.
 
     Args:
@@ -776,7 +777,7 @@ def generate_sparkline_html(trend_data, site_id, threshold=None):
     return f'<a href="{detail_url}" class="sparkline-link">{svg}</a>'
 
 
-def calculate_percent_change(trend_data):
+def calculate_percent_change(trend_data: Optional[Dict[str, Any]]) -> Tuple[Optional[float], str]:
     """Calculate percent change from oldest to newest value in trend data.
 
     Returns:
@@ -807,7 +808,7 @@ def calculate_percent_change(trend_data):
     return pct_change, direction
 
 
-def _smooth_sparkline_path(points):
+def _smooth_sparkline_path(points: List[Tuple[float, float]]) -> str:
     """Generate a smooth bezier curve SVG path through the given points."""
     if len(points) < 2:
         return ""
@@ -849,7 +850,7 @@ def _smooth_sparkline_path(points):
     return path
 
 # ---------------- Email ----------------
-def send_email(smtp: dict, subject: str, body: str):
+def send_email(smtp: Dict[str, Any], subject: str, body: str) -> None:
     msg = MIMEText(body)
 
     # Handle both single email and list of emails for recipients
@@ -875,7 +876,7 @@ def send_email(smtp: dict, subject: str, body: str):
         server.send_message(msg, from_addr=from_addr, to_addrs=to_addrs)
 
 # ---------------- HTML render ----------------
-def format_timestamp(iso_str: str) -> str:
+def format_timestamp(iso_str: Optional[str]) -> str:
     """Convert ISO timestamp to readable format like '10:29AM 10-29-2025'"""
     if not iso_str:
         return ""
@@ -888,7 +889,7 @@ def format_timestamp(iso_str: str) -> str:
         # If parsing fails, return original
         return iso_str
 
-def format_timestamp_stacked(iso_str: str) -> str:
+def format_timestamp_stacked(iso_str: Optional[str]) -> str:
     """Convert ISO timestamp to stacked HTML format (time on top, date below)"""
     if not iso_str:
         return ""
@@ -902,7 +903,7 @@ def format_timestamp_stacked(iso_str: str) -> str:
         # If parsing fails, return original
         return iso_str
 
-def render_static_html(generated_at_iso: str, rows: list, wind_threshold_mph: float = 10, wind_alert_color: str = "#ffc107", temp_threshold_f: float = 55, temp_alert_color: str = "#add8e6", temp_cold_threshold_f: float = 45, temp_cold_alert_color: str = "#1e90ff", predictions_html: str = ""):
+def render_static_html(generated_at_iso: str, rows: List[Dict[str, Any]], wind_threshold_mph: float = 10, wind_alert_color: str = "#ffc107", temp_threshold_f: float = 55, temp_alert_color: str = "#add8e6", temp_cold_threshold_f: float = 45, temp_cold_alert_color: str = "#1e90ff", predictions_html: str = "") -> str:
     # Build rain forecast marquee content
     def build_rain_marquee(rows):
         """Aggregate QPF data from all rivers and build marquee content if rain is forecast."""
@@ -1524,7 +1525,7 @@ function toggleExperimental() {{
 </body></html>"""
 
 # --------------- Main ---------------
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True, help="Path to JSON config file")
     ap.add_argument("--quiet", action="store_true", help="Only print on alerts/errors")
