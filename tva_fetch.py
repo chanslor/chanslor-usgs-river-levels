@@ -101,7 +101,7 @@ TVA_DISPLAY_CONFIG = {
 }
 
 
-def fetch_tva_observed(site_code: str, timeout: int = 30) -> Optional[List[Dict]]:
+def fetch_tva_observed(site_code: str, timeout: int = 30) -> Optional[List[Dict[str, Any]]]:
     """
     Fetch observed data from TVA API.
 
@@ -391,7 +391,7 @@ def get_tva_trend_data(site_code: str, hours: int = 12) -> Optional[Dict[str, An
     }
 
 
-def fetch_tva_predicted(site_code: str, timeout: int = 30) -> Optional[List[Dict]]:
+def fetch_tva_predicted(site_code: str, timeout: int = 30) -> Optional[List[Dict[str, Any]]]:
     """
     Fetch predicted data from TVA API (3-day forecast).
 
@@ -1742,7 +1742,7 @@ def generate_tva_forecast_html(site_code: str, runnable_threshold: int = 3000) -
     return html
 
 
-def main():
+def main() -> None:
     """Test TVA fetch for all known sites."""
     print("TVA Dam Observations")
     print("=" * 60)
