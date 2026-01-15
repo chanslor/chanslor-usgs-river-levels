@@ -8,7 +8,7 @@ based on QPF forecast and historical response patterns.
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 
-def calculate_predictions(sites_data: List[Dict], river_chars: Dict[str, Dict]) -> List[Dict]:
+def calculate_predictions(sites_data: List[Dict[str, Any]], river_chars: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Calculate predictions for each river based on QPF and characteristics.
 
@@ -175,7 +175,7 @@ def format_local_time(dt: datetime) -> str:
     return f"{day_name} {time_str}"
 
 
-def generate_predictions_html(predictions: List[Dict]) -> str:
+def generate_predictions_html(predictions: List[Dict[str, Any]]) -> str:
     """
     Generate HTML panel for predictions.
 
