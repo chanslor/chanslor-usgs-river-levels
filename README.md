@@ -1,5 +1,7 @@
 # USGS River Monitoring System
 
+![Tests](https://github.com/chanslor/chanslor-usgs-river-levels/actions/workflows/tests.yml/badge.svg)
+
 A containerized river gauge monitoring system that tracks USGS water levels, sends email alerts, and displays live data on a web dashboard.
 
 **🔗 Quick Links to Documentation:**
