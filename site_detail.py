@@ -237,6 +237,18 @@ def generate_site_detail_html(site_data, cfs_history, feet_history):
         {"min": 1500, "max": 2500, "label": "BEST!", "color": "#22c55e"},
         {"min": 2500, "max": 99999, "label": "Too High", "color": "#ef4444"},
     ]
+
+    # North Chickamauga visual gauge levels (from Bard Trimble)
+    # These are VISUAL gauge feet at the take-out, not USGS stage
+    bard_levels = [
+        {"min": -99, "max": 1.5, "label": "Too Low", "color": "#9ca3af"},
+        {"min": 1.5, "max": 2.0, "label": "Low", "color": "#fbbf24"},
+        {"min": 2.0, "max": 2.5, "label": "Worth It", "color": "#86efac"},
+        {"min": 2.5, "max": 3.2, "label": "Good", "color": "#22c55e"},
+        {"min": 3.2, "max": 3.5, "label": "Meaty", "color": "#3b82f6"},
+        {"min": 3.5, "max": 4.0, "label": "High", "color": "#f97316"},
+        {"min": 4.0, "max": 99, "label": "Too High", "color": "#ef4444"},
+    ]
     current_temp = site_data.get("temp_f")
     current_wind_mph = site_data.get("wind_mph")
     current_wind_dir = site_data.get("wind_dir", "")
@@ -951,6 +963,50 @@ body {{
       </div>
     </div>
   </div>''' if is_north_chick else ''}
+
+  {f'''<div class="bard-flow-guide" style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
+    <h3 style="margin: 0 0 16px 0; font-size: 18px; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 24px;">🚣</span> North Chick Flow Guide
+      <span style="font-size: 12px; color: #64748b; font-weight: normal;">(Bard Trimble)</span>
+    </h3>
+    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">
+      <div style="text-align: center; padding: 10px 4px; background: #9ca3af; border-radius: 8px; color: white;">
+        <div style="font-size: 12px; font-weight: bold;">&lt;1.5</div>
+        <div style="font-size: 10px; margin-top: 4px;">Too Low</div>
+      </div>
+      <div style="text-align: center; padding: 10px 4px; background: #fbbf24; border-radius: 8px; color: #78350f;">
+        <div style="font-size: 12px; font-weight: bold;">1.5-2.0</div>
+        <div style="font-size: 10px; margin-top: 4px;">Low</div>
+      </div>
+      <div style="text-align: center; padding: 10px 4px; background: #86efac; border-radius: 8px; color: #14532d;">
+        <div style="font-size: 12px; font-weight: bold;">2.0-2.5</div>
+        <div style="font-size: 10px; margin-top: 4px;">Worth It</div>
+      </div>
+      <div style="text-align: center; padding: 10px 4px; background: #22c55e; border-radius: 8px; color: white; box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);">
+        <div style="font-size: 12px; font-weight: bold;">2.5-3.2</div>
+        <div style="font-size: 10px; margin-top: 4px;">Good ⭐</div>
+      </div>
+      <div style="text-align: center; padding: 10px 4px; background: #3b82f6; border-radius: 8px; color: white;">
+        <div style="font-size: 12px; font-weight: bold;">3.2-3.5</div>
+        <div style="font-size: 10px; margin-top: 4px;">Meaty</div>
+      </div>
+      <div style="text-align: center; padding: 10px 4px; background: #f97316; border-radius: 8px; color: white;">
+        <div style="font-size: 12px; font-weight: bold;">3.5-4.0</div>
+        <div style="font-size: 10px; margin-top: 4px;">High</div>
+      </div>
+      <div style="text-align: center; padding: 10px 4px; background: #ef4444; border-radius: 8px; color: white;">
+        <div style="font-size: 12px; font-weight: bold;">&gt;4.0</div>
+        <div style="font-size: 10px; margin-top: 4px;">Too High</div>
+      </div>
+    </div>
+    <div style="margin-top: 8px; padding: 8px 12px; background: rgba(251, 191, 36, 0.2); border-radius: 6px; font-size: 11px; color: #92400e;">
+      ⚠️ <strong>Note:</strong> vSlot is dicey at 4ft+
+    </div>
+    <div style="margin-top: 12px; text-align: center; font-size: 12px; color: #64748b;">
+      Current Visual: <strong style="color: #1e293b;">{current_visual:.2f} ft</strong>
+      {f' — <span style="background: {[l["color"] for l in bard_levels if l["min"] <= (current_visual or 0) < l["max"]][0] if current_visual else "#9ca3af"}; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold;">{[l["label"] for l in bard_levels if l["min"] <= (current_visual or 0) < l["max"]][0] if current_visual else "N/A"}</span>' if current_visual else ''}
+    </div>
+  </div>''' if is_north_chick and current_visual is not None else ''}
 
   {"" if is_tva or is_streambeam or hide_cfs_chart else f'''<div class="chart-row">
     <div class="chart-box">
