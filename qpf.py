@@ -20,7 +20,7 @@ import os
 import sqlite3
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional
 
 import requests
 from dateutil import parser as dtparse
@@ -53,7 +53,7 @@ class QPFClient:
         })
         self._init_cache()
 
-    def _init_cache(self):
+    def _init_cache(self) -> None:
         conn = sqlite3.connect(self.cache_path)
         try:
             conn.execute("""
@@ -67,7 +67,7 @@ class QPFClient:
         finally:
             conn.close()
 
-    def _cache_get(self, key: str) -> Optional[dict]:
+    def _cache_get(self, key: str) -> Optional[Dict[str, Any]]:
         now = int(time.time())
         conn = sqlite3.connect(self.cache_path)
         try:
@@ -82,7 +82,7 @@ class QPFClient:
         finally:
             conn.close()
 
-    def _cache_put(self, key: str, payload: dict):
+    def _cache_put(self, key: str, payload: Dict[str, Any]) -> None:
         now = int(time.time())
         conn = sqlite3.connect(self.cache_path)
         try:
@@ -169,13 +169,13 @@ class QPFClient:
 
     # --------------- NWS helpers --------------- #
 
-    def _get_points_meta(self, lat: float, lon: float) -> dict:
+    def _get_points_meta(self, lat: float, lon: float) -> Dict[str, Any]:
         url = f"https://api.weather.gov/points/{lat:.4f},{lon:.4f}"
         r = self.session.get(url, timeout=self.timeout)
         r.raise_for_status()
         return r.json()
 
-    def _get_gridpoint(self, grid_id: str, grid_x: int, grid_y: int) -> dict:
+    def _get_gridpoint(self, grid_id: str, grid_x: int, grid_y: int) -> Dict[str, Any]:
         url = f"https://api.weather.gov/gridpoints/{grid_id}/{grid_x},{grid_y}"
         r = self.session.get(url, timeout=self.timeout)
         r.raise_for_status()
@@ -232,7 +232,7 @@ def _format_totals(totals: Dict[str, float]) -> str:
         parts.append(f"{d}: {totals[d]:.2f}\"")
     return ", ".join(parts)
 
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(description="Fetch QPF by day from NWS")
     ap.add_argument("--lat", type=float, required=True, help="Latitude")
     ap.add_argument("--lon", type=float, required=True, help="Longitude")
