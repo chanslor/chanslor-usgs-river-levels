@@ -465,8 +465,22 @@ def generate_site_detail_html(site_data: Dict[str, Any], cfs_history: List[Tuple
                 "unit": "cfs"
             }
 
-    status_color = "#4ade80" if in_range else "#ef4444"
-    status_text = "RUNNABLE" if in_range else "TOO LOW"
+    # Determine status text and color
+    # Little River Canyon uses special 6-level classification
+    if is_lrc and current_cfs is not None:
+        # Find matching zone from lrc_levels
+        for level in lrc_levels:
+            if level["min"] <= current_cfs < level["max"]:
+                status_text = level["label"].upper()
+                status_color = level["color"]
+                break
+        else:
+            # Fallback if no zone matched (shouldn't happen)
+            status_text = "UNKNOWN"
+            status_color = "#9ca3af"
+    else:
+        status_color = "#4ade80" if in_range else "#ef4444"
+        status_text = "RUNNABLE" if in_range else "TOO LOW"
 
     # Build threshold display
     threshold_parts = []
